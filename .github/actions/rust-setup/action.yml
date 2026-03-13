@@ -22,6 +22,14 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Clean stale cargo config
+      shell: bash
+      run: |
+        if [ -f "$HOME/.cargo/config.toml" ]; then
+          echo "Removing stale ~/.cargo/config.toml to prevent duplicate-key errors"
+          rm -f "$HOME/.cargo/config.toml"
+        fi
+
     - name: Install/update Rust stable toolchain
       shell: bash
       run: |
@@ -65,6 +73,9 @@ runs:
       env:
         CROSS_REPO_TOKEN: ${{ inputs.cross-repo-token }}
       run: |
+        # Remove checkout action's extraheader (uses GITHUB_TOKEN which can't access cross-repo)
+        git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+        git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         AUTH_URL="https://x-access-token:${CROSS_REPO_TOKEN}@github.com/"
         git config --global url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
         git config --global --add url."${AUTH_URL}".insteadOf "https://github.com/"
