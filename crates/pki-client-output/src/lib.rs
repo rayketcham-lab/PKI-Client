@@ -203,11 +203,33 @@ impl Certificate {
             .ok()
             .flatten()
             .map(|eku| {
-                eku.value
-                    .other
-                    .iter()
-                    .map(|oid| oid_to_eku_name(&oid.to_string()))
-                    .collect()
+                let mut usages = Vec::new();
+                let v = &eku.value;
+                if v.any {
+                    usages.push("Any Extended Key Usage".to_string());
+                }
+                if v.server_auth {
+                    usages.push("TLS Web Server Authentication".to_string());
+                }
+                if v.client_auth {
+                    usages.push("TLS Web Client Authentication".to_string());
+                }
+                if v.code_signing {
+                    usages.push("Code Signing".to_string());
+                }
+                if v.email_protection {
+                    usages.push("E-mail Protection".to_string());
+                }
+                if v.time_stamping {
+                    usages.push("Time Stamping".to_string());
+                }
+                if v.ocsp_signing {
+                    usages.push("OCSP Signing".to_string());
+                }
+                for oid in &v.other {
+                    usages.push(oid_to_eku_name(&oid.to_string()));
+                }
+                usages
             })
             .unwrap_or_default();
 

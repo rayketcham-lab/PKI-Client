@@ -160,7 +160,7 @@ fn probe_server(
             let json = serde_json::to_string_pretty(&result)?;
             println!("{json}");
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             println!("{}", "TLS Configuration".bold());
             println!();
 
@@ -334,7 +334,7 @@ fn lint_certs(
             let json = serde_json::to_string_pretty(&all_results)?;
             println!("{json}");
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             if all_results.is_empty() {
                 println!("{}", "No issues found!".green().bold());
             } else {

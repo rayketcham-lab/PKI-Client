@@ -153,7 +153,7 @@ fn check_revocation(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             print_revocation_result(&status, &method, &cert, config);
         }
     }
@@ -227,7 +227,7 @@ fn show_crl(file: PathBuf, config: &GlobalConfig) -> Result<CmdResult> {
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             println!("{}", "CRL Information".bold());
             println!();
             println!("  Issuer:      {}", crl.issuer);

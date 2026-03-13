@@ -78,6 +78,8 @@ pub enum OutputFormat {
     Json,
     /// Compact single-line output
     Compact,
+    /// Forensic deep-dive — every field, hex dumps, security notes
+    Forensic,
 }
 
 impl From<OutputFormat> for pki_client_output::OutputFormat {
@@ -86,6 +88,7 @@ impl From<OutputFormat> for pki_client_output::OutputFormat {
             OutputFormat::Text => Self::Text,
             OutputFormat::Json => Self::Json,
             OutputFormat::Compact => Self::Compact,
+            OutputFormat::Forensic => Self::Forensic,
         }
     }
 }

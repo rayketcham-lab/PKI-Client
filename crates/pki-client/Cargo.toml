@@ -79,6 +79,8 @@ tracing = "0.1"
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
 tempfile = { workspace = true }
+const-oid = "0.9"
+der = { workspace = true }
 
 # ── Linux package metadata ──────────────────────────────────────────
 

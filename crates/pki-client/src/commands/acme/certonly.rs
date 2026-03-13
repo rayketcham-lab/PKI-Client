@@ -289,7 +289,7 @@ pub(super) fn cmd_certonly(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             println!();
             println!("{}", "Certificate issued successfully!".green().bold());
             println!();

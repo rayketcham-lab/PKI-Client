@@ -13,6 +13,8 @@ pub enum OutputFormat {
     Json,
     /// Compact single-line output
     Compact,
+    /// Forensic deep-dive — every field, hex dumps, security assessments
+    Forensic,
 }
 
 impl FromStr for OutputFormat {
@@ -23,8 +25,9 @@ impl FromStr for OutputFormat {
             "text" | "t" => Ok(Self::Text),
             "json" | "j" => Ok(Self::Json),
             "compact" | "c" => Ok(Self::Compact),
+            "forensic" | "f" | "deep" | "verbose" => Ok(Self::Forensic),
             _ => Err(format!(
-                "Unknown format '{s}'. Valid options: text, json, compact"
+                "Unknown format '{s}'. Valid options: text, json, compact, forensic"
             )),
         }
     }
@@ -36,6 +39,7 @@ impl std::fmt::Display for OutputFormat {
             Self::Text => write!(f, "text"),
             Self::Json => write!(f, "json"),
             Self::Compact => write!(f, "compact"),
+            Self::Forensic => write!(f, "forensic"),
         }
     }
 }
@@ -51,12 +55,16 @@ pub trait Formatter {
     /// Format in compact form.
     fn to_compact(&self) -> String;
 
+    /// Format in forensic deep-dive mode.
+    fn to_forensic(&self, colored: bool) -> String;
+
     /// Format according to the specified output format.
     fn format(&self, format: OutputFormat, colored: bool) -> String {
         match format {
             OutputFormat::Text => self.to_text(colored),
             OutputFormat::Json => self.to_json(),
             OutputFormat::Compact => self.to_compact(),
+            OutputFormat::Forensic => self.to_forensic(colored),
         }
     }
 }

@@ -334,7 +334,7 @@ fn get_cacerts(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             if let Some(out_path) = output {
                 EstClient::save_cert(out_path, &certs)?;
                 println!("CA certificates saved to {}", out_path.display());
@@ -376,7 +376,7 @@ fn simple_enroll(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             if let Some(out_path) = output {
                 EstClient::save_cert(out_path, &cert)?;
                 if !config.quiet {
@@ -424,7 +424,7 @@ fn simple_reenroll(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             if let Some(out_path) = output {
                 EstClient::save_cert(out_path, &cert)?;
                 if !config.quiet {
@@ -474,7 +474,7 @@ fn server_keygen(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             if let Some(cert_path) = cert_output {
                 EstClient::save_cert(cert_path, &response.certificate)?;
                 if !config.quiet {
@@ -530,7 +530,7 @@ fn get_csrattrs(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Compact => match attrs {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => match attrs {
             Some(a) => {
                 println!("{}", "CSR Attributes:".bold());
                 println!("{}", a);

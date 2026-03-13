@@ -840,7 +840,7 @@ fn print_revocation_status(result: &crate::compat::RevocationCheckResult, config
                 println!("{json}");
             }
         }
-        OutputFormat::Text | OutputFormat::Compact => {
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
             let status_str = match &result.status {
                 RevocationStatus::Good => format!(
                     "    Status:     {} - Certificate is NOT revoked",

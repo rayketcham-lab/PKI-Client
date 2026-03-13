@@ -783,6 +783,1328 @@ impl CertFormatter {
         oid_registry::policy_name(oid)
     }
 
+    // ========================================================================
+    // FORENSIC MODE — "OpenSSL on crack"
+    // ========================================================================
+
+    /// Format a certificate in forensic deep-dive mode.
+    ///
+    /// Dumps every field with maximum detail: hex values, OIDs with names,
+    /// security assessments per field, DER size breakdown, key material hex,
+    /// extension criticality details, and compliance notes.
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn format_forensic(cert: &Certificate, colored: bool) -> String {
+        if colored {
+            Self::format_forensic_colored(cert)
+        } else {
+            Self::format_forensic_plain(cert)
+        }
+    }
+
+    /// Forensic format with ANSI colors.
+    #[allow(clippy::too_many_lines)]
+    fn format_forensic_colored(cert: &Certificate) -> String {
+        let mut o = String::with_capacity(8192);
+
+        let validation = Self::detect_validation_type(cert);
+        let purpose = Self::get_cert_purpose(cert);
+        let self_signed = Self::is_self_signed(cert);
+        let ca_vendor = Self::detect_ca_vendor(&cert.issuer);
+        let (grade, grade_reason) = Self::calculate_grade(cert);
+        let has_wildcard = Self::has_wildcard(cert);
+
+        // ── Banner ──────────────────────────────────────────────────────
+        let banner = "═".repeat(72);
+        o.push_str(&format!("{}\n", banner.cyan()));
+        o.push_str(&format!(
+            "  {}  —  Forensic Certificate Analysis\n",
+            "PKI CLIENT".cyan().bold()
+        ));
+        o.push_str(&format!("{}\n\n", banner.cyan()));
+
+        // ── Quick verdict ───────────────────────────────────────────────
+        let type_label = if cert.is_ca && self_signed {
+            "Root CA".magenta().bold()
+        } else if cert.is_ca {
+            "Intermediate CA".magenta().bold()
+        } else if self_signed {
+            "Self-Signed End Entity".yellow().bold()
+        } else {
+            "End Entity".green().bold()
+        };
+
+        let validation_badge = match validation {
+            "EV" => " EV ".on_green().white().bold(),
+            "OV" => " OV ".on_cyan().white().bold(),
+            "DV" => " DV ".on_blue().white().bold(),
+            "IV" => " IV ".on_yellow().white().bold(),
+            _ => " ?? ".on_bright_black().white(),
+        };
+
+        let grade_badge = match grade {
+            "A" => " A ".on_green().white().bold(),
+            "B" => " B ".on_cyan().white().bold(),
+            "C" => " C ".on_yellow().black().bold(),
+            "D" => " D ".on_red().white().bold(),
+            _ => " F ".on_red().white().bold(),
+        };
+
+        o.push_str(&format!(
+            "  {} {} {} {}\n",
+            grade_badge,
+            validation_badge,
+            type_label,
+            purpose.green()
+        ));
+        if !grade_reason.is_empty() {
+            o.push_str(&format!(
+                "  {} {}\n",
+                "WARNING:".yellow().bold(),
+                grade_reason.yellow()
+            ));
+        }
+        o.push('\n');
+
+        // ── Section: Identity ───────────────────────────────────────────
+        Self::forensic_section_header(&mut o, "IDENTITY", true);
+
+        let cn = cert.common_name().unwrap_or("(none)");
+        o.push_str(&format!("  Common Name (CN):     {}\n", cn.white().bold()));
+        o.push_str(&format!(
+            "  Full Subject DN:      {}\n",
+            cert.subject.white()
+        ));
+        o.push_str(&format!(
+            "  Full Issuer DN:       {}\n",
+            cert.issuer.yellow()
+        ));
+        if let Some(vendor) = ca_vendor {
+            o.push_str(&format!(
+                "  Known CA Vendor:      {}\n",
+                vendor.cyan().bold()
+            ));
+        }
+        o.push_str(&format!(
+            "  Self-Signed:          {}\n",
+            if self_signed {
+                "Yes".yellow().bold()
+            } else {
+                "No".green()
+            }
+        ));
+        o.push_str(&format!(
+            "  Wildcard:             {}\n",
+            if has_wildcard {
+                "Yes".magenta().bold()
+            } else {
+                "No".dimmed()
+            }
+        ));
+
+        // ── Section: Serial & Version ───────────────────────────────────
+        Self::forensic_section_header(&mut o, "VERSION & SERIAL", true);
+
+        o.push_str(&format!(
+            "  Version:              {} (0x{:02x})\n",
+            cert.version,
+            cert.version - 1
+        ));
+
+        let serial_upper = cert.serial.to_uppercase();
+        o.push_str(&format!(
+            "  Serial Number:        {}\n",
+            serial_upper.white().bold()
+        ));
+
+        // Serial length analysis
+        let serial_bytes = cert.serial.len().div_ceil(2);
+        let serial_note = if serial_bytes >= 16 {
+            "20+ bytes — excellent entropy".green()
+        } else if serial_bytes >= 8 {
+            "sufficient entropy".green()
+        } else {
+            "short serial — weak entropy".yellow()
+        };
+        o.push_str(&format!(
+            "  Serial Length:         ~{} bytes ({})\n",
+            serial_bytes, serial_note
+        ));
+
+        // ── Section: Validity ───────────────────────────────────────────
+        Self::forensic_section_header(&mut o, "VALIDITY & LIFETIME", true);
+
+        o.push_str(&format!(
+            "  Not Before:           {}\n",
+            cert.not_before
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string()
+                .white()
+        ));
+        o.push_str(&format!(
+            "  Not After:            {}\n",
+            cert.not_after
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string()
+                .white()
+        ));
+
+        let total_days = (cert.not_after - cert.not_before).num_days();
+        let total_hours = (cert.not_after - cert.not_before).num_hours();
+        let years = total_days / 365;
+        let months = (total_days % 365) / 30;
+        let rem_days = (total_days % 365) % 30;
+
+        o.push_str(&format!(
+            "  Total Validity:       {} days ({} year{}, {} month{}, {} day{})\n",
+            total_days,
+            years,
+            if years == 1 { "" } else { "s" },
+            months,
+            if months == 1 { "" } else { "s" },
+            rem_days,
+            if rem_days == 1 { "" } else { "s" },
+        ));
+        o.push_str(&format!(
+            "  Total Hours:          {}\n",
+            total_hours.to_string().dimmed()
+        ));
+
+        // Compliance check: CAB Forum says max 398 days for TLS
+        let is_tls = cert
+            .extended_key_usage
+            .iter()
+            .any(|e| e.contains("Server Authentication") || e.contains("Client Authentication"));
+        if !cert.is_ca && is_tls {
+            let cab_note = if total_days <= 398 {
+                "Compliant with CA/B Forum 398-day max".green()
+            } else {
+                "EXCEEDS CA/B Forum 398-day max for public TLS".red().bold()
+            };
+            o.push_str(&format!("  CA/B Forum:           {}\n", cab_note));
+        }
+
+        let days_left = cert.days_until_expiry();
+        let status = if cert.is_expired() {
+            format!(
+                "{} — expired {} days ago",
+                "EXPIRED".red().bold(),
+                -days_left
+            )
+        } else if days_left <= 7 {
+            format!("{} — {} days remaining", "CRITICAL".red().bold(), days_left)
+        } else if days_left <= 30 {
+            format!(
+                "{} — {} days remaining",
+                "EXPIRING SOON".yellow().bold(),
+                days_left
+            )
+        } else {
+            format!("{} days remaining", days_left.to_string().green())
+        };
+        o.push_str(&format!("  Days Remaining:       {}\n", status));
+
+        // Enhanced lifetime bar (60 chars wide)
+        let pct = cert.lifetime_used_percent();
+        let bar_w = 50;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let filled = ((pct / 100.0) * bar_w as f64).clamp(0.0, bar_w as f64) as usize;
+        let empty = bar_w - filled;
+
+        let bar_char = if pct >= 100.0 {
+            "█".repeat(bar_w).red().to_string()
+        } else if pct >= 70.0 {
+            format!(
+                "{}{}",
+                "█".repeat(filled).yellow(),
+                "░".repeat(empty).dimmed()
+            )
+        } else {
+            format!(
+                "{}{}",
+                "█".repeat(filled).green(),
+                "░".repeat(empty).dimmed()
+            )
+        };
+
+        let pct_label = if pct >= 100.0 {
+            "EXPIRED".red().bold().to_string()
+        } else if pct >= 70.0 {
+            format!("{:.2}% — {}", pct, "RENEW NOW".yellow().bold())
+        } else {
+            format!("{:.2}%", pct).green().to_string()
+        };
+
+        o.push_str(&format!(
+            "  Lifetime Used:        [{}] {}\n",
+            bar_char, pct_label
+        ));
+
+        // ── Section: Signature ──────────────────────────────────────────
+        Self::forensic_section_header(&mut o, "SIGNATURE ALGORITHM", true);
+
+        let sig_security = Self::assess_signature(&cert.signature_algorithm_name);
+        o.push_str(&format!(
+            "  Algorithm:            {} ({})\n",
+            cert.signature_algorithm_name.white().bold(),
+            cert.signature_algorithm.dimmed()
+        ));
+        o.push_str(&format!(
+            "  OID:                  {}\n",
+            cert.signature_algorithm.dimmed()
+        ));
+        o.push_str(&format!("  Security:             {}\n", sig_security));
+
+        // ── Section: Public Key ─────────────────────────────────────────
+        Self::forensic_section_header(&mut o, "SUBJECT PUBLIC KEY", true);
+
+        o.push_str(&format!(
+            "  Algorithm:            {} ({})\n",
+            cert.key_algorithm_name.cyan().bold(),
+            cert.key_algorithm.dimmed()
+        ));
+        o.push_str(&format!(
+            "  Key Size:             {} bits\n",
+            cert.key_size.to_string().white().bold()
+        ));
+
+        let key_security = Self::assess_key_strength(&cert.key_algorithm_name, cert.key_size);
+        o.push_str(&format!("  Strength:             {}\n", key_security));
+
+        if let Some(ref curve) = cert.ec_curve {
+            o.push_str(&format!(
+                "  EC Named Curve:       {} ({})\n",
+                curve.green().bold(),
+                Self::curve_oid(curve).dimmed()
+            ));
+        }
+
+        if let Some(ref modulus) = cert.rsa_modulus {
+            o.push_str("  RSA Modulus (hex):\n");
+            for chunk in modulus.as_bytes().chunks(64) {
+                let line = std::str::from_utf8(chunk).unwrap_or("");
+                o.push_str(&format!("      {}\n", line.dimmed()));
+            }
+        }
+        if let Some(exp) = cert.rsa_exponent {
+            let exp_note = if exp == 65537 {
+                "standard F4".green()
+            } else if exp == 3 {
+                "WEAK — e=3 is vulnerable".red().bold()
+            } else {
+                "non-standard".yellow()
+            };
+            o.push_str(&format!(
+                "  RSA Exponent:         {} (0x{:x}) — {}\n",
+                exp, exp, exp_note
+            ));
+        }
+
+        // ── Section: Extensions ─────────────────────────────────────────
+        Self::forensic_section_header(&mut o, "X.509v3 EXTENSIONS", true);
+
+        // Basic Constraints
+        o.push_str(&format!(
+            "  {} [OID: 2.5.29.19]\n",
+            "Basic Constraints".white().bold()
+        ));
+        o.push_str(&format!(
+            "    Critical:           {}\n",
+            Self::critical_display(cert.basic_constraints_critical, true)
+        ));
+        o.push_str(&format!(
+            "    CA:                 {}\n",
+            if cert.is_ca {
+                "TRUE".magenta().bold()
+            } else {
+                "FALSE".normal()
+            }
+        ));
+        if cert.path_length >= 0 {
+            o.push_str(&format!(
+                "    Path Length:         {} (max {} intermediate CAs)\n",
+                cert.path_length, cert.path_length
+            ));
+        } else {
+            o.push_str(&format!(
+                "    Path Length:         {}\n",
+                "unlimited".dimmed()
+            ));
+        }
+
+        // Key Usage
+        if !cert.key_usage.is_empty() {
+            o.push('\n');
+            o.push_str(&format!(
+                "  {} [OID: 2.5.29.15]\n",
+                "Key Usage".white().bold()
+            ));
+            o.push_str(&format!(
+                "    Critical:           {}\n",
+                Self::critical_display(cert.key_usage_critical, true)
+            ));
+            for ku in &cert.key_usage {
+                let ku_note = Self::key_usage_note(ku);
+                o.push_str(&format!("    - {}", ku.green()));
+                if !ku_note.is_empty() {
+                    o.push_str(&format!(" {}", ku_note.dimmed()));
+                }
+                o.push('\n');
+            }
+            // Compliance: CA must have keyCertSign
+            if cert.is_ca && !cert.key_usage.iter().any(|k| k == "Certificate Sign") {
+                o.push_str(&format!(
+                    "    {} {}\n",
+                    "!!".red().bold(),
+                    "CA cert MISSING keyCertSign — non-compliant".red()
+                ));
+            }
+        }
+
+        // Extended Key Usage
+        if !cert.extended_key_usage.is_empty() {
+            o.push('\n');
+            o.push_str(&format!(
+                "  {} [OID: 2.5.29.37]\n",
+                "Extended Key Usage".white().bold()
+            ));
+            for eku in &cert.extended_key_usage {
+                let eku_oid = Self::eku_to_oid(eku);
+                o.push_str(&format!(
+                    "    - {} {}\n",
+                    eku.green(),
+                    format!("({})", eku_oid).dimmed()
+                ));
+            }
+            // anyExtendedKeyUsage warning
+            if cert
+                .extended_key_usage
+                .iter()
+                .any(|e| e.contains("Any Extended Key Usage"))
+            {
+                o.push_str(&format!(
+                    "    {} {}\n",
+                    "NOTE:".yellow().bold(),
+                    "anyExtendedKeyUsage allows all purposes — broad trust scope".yellow()
+                ));
+            }
+        }
+
+        // Subject Alternative Names
+        if !cert.san.is_empty() {
+            o.push('\n');
+            o.push_str(&format!(
+                "  {} [OID: 2.5.29.17] — {} entries\n",
+                "Subject Alternative Name".white().bold(),
+                cert.san.len().to_string().cyan().bold()
+            ));
+            for (i, san) in cert.san.iter().enumerate() {
+                let (san_type, san_value) = match san {
+                    crate::SanEntry::Dns(v) => ("DNS", v.as_str()),
+                    crate::SanEntry::Ip(v) => ("IP", v.as_str()),
+                    crate::SanEntry::Email(v) => ("Email", v.as_str()),
+                    crate::SanEntry::Uri(v) => ("URI", v.as_str()),
+                    crate::SanEntry::Other(v) => ("Other", v.as_str()),
+                };
+                let idx = format!("[{}]", i + 1).dimmed();
+                o.push_str(&format!(
+                    "    {} {:>5}: {}\n",
+                    idx,
+                    san_type.cyan(),
+                    san_value.green()
+                ));
+            }
+        } else if !cert.is_ca {
+            o.push('\n');
+            o.push_str(&format!(
+                "  {} [OID: 2.5.29.17]\n",
+                "Subject Alternative Name".white().bold()
+            ));
+            o.push_str(&format!(
+                "    {} {}\n",
+                "!!".red().bold(),
+                "MISSING — modern TLS requires SAN extension".red()
+            ));
+        }
+
+        // Key Identifiers
+        o.push('\n');
+        o.push_str(&format!(
+            "  {} [OID: 2.5.29.14]\n",
+            "Subject Key Identifier".white().bold()
+        ));
+        if let Some(ref ski) = cert.subject_key_id {
+            o.push_str(&format!("    {}\n", Self::format_hex_colons(ski)));
+        } else {
+            o.push_str(&format!("    {}\n", "(not present)".dimmed()));
+        }
+
+        o.push('\n');
+        o.push_str(&format!(
+            "  {} [OID: 2.5.29.35]\n",
+            "Authority Key Identifier".white().bold()
+        ));
+        if let Some(ref aki) = cert.authority_key_id {
+            o.push_str(&format!("    keyid: {}\n", Self::format_hex_colons(aki)));
+            // Chain linkage check
+            if self_signed {
+                if let Some(ref ski) = cert.subject_key_id {
+                    if aki == ski {
+                        o.push_str(&format!(
+                            "    {} {}\n",
+                            "OK".green().bold(),
+                            "AKI matches SKI (self-signed root)".green()
+                        ));
+                    } else {
+                        o.push_str(&format!(
+                            "    {} {}\n",
+                            "NOTE:".yellow(),
+                            "AKI differs from SKI (common with some CAs)".dimmed()
+                        ));
+                    }
+                }
+            }
+        } else {
+            o.push_str(&format!("    {}\n", "(not present)".dimmed()));
+            if !self_signed {
+                o.push_str(&format!(
+                    "    {} {}\n",
+                    "!!".yellow().bold(),
+                    "Non-root cert without AKI — chain building may fail".yellow()
+                ));
+            }
+        }
+
+        // Authority Information Access
+        o.push('\n');
+        o.push_str(&format!(
+            "  {} [OID: 1.3.6.1.5.5.7.1.1]\n",
+            "Authority Information Access".white().bold()
+        ));
+        if cert.ocsp_urls.is_empty() && cert.ca_issuer_urls.is_empty() {
+            if cert.is_ca && self_signed {
+                o.push_str(&format!(
+                    "    {}\n",
+                    "(not present — normal for root CAs)".dimmed()
+                ));
+            } else {
+                o.push_str(&format!(
+                    "    {} {}\n",
+                    "!!".yellow().bold(),
+                    "No AIA — clients cannot fetch issuer cert or check OCSP".yellow()
+                ));
+            }
+        } else {
+            for url in &cert.ocsp_urls {
+                o.push_str(&format!(
+                    "    OCSP Responder:     {} {}\n",
+                    url.blue(),
+                    "(1.3.6.1.5.5.7.48.1)".dimmed()
+                ));
+            }
+            for url in &cert.ca_issuer_urls {
+                o.push_str(&format!(
+                    "    CA Issuers:         {} {}\n",
+                    url.blue(),
+                    "(1.3.6.1.5.5.7.48.2)".dimmed()
+                ));
+            }
+        }
+
+        // CRL Distribution Points
+        o.push('\n');
+        o.push_str(&format!(
+            "  {} [OID: 2.5.29.31]\n",
+            "CRL Distribution Points".white().bold()
+        ));
+        if cert.crl_distribution_points.is_empty() {
+            if cert.is_ca && self_signed {
+                o.push_str(&format!(
+                    "    {}\n",
+                    "(not present — normal for root CAs)".dimmed()
+                ));
+            } else if !cert.ocsp_urls.is_empty() {
+                o.push_str(&format!(
+                    "    {}\n",
+                    "(not present — OCSP available as alternative)".dimmed()
+                ));
+            } else {
+                o.push_str(&format!(
+                    "    {} {}\n",
+                    "!!".yellow().bold(),
+                    "No CRL and no OCSP — no revocation checking possible".red()
+                ));
+            }
+        } else {
+            for url in &cert.crl_distribution_points {
+                o.push_str(&format!("    URI: {}\n", url.blue()));
+            }
+        }
+
+        // Certificate Policies
+        if !cert.certificate_policies.is_empty() {
+            o.push('\n');
+            o.push_str(&format!(
+                "  {} [OID: 2.5.29.32]\n",
+                "Certificate Policies".white().bold()
+            ));
+            for policy in &cert.certificate_policies {
+                let name = Self::policy_oid_to_name(policy);
+                o.push_str(&format!("    - {}\n", name.green()));
+            }
+        }
+
+        // OCSP Must-Staple
+        o.push('\n');
+        o.push_str(&format!(
+            "  {} [OID: 1.3.6.1.5.5.7.1.24]\n",
+            "TLS Feature (OCSP Must-Staple)".white().bold()
+        ));
+        if cert.ocsp_must_staple {
+            o.push_str(&format!(
+                "    {} — server MUST staple OCSP response\n",
+                "ENABLED".green().bold()
+            ));
+        } else {
+            o.push_str(&format!("    {}\n", "Not present".dimmed()));
+        }
+
+        // CT SCTs
+        o.push('\n');
+        o.push_str(&format!(
+            "  {} [OID: 1.3.6.1.4.1.11129.2.4.2]\n",
+            "Certificate Transparency SCTs".white().bold()
+        ));
+        if cert.ct_scts.is_empty() {
+            if cert.is_ca || self_signed {
+                o.push_str(&format!(
+                    "    {}\n",
+                    "(not applicable for CA certs)".dimmed()
+                ));
+            } else {
+                o.push_str(&format!(
+                    "    {} {}\n",
+                    "!!".yellow().bold(),
+                    "No embedded SCTs — may be rejected by Chrome/Apple".yellow()
+                ));
+            }
+        } else {
+            o.push_str(&format!(
+                "    {} SCT(s) embedded\n",
+                cert.ct_scts.len().to_string().green().bold()
+            ));
+            for (i, sct) in cert.ct_scts.iter().enumerate() {
+                o.push_str(&format!(
+                    "    [{}] Log: {}  Timestamp: {}\n",
+                    i + 1,
+                    sct.log_id.dimmed(),
+                    sct.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
+                ));
+            }
+        }
+
+        // ── Section: Fingerprints ───────────────────────────────────────
+        Self::forensic_section_header(&mut o, "FINGERPRINTS & PINNING", true);
+
+        o.push_str(&format!(
+            "  SHA-256:              {}\n",
+            cert.fingerprint_sha256.cyan()
+        ));
+        o.push_str(&format!(
+            "  SHA-256 (colons):     {}\n",
+            Self::format_hex_colons(&cert.fingerprint_sha256).dimmed()
+        ));
+        o.push_str(&format!(
+            "  SHA-1:                {} {}\n",
+            cert.fingerprint_sha1.dimmed(),
+            "(deprecated — do not use for pinning)".dimmed()
+        ));
+        o.push_str(&format!(
+            "  SPKI Pin (SHA-256):   {}\n",
+            cert.spki_sha256_b64.green().bold()
+        ));
+        o.push_str(&format!(
+            "  Pin Header:           {}\n",
+            format!("pin-sha256=\"{}\"", cert.spki_sha256_b64).green()
+        ));
+
+        // ── Section: DER Analysis ───────────────────────────────────────
+        Self::forensic_section_header(&mut o, "DER ENCODING", true);
+
+        let der_len = cert.der.len();
+        o.push_str(&format!(
+            "  Total Size:           {} bytes ({:.1} KB)\n",
+            der_len,
+            der_len as f64 / 1024.0
+        ));
+
+        if !cert.der.is_empty() {
+            // Show first and last 32 bytes
+            let preview_len = 32.min(cert.der.len());
+            let hex_start: String = cert.der[..preview_len]
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(" ");
+            o.push_str(&format!(
+                "  First {} bytes:      {}\n",
+                preview_len,
+                hex_start.dimmed()
+            ));
+
+            if cert.der.len() > 64 {
+                let tail_start = cert.der.len() - 32.min(cert.der.len());
+                let hex_end: String = cert.der[tail_start..]
+                    .iter()
+                    .map(|b| format!("{:02x}", b))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                o.push_str(&format!(
+                    "  Last {} bytes:       {}\n",
+                    cert.der.len() - tail_start,
+                    hex_end.dimmed()
+                ));
+            }
+
+            // ASN.1 outer tag check
+            if cert.der[0] == 0x30 {
+                o.push_str(&format!(
+                    "  ASN.1 Outer Tag:      {} (SEQUENCE)\n",
+                    "0x30".green()
+                ));
+            } else {
+                o.push_str(&format!(
+                    "  ASN.1 Outer Tag:      {} {}\n",
+                    format!("0x{:02x}", cert.der[0]).red(),
+                    "UNEXPECTED — should be 0x30 SEQUENCE".red()
+                ));
+            }
+        }
+
+        // ── Section: Security Assessment ────────────────────────────────
+        Self::forensic_section_header(&mut o, "SECURITY ASSESSMENT", true);
+
+        let mut issues: Vec<(String, String)> = Vec::new();
+        let mut good: Vec<String> = Vec::new();
+
+        // Key
+        if cert.key_algorithm_name == "RSA" && cert.key_size < 2048 {
+            issues.push((
+                "CRITICAL".to_string(),
+                format!(
+                    "RSA key only {} bits — factoring attacks feasible",
+                    cert.key_size
+                ),
+            ));
+        } else if cert.key_algorithm_name == "RSA" && cert.key_size == 2048 {
+            issues.push((
+                "NOTICE".to_string(),
+                "RSA 2048 is minimum acceptable — consider 3072+ for longevity".to_string(),
+            ));
+        } else if cert.key_algorithm_name == "RSA" && cert.key_size >= 3072 {
+            good.push(format!("RSA {} bit key — strong", cert.key_size));
+        }
+
+        if cert.key_algorithm_name == "EC" {
+            good.push(format!(
+                "ECDSA {} — strong with smaller key size",
+                cert.ec_curve.as_deref().unwrap_or("unknown curve")
+            ));
+        }
+
+        if cert.key_algorithm_name == "Ed25519" {
+            good.push("Ed25519 — modern, fast, strong (128-bit security)".to_string());
+        }
+
+        if cert.key_algorithm_name.starts_with("ML-DSA") {
+            good.push(format!(
+                "{} — post-quantum safe (FIPS 204)",
+                cert.key_algorithm_name
+            ));
+        }
+
+        // Signature
+        if cert.signature_algorithm_name.contains("SHA-1")
+            || cert.signature_algorithm_name.contains("sha1")
+        {
+            issues.push((
+                "CRITICAL".to_string(),
+                "SHA-1 signature — collision attacks demonstrated (SHAttered)".to_string(),
+            ));
+        } else if cert.signature_algorithm_name.contains("MD5") {
+            issues.push((
+                "CRITICAL".to_string(),
+                "MD5 signature — trivially breakable, collision attacks since 2004".to_string(),
+            ));
+        } else {
+            good.push(format!(
+                "Signature algorithm {} — acceptable",
+                cert.signature_algorithm_name
+            ));
+        }
+
+        // Expiry
+        if cert.is_expired() {
+            issues.push((
+                "CRITICAL".to_string(),
+                "Certificate has EXPIRED".to_string(),
+            ));
+        } else if days_left <= 7 {
+            issues.push((
+                "URGENT".to_string(),
+                format!("Expires in {} days", days_left),
+            ));
+        } else if days_left <= 30 {
+            issues.push((
+                "WARNING".to_string(),
+                format!("Expires in {} days — renew soon", days_left),
+            ));
+        }
+
+        // Revocation
+        if !cert.is_ca
+            && !self_signed
+            && cert.ocsp_urls.is_empty()
+            && cert.crl_distribution_points.is_empty()
+        {
+            issues.push((
+                "WARNING".to_string(),
+                "No revocation endpoints (OCSP/CRL) — cert cannot be revoked".to_string(),
+            ));
+        }
+
+        // CT
+        if !cert.is_ca && !self_signed && cert.ct_scts.is_empty() {
+            issues.push((
+                "NOTICE".to_string(),
+                "No Certificate Transparency — may fail browser CT policies".to_string(),
+            ));
+        }
+
+        // SANs
+        if !cert.is_ca && cert.san.is_empty() {
+            issues.push((
+                "WARNING".to_string(),
+                "No SAN extension — CN-only matching deprecated since RFC 6125".to_string(),
+            ));
+        }
+
+        // Print results
+        if issues.is_empty() {
+            o.push_str(&format!(
+                "  {} {}\n",
+                "ALL CLEAR".green().bold(),
+                "No security issues detected".green()
+            ));
+        } else {
+            for (severity, msg) in &issues {
+                let icon = match severity.as_str() {
+                    "CRITICAL" => "██".red().bold(),
+                    "URGENT" => "▓▓".red(),
+                    "WARNING" => "▒▒".yellow(),
+                    "NOTICE" => "░░".blue(),
+                    _ => "  ".normal(),
+                };
+                let severity_colored = match severity.as_str() {
+                    "CRITICAL" => severity.red().bold(),
+                    "URGENT" => severity.red(),
+                    "WARNING" => severity.yellow(),
+                    "NOTICE" => severity.blue(),
+                    _ => severity.normal(),
+                };
+                o.push_str(&format!("  {} {:>8}  {}\n", icon, severity_colored, msg));
+            }
+        }
+
+        if !good.is_empty() {
+            o.push('\n');
+            for item in &good {
+                o.push_str(&format!("  {} {}\n", "OK".green().bold(), item.green()));
+            }
+        }
+
+        // ── Footer ──────────────────────────────────────────────────────
+        o.push('\n');
+        o.push_str(&format!("{}\n", banner.cyan()));
+
+        o
+    }
+
+    /// Forensic format without colors (plain text).
+    #[allow(clippy::too_many_lines)]
+    fn format_forensic_plain(cert: &Certificate) -> String {
+        let mut o = String::with_capacity(8192);
+
+        let validation = Self::detect_validation_type(cert);
+        let purpose = Self::get_cert_purpose(cert);
+        let self_signed = Self::is_self_signed(cert);
+        let ca_vendor = Self::detect_ca_vendor(&cert.issuer);
+        let (grade, grade_reason) = Self::calculate_grade(cert);
+        let has_wildcard = Self::has_wildcard(cert);
+
+        let banner = "=".repeat(72);
+        o.push_str(&format!("{}\n", banner));
+        o.push_str("  PKI CLIENT  --  Forensic Certificate Analysis\n");
+        o.push_str(&format!("{}\n\n", banner));
+
+        // Verdict
+        let type_label = if cert.is_ca && self_signed {
+            "Root CA"
+        } else if cert.is_ca {
+            "Intermediate CA"
+        } else if self_signed {
+            "Self-Signed End Entity"
+        } else {
+            "End Entity"
+        };
+        o.push_str(&format!(
+            "  [{}] [{}] {} — {}\n",
+            grade, validation, type_label, purpose
+        ));
+        if !grade_reason.is_empty() {
+            o.push_str(&format!("  WARNING: {}\n", grade_reason));
+        }
+        o.push('\n');
+
+        // Identity
+        Self::forensic_section_header(&mut o, "IDENTITY", false);
+        let cn = cert.common_name().unwrap_or("(none)");
+        o.push_str(&format!("  Common Name (CN):     {}\n", cn));
+        o.push_str(&format!("  Full Subject DN:      {}\n", cert.subject));
+        o.push_str(&format!("  Full Issuer DN:       {}\n", cert.issuer));
+        if let Some(vendor) = ca_vendor {
+            o.push_str(&format!("  Known CA Vendor:      {}\n", vendor));
+        }
+        o.push_str(&format!(
+            "  Self-Signed:          {}\n",
+            if self_signed { "Yes" } else { "No" }
+        ));
+        o.push_str(&format!(
+            "  Wildcard:             {}\n",
+            if has_wildcard { "Yes" } else { "No" }
+        ));
+
+        // Version & Serial
+        Self::forensic_section_header(&mut o, "VERSION & SERIAL", false);
+        o.push_str(&format!(
+            "  Version:              {} (0x{:02x})\n",
+            cert.version,
+            cert.version - 1
+        ));
+        let serial_upper = cert.serial.to_uppercase();
+        o.push_str(&format!("  Serial Number:        {}\n", serial_upper));
+        let serial_bytes = cert.serial.len().div_ceil(2);
+        o.push_str(&format!(
+            "  Serial Length:         ~{} bytes\n",
+            serial_bytes
+        ));
+
+        // Validity
+        Self::forensic_section_header(&mut o, "VALIDITY & LIFETIME", false);
+        o.push_str(&format!(
+            "  Not Before:           {}\n",
+            cert.not_before.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
+        o.push_str(&format!(
+            "  Not After:            {}\n",
+            cert.not_after.format("%Y-%m-%d %H:%M:%S UTC")
+        ));
+        let total_days = (cert.not_after - cert.not_before).num_days();
+        o.push_str(&format!("  Total Validity:       {} days\n", total_days));
+        let days_left = cert.days_until_expiry();
+        o.push_str(&format!(
+            "  Days Remaining:       {}{}\n",
+            days_left,
+            if cert.is_expired() { " (EXPIRED)" } else { "" }
+        ));
+        let pct = cert.lifetime_used_percent();
+        o.push_str(&format!("  Lifetime Used:        {:.2}%\n", pct));
+
+        // Signature
+        Self::forensic_section_header(&mut o, "SIGNATURE ALGORITHM", false);
+        o.push_str(&format!(
+            "  Algorithm:            {}\n",
+            cert.signature_algorithm_name
+        ));
+        o.push_str(&format!(
+            "  OID:                  {}\n",
+            cert.signature_algorithm
+        ));
+
+        // Public Key
+        Self::forensic_section_header(&mut o, "SUBJECT PUBLIC KEY", false);
+        o.push_str(&format!(
+            "  Algorithm:            {}\n",
+            cert.key_algorithm_name
+        ));
+        o.push_str(&format!("  Key Size:             {} bits\n", cert.key_size));
+        if let Some(ref curve) = cert.ec_curve {
+            o.push_str(&format!("  EC Named Curve:       {}\n", curve));
+        }
+        if let Some(ref modulus) = cert.rsa_modulus {
+            o.push_str("  RSA Modulus (hex):\n");
+            for chunk in modulus.as_bytes().chunks(64) {
+                let line = std::str::from_utf8(chunk).unwrap_or("");
+                o.push_str(&format!("      {}\n", line));
+            }
+        }
+        if let Some(exp) = cert.rsa_exponent {
+            o.push_str(&format!("  RSA Exponent:         {} (0x{:x})\n", exp, exp));
+        }
+
+        // Extensions
+        Self::forensic_section_header(&mut o, "X.509v3 EXTENSIONS", false);
+
+        o.push_str("  Basic Constraints [2.5.29.19]\n");
+        o.push_str(&format!(
+            "    Critical:           {}\n",
+            if cert.basic_constraints_critical {
+                "yes"
+            } else {
+                "no"
+            }
+        ));
+        o.push_str(&format!(
+            "    CA:                 {}\n",
+            if cert.is_ca { "TRUE" } else { "FALSE" }
+        ));
+        if cert.path_length >= 0 {
+            o.push_str(&format!("    Path Length:         {}\n", cert.path_length));
+        } else {
+            o.push_str("    Path Length:         unlimited\n");
+        }
+
+        if !cert.key_usage.is_empty() {
+            o.push_str(&format!(
+                "\n  Key Usage [2.5.29.15] (critical: {})\n",
+                if cert.key_usage_critical { "yes" } else { "no" }
+            ));
+            for ku in &cert.key_usage {
+                o.push_str(&format!("    - {}\n", ku));
+            }
+        }
+
+        if !cert.extended_key_usage.is_empty() {
+            o.push_str("\n  Extended Key Usage [2.5.29.37]\n");
+            for eku in &cert.extended_key_usage {
+                o.push_str(&format!("    - {}\n", eku));
+            }
+        }
+
+        if !cert.san.is_empty() {
+            o.push_str(&format!(
+                "\n  Subject Alternative Name [2.5.29.17] -- {} entries\n",
+                cert.san.len()
+            ));
+            for (i, san) in cert.san.iter().enumerate() {
+                o.push_str(&format!("    [{}] {}\n", i + 1, san));
+            }
+        }
+
+        if let Some(ref ski) = cert.subject_key_id {
+            o.push_str("\n  Subject Key Identifier [2.5.29.14]\n");
+            o.push_str(&format!("    {}\n", Self::format_hex_colons(ski)));
+        }
+        if let Some(ref aki) = cert.authority_key_id {
+            o.push_str("\n  Authority Key Identifier [2.5.29.35]\n");
+            o.push_str(&format!("    keyid: {}\n", Self::format_hex_colons(aki)));
+        }
+
+        if !cert.ocsp_urls.is_empty() || !cert.ca_issuer_urls.is_empty() {
+            o.push_str("\n  Authority Information Access [1.3.6.1.5.5.7.1.1]\n");
+            for url in &cert.ocsp_urls {
+                o.push_str(&format!("    OCSP:       {}\n", url));
+            }
+            for url in &cert.ca_issuer_urls {
+                o.push_str(&format!("    CA Issuers: {}\n", url));
+            }
+        }
+
+        if !cert.crl_distribution_points.is_empty() {
+            o.push_str("\n  CRL Distribution Points [2.5.29.31]\n");
+            for url in &cert.crl_distribution_points {
+                o.push_str(&format!("    URI: {}\n", url));
+            }
+        }
+
+        if !cert.certificate_policies.is_empty() {
+            o.push_str("\n  Certificate Policies [2.5.29.32]\n");
+            for policy in &cert.certificate_policies {
+                o.push_str(&format!("    - {}\n", Self::policy_oid_to_name(policy)));
+            }
+        }
+
+        o.push_str(&format!(
+            "\n  OCSP Must-Staple [1.3.6.1.5.5.7.1.24]: {}\n",
+            if cert.ocsp_must_staple {
+                "ENABLED"
+            } else {
+                "not present"
+            }
+        ));
+
+        o.push_str(&format!(
+            "  CT SCTs [1.3.6.1.4.1.11129.2.4.2]: {}\n",
+            if cert.ct_scts.is_empty() {
+                "none".to_string()
+            } else {
+                format!("{} embedded", cert.ct_scts.len())
+            }
+        ));
+
+        // Fingerprints
+        Self::forensic_section_header(&mut o, "FINGERPRINTS & PINNING", false);
+        o.push_str(&format!(
+            "  SHA-256:              {}\n",
+            cert.fingerprint_sha256
+        ));
+        o.push_str(&format!(
+            "  SHA-1:                {}\n",
+            cert.fingerprint_sha1
+        ));
+        o.push_str(&format!(
+            "  SPKI Pin (SHA-256):   {}\n",
+            cert.spki_sha256_b64
+        ));
+
+        // DER
+        Self::forensic_section_header(&mut o, "DER ENCODING", false);
+        let der_len = cert.der.len();
+        o.push_str(&format!(
+            "  Total Size:           {} bytes ({:.1} KB)\n",
+            der_len,
+            der_len as f64 / 1024.0
+        ));
+
+        // Security Assessment (plain)
+        Self::forensic_section_header(&mut o, "SECURITY ASSESSMENT", false);
+
+        let days_left = cert.days_until_expiry();
+
+        if cert.key_algorithm_name == "RSA" && cert.key_size < 2048 {
+            o.push_str(&format!(
+                "  CRITICAL: RSA key only {} bits\n",
+                cert.key_size
+            ));
+        }
+        if cert.signature_algorithm_name.contains("SHA-1")
+            || cert.signature_algorithm_name.contains("sha1")
+        {
+            o.push_str("  CRITICAL: SHA-1 signature\n");
+        }
+        if cert.signature_algorithm_name.contains("MD5") {
+            o.push_str("  CRITICAL: MD5 signature\n");
+        }
+        if cert.is_expired() {
+            o.push_str("  CRITICAL: Certificate has EXPIRED\n");
+        } else if days_left <= 30 {
+            o.push_str(&format!("  WARNING: Expires in {} days\n", days_left));
+        }
+        if !cert.is_ca
+            && !self_signed
+            && cert.ocsp_urls.is_empty()
+            && cert.crl_distribution_points.is_empty()
+        {
+            o.push_str("  WARNING: No revocation endpoints (OCSP/CRL)\n");
+        }
+        if !cert.is_ca && cert.san.is_empty() {
+            o.push_str("  WARNING: No SAN extension\n");
+        }
+        if !cert.is_ca && !self_signed && cert.ct_scts.is_empty() {
+            o.push_str("  NOTICE: No Certificate Transparency SCTs\n");
+        }
+
+        o.push_str(&format!("{}\n", banner));
+
+        o
+    }
+
+    // ── Forensic helpers ────────────────────────────────────────────────
+
+    /// Write a section header.
+    fn forensic_section_header(o: &mut String, title: &str, colored: bool) {
+        o.push('\n');
+        if colored {
+            let line = "─".repeat(72 - title.len() - 4);
+            o.push_str(&format!("  {} {}\n", title.cyan().bold(), line.dimmed()));
+        } else {
+            let line = "-".repeat(72 - title.len() - 4);
+            o.push_str(&format!("  {} {}\n", title, line));
+        }
+    }
+
+    /// Format a hex string with colon separators (aa:bb:cc:dd...).
+    fn format_hex_colons(hex: &str) -> String {
+        // If it already has colons, return as-is
+        if hex.contains(':') {
+            return hex.to_string();
+        }
+        hex.as_bytes()
+            .chunks(2)
+            .map(|c| std::str::from_utf8(c).unwrap_or("??"))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    /// Assess signature algorithm security.
+    fn assess_signature(name: &str) -> String {
+        use colored::Colorize;
+        let lower = name.to_lowercase();
+        if lower.contains("md5") {
+            format!("{} — broken, trivially forgeable", "CRITICAL".red().bold())
+        } else if lower.contains("sha-1") || lower.contains("sha1") {
+            format!(
+                "{} — collision attacks demonstrated (SHAttered, 2017)",
+                "WEAK".red().bold()
+            )
+        } else if lower.contains("sha-256") || lower.contains("sha256") {
+            format!("{} — current standard", "STRONG".green().bold())
+        } else if lower.contains("sha-384")
+            || lower.contains("sha384")
+            || lower.contains("sha-512")
+            || lower.contains("sha512")
+        {
+            format!("{} — exceeds requirements", "STRONG".green().bold())
+        } else if lower.contains("ed25519") || lower.contains("ed448") {
+            format!(
+                "{} — modern EdDSA, no hash truncation",
+                "STRONG".green().bold()
+            )
+        } else if lower.contains("ml-dsa") {
+            format!(
+                "{} — post-quantum (FIPS 204)",
+                "FUTURE-PROOF".green().bold()
+            )
+        } else if lower.contains("slh-dsa") {
+            format!(
+                "{} — post-quantum stateless hash-based (FIPS 205)",
+                "FUTURE-PROOF".green().bold()
+            )
+        } else if lower.contains("pss") {
+            format!(
+                "{} — RSA-PSS probabilistic padding",
+                "STRONG".green().bold()
+            )
+        } else {
+            format!("{}", "UNKNOWN — manual review needed".yellow())
+        }
+    }
+
+    /// Assess key algorithm strength.
+    fn assess_key_strength(algo: &str, bits: u32) -> String {
+        use colored::Colorize;
+        match algo {
+            "RSA" => match bits {
+                0..=1023 => format!(
+                    "{} — {} bits, factoring attacks practical",
+                    "BROKEN".red().bold(),
+                    bits
+                ),
+                1024..=2047 => format!(
+                    "{} — {} bits, below minimum (NIST deprecates < 2048)",
+                    "WEAK".red().bold(),
+                    bits
+                ),
+                2048 => format!(
+                    "{} — minimum acceptable, ~112-bit security",
+                    "ACCEPTABLE".yellow()
+                ),
+                2049..=3071 => format!("{} — ~128-bit security equivalent", "GOOD".green()),
+                3072..=4095 => format!(
+                    "{} — ~128-bit security, recommended",
+                    "STRONG".green().bold()
+                ),
+                _ => format!(
+                    "{} — {} bits, exceeds requirements",
+                    "STRONG".green().bold(),
+                    bits
+                ),
+            },
+            "EC" => match bits {
+                256 => format!("{} — ~128-bit security (P-256)", "STRONG".green().bold()),
+                384 => format!("{} — ~192-bit security (P-384)", "STRONG".green().bold()),
+                521 => format!("{} — ~256-bit security (P-521)", "STRONG".green().bold()),
+                _ => format!("{} — {} bits", "UNKNOWN".yellow(), bits),
+            },
+            "Ed25519" => format!(
+                "{} — 128-bit security, modern curve",
+                "STRONG".green().bold()
+            ),
+            "Ed448" => format!(
+                "{} — 224-bit security, modern curve",
+                "STRONG".green().bold()
+            ),
+            _ if algo.starts_with("ML-DSA") => format!(
+                "{} — NIST post-quantum standard (FIPS 204)",
+                "FUTURE-PROOF".green().bold()
+            ),
+            _ if algo.starts_with("SLH-DSA") => format!(
+                "{} — stateless hash-based PQ (FIPS 205)",
+                "FUTURE-PROOF".green().bold()
+            ),
+            _ => format!("{} — manual review needed", "UNKNOWN".yellow()),
+        }
+    }
+
+    /// Return OID for known EC curves.
+    fn curve_oid(curve: &str) -> &'static str {
+        match curve {
+            "P-256" => "1.2.840.10045.3.1.7 (prime256v1/secp256r1)",
+            "P-384" => "1.3.132.0.34 (secp384r1)",
+            "P-521" => "1.3.132.0.35 (secp521r1)",
+            "secp256k1" => "1.3.132.0.10 (secp256k1/Bitcoin)",
+            _ => "unknown",
+        }
+    }
+
+    /// Display critical flag with context.
+    fn critical_display(is_critical: bool, colored: bool) -> String {
+        if colored {
+            if is_critical {
+                format!(
+                    "{} — MUST be processed, reject if unrecognized",
+                    "Yes (critical)".yellow().bold()
+                )
+            } else {
+                format!("{} — MAY be ignored if unrecognized", "No".dimmed())
+            }
+        } else if is_critical {
+            "Yes (critical) -- MUST be processed".to_string()
+        } else {
+            "No -- MAY be ignored".to_string()
+        }
+    }
+
+    /// Return explanatory note for key usage flag.
+    fn key_usage_note(usage: &str) -> &'static str {
+        match usage {
+            "Digital Signature" => "(sign data, TLS handshakes)",
+            "Non Repudiation" => "(content commitment, cannot deny signing)",
+            "Key Encipherment" => "(encrypt session keys, RSA key exchange)",
+            "Data Encipherment" => "(directly encrypt data — rare)",
+            "Key Agreement" => "(DH/ECDH key agreement)",
+            "Certificate Sign" => "(sign other certificates — CA only)",
+            "CRL Sign" => "(sign CRLs — CA only)",
+            "Encipher Only" => "(key agreement: encrypt only)",
+            "Decipher Only" => "(key agreement: decrypt only)",
+            _ => "",
+        }
+    }
+
+    /// Map EKU display name back to OID.
+    fn eku_to_oid(name: &str) -> &'static str {
+        match name {
+            "TLS Web Server Authentication" | "Server Authentication" => "1.3.6.1.5.5.7.3.1",
+            "TLS Web Client Authentication" | "Client Authentication" => "1.3.6.1.5.5.7.3.2",
+            "Code Signing" => "1.3.6.1.5.5.7.3.3",
+            "E-mail Protection" | "Email Protection" => "1.3.6.1.5.5.7.3.4",
+            "Time Stamping" => "1.3.6.1.5.5.7.3.8",
+            "OCSP Signing" => "1.3.6.1.5.5.7.3.9",
+            "Any Extended Key Usage" => "2.5.29.37.0",
+            _ => "unknown",
+        }
+    }
+
     /// Format a certificate without colors (plain text, OpenSSL-style).
     #[must_use]
     pub fn format_plain(cert: &Certificate) -> String {
@@ -1009,6 +2331,10 @@ impl Formatter for Certificate {
             "OK"
         };
         format!("{} | {} | {}d | {:.0}%", cn, status, days, lifetime)
+    }
+
+    fn to_forensic(&self, colored: bool) -> String {
+        CertFormatter::format_forensic(self, colored)
     }
 }
 
