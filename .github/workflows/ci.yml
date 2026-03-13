@@ -25,7 +25,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: rustfmt
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo fmt --check
         run: cargo fmt --all --check
 
@@ -40,7 +40,7 @@ jobs:
         with:
           components: clippy
           cache-prefix: clippy
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
 
@@ -55,7 +55,7 @@ jobs:
         with:
           components: clippy
           cache-prefix: clippy-pqc
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo clippy --features pqc
         run: cargo clippy --all-targets --features pqc -- -D warnings
 
@@ -69,7 +69,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: test
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo test
         run: cargo test --all
 
@@ -83,7 +83,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: test-pqc
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo test --features pqc
         run: cargo test --all --features pqc
 
@@ -97,7 +97,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: build
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo build --release
         run: cargo build --release
       - name: Verify pki binary
@@ -119,7 +119,7 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl
           cache-prefix: build-musl
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: Install musl toolchain
         run: |
           if ! command -v musl-gcc &> /dev/null; then
@@ -147,7 +147,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: audit
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: Install cargo-audit
         run: which cargo-audit || cargo install cargo-audit --locked
       - name: Run cargo audit
@@ -176,7 +176,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: deny
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: Install cargo-deny
         run: which cargo-deny || cargo install cargo-deny --locked
       - name: Run cargo deny

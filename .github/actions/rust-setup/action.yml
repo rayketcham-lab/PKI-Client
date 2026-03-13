@@ -70,7 +70,6 @@ runs:
         git config --global --add url."${AUTH_URL}".insteadOf "https://github.com/"
 
     - name: Configure cargo to use git CLI for fetches
-      if: inputs.cross-repo-token != ''
       shell: bash
       run: |
         mkdir -p "$HOME/.cargo"
