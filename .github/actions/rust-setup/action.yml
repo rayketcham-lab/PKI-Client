@@ -69,6 +69,13 @@ runs:
         git config --global url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
         git config --global --add url."${AUTH_URL}".insteadOf "https://github.com/"
 
+    - name: Configure cargo to use git CLI for fetches
+      if: inputs.cross-repo-token != ''
+      shell: bash
+      run: |
+        mkdir -p "$HOME/.cargo"
+        printf '[net]\ngit-fetch-with-cli = true\n' >> "$HOME/.cargo/config.toml"
+
     - name: Cache cargo registry + build artifacts
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
       with:
