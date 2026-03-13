@@ -76,13 +76,14 @@ runs:
         # Remove any checkout-injected extraheaders that override our auth
         git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
-        # Store credentials and force git to use credential-store (overrides any existing helper)
-        echo "https://x-access-token:${CROSS_REPO_TOKEN}@github.com" > "$HOME/.git-credentials"
-        chmod 600 "$HOME/.git-credentials"
-        git config --global credential.helper "store --file=$HOME/.git-credentials"
-        # Also set insteadOf as fallback for SSH-style URLs
+        # Use GIT_CONFIG_COUNT env vars (highest priority, overrides all file-based config)
         AUTH_URL="https://x-access-token:${CROSS_REPO_TOKEN}@github.com/"
-        git config --global url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
+        echo "GIT_CONFIG_COUNT=1" >> "$GITHUB_ENV"
+        echo "GIT_CONFIG_KEY_0=url.${AUTH_URL}.insteadOf" >> "$GITHUB_ENV"
+        echo "GIT_CONFIG_VALUE_0=https://github.com/" >> "$GITHUB_ENV"
+        # Also set in global config for current step and SSH fallback
+        git config --global url."${AUTH_URL}".insteadOf "https://github.com/"
+        git config --global --add url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
 
     - name: Configure cargo to use git CLI for fetches
       shell: bash
