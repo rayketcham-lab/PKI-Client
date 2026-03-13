@@ -8,6 +8,7 @@
 [advisories]
 ignore = [
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack: pki-client only uses RSA signing, not decryption" },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained: transitive via tabled_derive, compile-time only" },
 ]
 yanked = "warn"  # digest 0.11.1 yanked, transitive via spork-core PQC deps
 
