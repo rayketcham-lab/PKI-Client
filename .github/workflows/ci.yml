@@ -21,13 +21,13 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
           components: rustfmt
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - run: cargo fmt --all --check
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
 
   clippy:
     name: Clippy
@@ -35,16 +35,14 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
-        with:
-          prefix-key: "v0-rust-pki-${{ runner.name }}"
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - run: cargo clippy --all-targets -- -D warnings
+          cache-prefix: clippy
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
 
   clippy-pqc:
     name: Clippy (PQC)
@@ -52,16 +50,14 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
-        with:
-          prefix-key: "v0-rust-pki-pqc-${{ runner.name }}"
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - run: cargo clippy --all-targets --features pqc -- -D warnings
+          cache-prefix: clippy-pqc
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: cargo clippy --features pqc
+        run: cargo clippy --all-targets --features pqc -- -D warnings
 
   test:
     name: Test
@@ -69,14 +65,13 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
-      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
-          prefix-key: "v0-rust-pki-${{ runner.name }}"
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - run: cargo test --all
+          cache-prefix: test
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: cargo test
+        run: cargo test --all
 
   test-pqc:
     name: Test (PQC)
@@ -84,14 +79,13 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
-      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
-          prefix-key: "v0-rust-pki-pqc-${{ runner.name }}"
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - run: cargo test --all --features pqc
+          cache-prefix: test-pqc
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: cargo test --features pqc
+        run: cargo test --all --features pqc
 
   build:
     name: Build
@@ -99,15 +93,14 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
-      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
-          prefix-key: "v0-rust-pki-${{ runner.name }}"
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - run: cargo build --release
-      - name: Verify pki binary built
+          cache-prefix: build
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: cargo build --release
+        run: cargo build --release
+      - name: Verify pki binary
         run: |
           if [ ! -f "target/release/pki" ]; then
             echo "ERROR: pki binary not found"
@@ -121,15 +114,12 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./.github/actions/rust-setup
         with:
           targets: x86_64-unknown-linux-musl
-      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
-        with:
-          prefix-key: "v0-rust-pki-${{ runner.name }}"
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+          cache-prefix: build-musl
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
       - name: Install musl toolchain
         run: |
           if ! command -v musl-gcc &> /dev/null; then
@@ -151,15 +141,16 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: audit
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
       - name: Install cargo-audit
         run: which cargo-audit || cargo install cargo-audit --locked
-      - name: Configure git auth
-        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
-      - name: Run audit
+      - name: Run cargo audit
         env:
           GITHUB_TOKEN: ""
           GIT_TERMINAL_PROMPT: "0"
@@ -175,11 +166,18 @@ jobs:
           done
 
   cargo-deny:
-    name: Dependency audit (cargo-deny)
-    runs-on: ubuntu-latest
+    name: Dependency Audit (cargo-deny)
+    runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: deny
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN }}
+      - name: Install cargo-deny
+        run: which cargo-deny || cargo install cargo-deny --locked
+      - name: Run cargo deny
+        run: cargo deny check
