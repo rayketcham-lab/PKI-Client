@@ -85,6 +85,21 @@ runs:
         git config --global url."${AUTH_URL}".insteadOf "https://github.com/"
         git config --global --add url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
 
+    - name: Verify cross-repo git auth
+      if: inputs.cross-repo-token != ''
+      shell: bash
+      env:
+        GIT_CONFIG_COUNT: '1'
+        GIT_CONFIG_KEY_0: url.https://x-access-token:${{ inputs.cross-repo-token }}@github.com/.insteadOf
+        GIT_CONFIG_VALUE_0: https://github.com/
+      run: |
+        echo "::group::Git Auth Diagnostic"
+        echo "HOME=$HOME"
+        echo "GIT_CONFIG_COUNT=$GIT_CONFIG_COUNT"
+        echo "Testing cross-repo access..."
+        git ls-remote https://github.com/rayketcham-lab/spork-ca-engine.git HEAD 2>&1 | head -3
+        echo "::endgroup::"
+
     - name: Configure cargo to use git CLI for fetches
       shell: bash
       env:
