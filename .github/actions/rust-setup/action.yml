@@ -76,9 +76,10 @@ runs:
         # Remove any checkout-injected extraheaders that override our auth
         git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
-        # Use .netrc for reliable cross-repo auth (works with all git credential flows)
-        echo "machine github.com login x-access-token password ${CROSS_REPO_TOKEN}" > "$HOME/.netrc"
-        chmod 600 "$HOME/.netrc"
+        # Store credentials and force git to use credential-store (overrides any existing helper)
+        echo "https://x-access-token:${CROSS_REPO_TOKEN}@github.com" > "$HOME/.git-credentials"
+        chmod 600 "$HOME/.git-credentials"
+        git config --global credential.helper "store --file=$HOME/.git-credentials"
         # Also set insteadOf as fallback for SSH-style URLs
         AUTH_URL="https://x-access-token:${CROSS_REPO_TOKEN}@github.com/"
         git config --global url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
