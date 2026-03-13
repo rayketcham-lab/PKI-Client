@@ -18,7 +18,7 @@ concurrency:
 jobs:
   fmt:
     name: Format
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -32,7 +32,7 @@ jobs:
   clippy:
     name: Clippy
     needs: [fmt]
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -47,7 +47,7 @@ jobs:
   clippy-pqc:
     name: Clippy (PQC)
     needs: [fmt]
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -62,7 +62,7 @@ jobs:
   test:
     name: Test
     needs: [fmt, clippy]
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -76,7 +76,7 @@ jobs:
   test-pqc:
     name: Test (PQC)
     needs: [fmt, clippy-pqc]
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -90,7 +90,7 @@ jobs:
   build:
     name: Build
     needs: [fmt, clippy]
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -111,7 +111,7 @@ jobs:
   build-musl:
     name: Build (musl static)
     needs: [fmt, clippy]
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -138,7 +138,7 @@ jobs:
 
   audit:
     name: Security Audit
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -167,7 +167,7 @@ jobs:
 
   cargo-deny:
     name: Dependency Audit (cargo-deny)
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
