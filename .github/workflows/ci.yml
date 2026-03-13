@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: self-hosted
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+        with:
+          components: rustfmt
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy
+    needs: [fmt]
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+        with:
+          prefix-key: "v0-rust-pki-${{ runner.name }}"
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - run: cargo clippy --all-targets -- -D warnings
+
+  clippy-pqc:
+    name: Clippy (PQC)
+    needs: [fmt]
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+        with:
+          prefix-key: "v0-rust-pki-pqc-${{ runner.name }}"
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - run: cargo clippy --all-targets --features pqc -- -D warnings
+
+  test:
+    name: Test
+    needs: [fmt, clippy]
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+        with:
+          prefix-key: "v0-rust-pki-${{ runner.name }}"
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - run: cargo test --all
+
+  test-pqc:
+    name: Test (PQC)
+    needs: [fmt, clippy-pqc]
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+        with:
+          prefix-key: "v0-rust-pki-pqc-${{ runner.name }}"
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - run: cargo test --all --features pqc
+
+  build:
+    name: Build
+    needs: [fmt, clippy]
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+        with:
+          prefix-key: "v0-rust-pki-${{ runner.name }}"
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - run: cargo build --release
+      - name: Verify pki binary built
+        run: |
+          if [ ! -f "target/release/pki" ]; then
+            echo "ERROR: pki binary not found"
+            exit 1
+          fi
+          echo "OK: pki ($(du -h target/release/pki | cut -f1))"
+
+  build-musl:
+    name: Build (musl static)
+    needs: [fmt, clippy]
+    runs-on: self-hosted
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@401aff9a7a08acb9d27b64936a90db81024cff97  # v2.8.2
+        with:
+          prefix-key: "v0-rust-pki-${{ runner.name }}"
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - name: Install musl toolchain
+        run: |
+          if ! command -v musl-gcc &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools
+          fi
+      - name: Build static binary
+        run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: Verify static linking
+        run: |
+          if ldd "target/x86_64-unknown-linux-musl/release/pki" 2>&1 | grep -q "not a dynamic"; then
+            echo "OK: pki is statically linked"
+          else
+            echo "WARN: pki may not be fully static"
+          fi
+
+  audit:
+    name: Security Audit
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7  # stable
+      - name: Install cargo-audit
+        run: which cargo-audit || cargo install cargo-audit --locked
+      - name: Configure git auth
+        run: git config --global url."https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/".insteadOf "ssh://git@github.com/"
+      - name: Run audit
+        env:
+          GITHUB_TOKEN: ""
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          git config --unset-all http.https://github.com/.extraheader || true
+          git config --global --unset-all http.https://github.com/.extraheader || true
+          for i in 1 2 3; do
+            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0398; then
+              break
+            fi
+            echo "Retry $i: advisory database fetch failed, retrying..."
+            sleep 5
+          done
+
+  cargo-deny:
+    name: Dependency audit (cargo-deny)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@v2

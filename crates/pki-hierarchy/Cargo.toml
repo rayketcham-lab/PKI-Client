@@ -1,0 +1,19 @@
+[package]
+name = "pki-hierarchy"
+description = "Declarative PKI hierarchy builder"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+spork-core = { workspace = true, features = ["ceremony"] }
+serde = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { version = "1.8", features = ["derive"] }
+hex = { workspace = true }
+const-oid = "0.9"
+
+[features]
+pqc = ["spork-core/pqc"]

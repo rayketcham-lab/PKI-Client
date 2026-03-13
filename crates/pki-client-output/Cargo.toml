@@ -1,0 +1,27 @@
+[package]
+name = "pki-client-output"
+description = "Output formatting library for PKI CLI client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+colored = "2"
+chrono = { workspace = true }
+tabled = "0.15"
+
+# Certificate parsing
+x509-parser = { workspace = true }
+pem = { workspace = true }
+
+# Hashing for fingerprints
+sha1 = "0.10"
+sha2 = "0.10"
+hex = "0.4"
+base64 = { workspace = true }
+
+# OID registry TOML loading
+toml = "0.8"

@@ -1,0 +1,98 @@
+[package]
+name = "pki-client"
+description = "Modern PKI operations tool — certificate inspection, key management, TLS probing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "pki"
+path = "src/main.rs"
+
+[features]
+default = []
+pqc = ["spork-core/pqc", "pki-hierarchy/pqc"]
+fips = ["spork-core/fips"]
+
+[dependencies]
+# Internal crates
+spork-core = { workspace = true }
+pki-client-output = { workspace = true }
+pki-probe = { workspace = true }
+pki-hierarchy = { workspace = true }
+
+# CLI framework
+clap = { workspace = true }
+clap_complete = { workspace = true }
+clap_mangen = { workspace = true }
+rustyline = { workspace = true }
+
+# Output
+colored = { workspace = true }
+tabled = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+humantime = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Certificate handling
+pem = { workspace = true }
+x509-parser = { workspace = true }
+base64 = { workspace = true }
+sha2 = "0.10"
+sha1 = "0.10"
+hex = { workspace = true }
+rand = { workspace = true }
+
+# Crypto for ACME (JWS signing)
+p256 = { version = "0.13", features = ["ecdsa", "pem"] }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Internationalized domain name validation (IDNA 2008 / RFC 5891)
+idna = "1.1"
+
+# URL parsing (for SSRF validation)
+url = "2.5"
+
+# Config directory detection
+dirs = "5"
+
+# PKCS#12/PFX creation (Windows IIS cert deployment)
+p12 = "0.6"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+tempfile = { workspace = true }
+
+# ── Linux package metadata ──────────────────────────────────────────
+
+[package.metadata.deb]
+name = "pki-client"
+maintainer = "Ray Ketcham <ray@rayketcham.com>"
+section = "utils"
+priority = "optional"
+depends = "libc6"
+assets = [
+    ["target/release/pki", "usr/bin/", "755"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/x86_64-unknown-linux-musl/release/pki", dest = "/usr/bin/pki", mode = "755" },
+]
