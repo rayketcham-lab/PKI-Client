@@ -62,8 +62,12 @@ runs:
     - name: Configure git auth for cross-repo deps
       if: inputs.cross-repo-token != ''
       shell: bash
+      env:
+        CROSS_REPO_TOKEN: ${{ inputs.cross-repo-token }}
       run: |
-        git config --global url."https://x-access-token:${{ inputs.cross-repo-token }}@github.com/".insteadOf "ssh://git@github.com/"
+        AUTH_URL="https://x-access-token:${CROSS_REPO_TOKEN}@github.com/"
+        git config --global url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
+        git config --global --add url."${AUTH_URL}".insteadOf "https://github.com/"
 
     - name: Cache cargo registry + build artifacts
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
