@@ -73,12 +73,15 @@ runs:
       env:
         CROSS_REPO_TOKEN: ${{ inputs.cross-repo-token }}
       run: |
-        # Remove checkout action's extraheader (uses GITHUB_TOKEN which can't access cross-repo)
+        # Remove any checkout-injected extraheaders that override our auth
         git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
         git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+        # Use .netrc for reliable cross-repo auth (works with all git credential flows)
+        echo "machine github.com login x-access-token password ${CROSS_REPO_TOKEN}" > "$HOME/.netrc"
+        chmod 600 "$HOME/.netrc"
+        # Also set insteadOf as fallback for SSH-style URLs
         AUTH_URL="https://x-access-token:${CROSS_REPO_TOKEN}@github.com/"
         git config --global url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
-        git config --global --add url."${AUTH_URL}".insteadOf "https://github.com/"
 
     - name: Configure cargo to use git CLI for fetches
       shell: bash

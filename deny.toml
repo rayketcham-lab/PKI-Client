@@ -10,6 +10,7 @@ ignore = [
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack: pki-client only uses RSA signing, not decryption" },
     { id = "RUSTSEC-2024-0398", reason = "sharks secret sharing bias: transitive via spork-core, not directly used" },
 ]
+yanked = "warn"  # digest 0.11.1 yanked, transitive via spork-core PQC deps
 
 # ============================================================================
 # Licenses - Allowed and denied licenses
@@ -55,7 +56,7 @@ deny = [
     { name = "openssl" },
     { name = "openssl-sys" },
     { name = "native-tls" },
-    { name = "sha1", wrappers = ["pki-client", "pki-client-output", "p12", "p12-keystore"] },
+    { name = "sha1", wrappers = ["pki-client", "pki-client-output", "p12", "p12-keystore", "x509-cert", "spork-core"] },
     { name = "rust-crypto" },
     { name = "crypto" },
     { name = "failure" },
