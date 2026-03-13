@@ -1925,10 +1925,10 @@ impl CertFormatter {
     fn forensic_section_header(o: &mut String, title: &str, colored: bool) {
         o.push('\n');
         if colored {
-            let line = "─".repeat(72 - title.len() - 4);
+            let line = "─".repeat(68usize.saturating_sub(title.len()));
             o.push_str(&format!("  {} {}\n", title.cyan().bold(), line.dimmed()));
         } else {
-            let line = "-".repeat(72 - title.len() - 4);
+            let line = "-".repeat(68usize.saturating_sub(title.len()));
             o.push_str(&format!("  {} {}\n", title, line));
         }
     }
@@ -2009,7 +2009,7 @@ impl CertFormatter {
                     "{} — minimum acceptable, ~112-bit security",
                     "ACCEPTABLE".yellow()
                 ),
-                2049..=3071 => format!("{} — ~128-bit security equivalent", "GOOD".green()),
+                2049..=3071 => format!("{} — ~112-128-bit security equivalent", "GOOD".green()),
                 3072..=4095 => format!(
                     "{} — ~128-bit security, recommended",
                     "STRONG".green().bold()
@@ -2640,5 +2640,68 @@ mod tests {
         let cert = make_cert();
         let output = CertFormatter::format_plain(&cert);
         assert!(!output.contains("\x1b["));
+    }
+
+    // ========== compact format tests ==========
+
+    #[test]
+    fn test_compact_output_valid_cert() {
+        let cert = make_cert();
+        let output = cert.to_compact();
+        assert!(output.contains("test.example.com"));
+        assert!(output.contains("OK"));
+        assert!(output.contains("|"));
+    }
+
+    #[test]
+    fn test_compact_output_expired_cert() {
+        let mut cert = make_cert();
+        cert.not_after = Utc::now() - Duration::days(10);
+        let output = cert.to_compact();
+        assert!(output.contains("EXPIRED"));
+    }
+
+    #[test]
+    fn test_compact_output_expiring_soon() {
+        let mut cert = make_cert();
+        cert.not_after = Utc::now() + Duration::days(15);
+        let output = cert.to_compact();
+        assert!(output.contains("EXPIRING") || output.contains("RENEW"));
+    }
+
+    #[test]
+    fn test_compact_output_renew_threshold() {
+        let mut cert = make_cert();
+        // 365-day cert, 300 days in => ~82% lifetime used
+        cert.not_before = Utc::now() - Duration::days(300);
+        cert.not_after = Utc::now() + Duration::days(65);
+        let output = cert.to_compact();
+        assert!(output.contains("RENEW"));
+    }
+
+    #[test]
+    fn test_compact_output_single_line() {
+        let cert = make_cert();
+        let output = cert.to_compact();
+        assert_eq!(output.lines().count(), 1, "compact must be single line");
+    }
+
+    #[test]
+    fn test_compact_via_formatter_trait() {
+        let cert = make_cert();
+        let output = cert.format(crate::OutputFormat::Compact, false);
+        assert!(output.contains("test.example.com"));
+        assert!(output.contains("|"));
+    }
+
+    // ========== forensic_section_header tests ==========
+
+    #[test]
+    fn test_forensic_section_header_long_title_no_panic() {
+        let mut o = String::new();
+        // Title longer than 68 chars should not panic thanks to saturating_sub
+        let long_title = "A".repeat(100);
+        CertFormatter::forensic_section_header(&mut o, &long_title, false);
+        assert!(o.contains(&long_title));
     }
 }

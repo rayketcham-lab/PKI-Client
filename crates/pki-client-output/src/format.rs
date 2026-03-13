@@ -68,3 +68,77 @@ pub trait Formatter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_full_names() {
+        assert_eq!("text".parse::<OutputFormat>().unwrap(), OutputFormat::Text);
+        assert_eq!("json".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
+        assert_eq!(
+            "compact".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Compact
+        );
+        assert_eq!(
+            "forensic".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Forensic
+        );
+    }
+
+    #[test]
+    fn test_parse_short_aliases() {
+        assert_eq!("t".parse::<OutputFormat>().unwrap(), OutputFormat::Text);
+        assert_eq!("j".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
+        assert_eq!("c".parse::<OutputFormat>().unwrap(), OutputFormat::Compact);
+        assert_eq!("f".parse::<OutputFormat>().unwrap(), OutputFormat::Forensic);
+    }
+
+    #[test]
+    fn test_parse_forensic_aliases() {
+        assert_eq!(
+            "deep".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Forensic
+        );
+        assert_eq!(
+            "verbose".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Forensic
+        );
+    }
+
+    #[test]
+    fn test_parse_case_insensitive() {
+        assert_eq!("TEXT".parse::<OutputFormat>().unwrap(), OutputFormat::Text);
+        assert_eq!("JSON".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
+        assert_eq!(
+            "Forensic".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Forensic
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid() {
+        assert!("xml".parse::<OutputFormat>().is_err());
+        assert!("".parse::<OutputFormat>().is_err());
+        assert!("html".parse::<OutputFormat>().is_err());
+    }
+
+    #[test]
+    fn test_display_roundtrip() {
+        for fmt in [
+            OutputFormat::Text,
+            OutputFormat::Json,
+            OutputFormat::Compact,
+            OutputFormat::Forensic,
+        ] {
+            let s = fmt.to_string();
+            assert_eq!(s.parse::<OutputFormat>().unwrap(), fmt);
+        }
+    }
+
+    #[test]
+    fn test_default_is_text() {
+        assert_eq!(OutputFormat::default(), OutputFormat::Text);
+    }
+}

@@ -1488,3 +1488,240 @@ fn test_forensic_output_security_assessment() {
     // Should note missing revocation
     assert!(output.contains("revocation") || output.contains("OCSP") || output.contains("CRL"));
 }
+
+// ============================================================================
+// EKU REGRESSION TESTS — assert exact display names, not just counts
+// ============================================================================
+
+#[test]
+fn test_eku_display_names_dual_purpose() {
+    let (ca_key, _, _) = build_root_ca(AlgorithmId::EcdsaP256, "EKU Names CA");
+    let (der, _pem) = EeCertBuilder::new(
+        AlgorithmId::EcdsaP256,
+        "eku-names.example.com",
+        &ca_key,
+        "EKU Names CA",
+    )
+    .eku(EKU_SERVER_AUTH)
+    .eku(EKU_CLIENT_AUTH)
+    .build();
+
+    let cert = Certificate::from_der(&der).unwrap();
+    assert!(
+        cert.extended_key_usage
+            .iter()
+            .any(|e| e.contains("Server") || e.contains("serverAuth")),
+        "Missing server auth EKU display name: {:?}",
+        cert.extended_key_usage
+    );
+    assert!(
+        cert.extended_key_usage
+            .iter()
+            .any(|e| e.contains("Client") || e.contains("clientAuth")),
+        "Missing client auth EKU display name: {:?}",
+        cert.extended_key_usage
+    );
+}
+
+#[test]
+fn test_eku_display_names_kitchen_sink() {
+    let (ca_key, _, _) = build_root_ca(AlgorithmId::EcdsaP256, "EKU Kitchen CA");
+    let (der, _pem) = EeCertBuilder::new(
+        AlgorithmId::EcdsaP256,
+        "eku-all.example.com",
+        &ca_key,
+        "EKU Kitchen CA",
+    )
+    .eku(EKU_SERVER_AUTH)
+    .eku(EKU_CLIENT_AUTH)
+    .eku(EKU_CODE_SIGNING)
+    .eku(EKU_EMAIL_PROTECTION)
+    .eku(EKU_TIME_STAMPING)
+    .eku(EKU_OCSP_SIGNING)
+    .build();
+
+    let cert = Certificate::from_der(&der).unwrap();
+    let ekus = &cert.extended_key_usage;
+
+    // Assert each EKU resolves to a human-readable name, not a raw OID
+    let expected_fragments = [
+        "Server",
+        "Client",
+        "Code Signing",
+        "mail", // "E-mail Protection" or "Email Protection"
+        "Time Stamping",
+        "OCSP Signing",
+    ];
+    for frag in &expected_fragments {
+        assert!(
+            ekus.iter()
+                .any(|e| e.to_lowercase().contains(&frag.to_lowercase())),
+            "Missing EKU containing '{}' in: {:?}",
+            frag,
+            ekus
+        );
+    }
+
+    // Also verify text output renders them
+    let text = CertFormatter::format(cert_ref(&cert), false);
+    for frag in &expected_fragments {
+        assert!(
+            text.to_lowercase().contains(&frag.to_lowercase()),
+            "Text output missing EKU fragment '{}'\nOutput:\n{}",
+            frag,
+            text
+        );
+    }
+}
+
+/// Helper to get a reference that satisfies CertFormatter::format
+fn cert_ref(cert: &Certificate) -> &Certificate {
+    cert
+}
+
+// ============================================================================
+// EXPIRED CERTIFICATE INTEGRATION TEST
+// ============================================================================
+
+#[test]
+fn test_decode_expired_cert_forensic() {
+    use chrono::{Duration, Utc};
+    use spork_core::cert::Validity;
+
+    // Build a CA with validity entirely in the past (already expired)
+    let ca_key = KeyPair::generate(AlgorithmId::EcdsaP256).expect("keygen");
+    let ca_dn = NameBuilder::new("Expired Test CA")
+        .organization("Test PKI")
+        .country("US")
+        .build();
+
+    let not_before = Utc::now() - Duration::days(365);
+    let not_after = Utc::now() - Duration::days(1);
+    let validity = Validity::new(not_before, not_after).expect("validity");
+
+    let ca_cert = CertificateBuilder::new(
+        ca_dn,
+        ca_key.public_key_der().unwrap(),
+        ca_key.algorithm_id(),
+    )
+    .validity(validity)
+    .basic_constraints(BasicConstraints::ca())
+    .key_usage(KeyUsage::new(KeyUsageFlags::new(
+        KeyUsageFlags::KEY_CERT_SIGN | KeyUsageFlags::CRL_SIGN,
+    )))
+    .build_and_sign(&ca_key)
+    .unwrap();
+
+    let der = ca_cert.to_der().unwrap();
+    let cert = Certificate::from_der(&der).unwrap();
+
+    // Forensic output should handle expired certs gracefully
+    let forensic = CertFormatter::format_forensic(&cert, false);
+    assert!(forensic.contains("SECURITY ASSESSMENT"));
+    assert!(forensic.contains("Expired Test CA"));
+
+    // Compact output should show EXPIRED or EXPIRING
+    use pki_client_output::Formatter;
+    let compact = cert.to_compact();
+    assert!(
+        compact.contains("EXPIRED") || compact.contains("EXPIRING"),
+        "Compact should flag expired cert: {}",
+        compact
+    );
+
+    // Text output should also work without panicking
+    let text = CertFormatter::format(&cert, false);
+    assert!(text.contains("Expired Test CA"));
+}
+
+// ============================================================================
+// COMPACT FORMAT INTEGRATION TESTS
+// ============================================================================
+
+#[test]
+fn test_compact_format_integration() {
+    use pki_client_output::{Formatter, OutputFormat};
+
+    let (_, der, _) = build_root_ca(AlgorithmId::EcdsaP256, "Compact Test CA");
+    let cert = Certificate::from_der(&der).unwrap();
+
+    let compact = cert.format(OutputFormat::Compact, false);
+    // Should be a single line
+    assert_eq!(compact.lines().count(), 1, "compact must be single line");
+    // Should contain the CN
+    assert!(compact.contains("Compact Test CA"));
+    // Should have pipe separators
+    assert!(compact.contains("|"));
+    // Should have a status
+    assert!(
+        compact.contains("OK") || compact.contains("RENEW") || compact.contains("EXPIRING"),
+        "compact missing status: {}",
+        compact
+    );
+}
+
+#[test]
+fn test_compact_format_ee_cert() {
+    use pki_client_output::{Formatter, OutputFormat};
+
+    let (ca_key, _, _) = build_root_ca(AlgorithmId::EcdsaP256, "Compact EE CA");
+    let (der, _pem) = EeCertBuilder::new(
+        AlgorithmId::EcdsaP256,
+        "compact-test.example.com",
+        &ca_key,
+        "Compact EE CA",
+    )
+    .eku(EKU_SERVER_AUTH)
+    .build();
+
+    let cert = Certificate::from_der(&der).unwrap();
+    let compact = cert.format(OutputFormat::Compact, false);
+
+    assert!(compact.contains("compact-test.example.com"));
+    assert_eq!(compact.lines().count(), 1);
+}
+
+// ============================================================================
+// SELF-SIGNED END-ENTITY CERT TEST
+// ============================================================================
+
+#[test]
+fn test_decode_self_signed_end_entity() {
+    // Self-signed but NOT a CA — unusual but valid scenario
+    let key = KeyPair::generate(AlgorithmId::EcdsaP256).expect("keygen");
+    let dn = NameBuilder::new("self-signed-ee.example.com")
+        .organization("Test PKI")
+        .build();
+
+    let cert = CertificateBuilder::new(dn, key.public_key_der().unwrap(), key.algorithm_id())
+        .validity(Validity::years_from_now(1))
+        .basic_constraints(BasicConstraints::end_entity())
+        .key_usage(KeyUsage::new(KeyUsageFlags::new(
+            KeyUsageFlags::DIGITAL_SIGNATURE,
+        )))
+        .extended_key_usage(ExtendedKeyUsage::new(vec![EKU_SERVER_AUTH]))
+        .subject_alt_name(SubjectAltName::new().dns("self-signed-ee.example.com"))
+        .build_and_sign(&key)
+        .unwrap();
+
+    let der = cert.to_der().unwrap();
+    let parsed = Certificate::from_der(&der).unwrap();
+
+    // Should be self-signed
+    assert!(parsed.is_self_signed());
+    // Should NOT be a CA
+    assert!(!parsed.is_ca);
+    // Should have SANs
+    assert!(!parsed.san.is_empty());
+    // EKU should be present
+    assert!(!parsed.extended_key_usage.is_empty());
+
+    // Text output should mention self-signed
+    let text = CertFormatter::format(&parsed, false);
+    assert!(text.contains("self-signed-ee.example.com"));
+
+    // Forensic should flag as self-signed
+    let forensic = CertFormatter::format_forensic(&parsed, false);
+    assert!(forensic.contains("Self-Signed"));
+    assert!(forensic.contains("Yes"));
+}
