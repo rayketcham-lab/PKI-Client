@@ -5,775 +5,798 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>pki — Modern PKI operations, made human</title>
 <meta name="description" content="Modern PKI CLI tool — certificate inspection, key management, TLS probing, and enrollment protocols. Pure Rust. No OpenSSL.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1f510;</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 :root {
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #21262d;
-  --bg-card: #1c2128;
-  --border: #30363d;
-  --border-light: #3d444d;
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #6e7681;
-  --accent: #58a6ff;
-  --accent-hover: #79c0ff;
-  --accent-dim: #1f6feb;
-  --accent-subtle: rgba(56, 139, 253, 0.1);
-  --teal: #3fb950;
-  --orange: #d29922;
-  --red: #f85149;
-  --purple: #bc8cff;
-  --sidebar-width: 280px;
-  --header-height: 0px;
+  --bg: #06080f;
+  --bg-secondary: #0c1019;
+  --surface: #111827;
+  --surface-hover: #1a2236;
+  --border: #1e293b;
+  --border-glow: rgba(34, 211, 238, 0.25);
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --accent: #22d3ee;
+  --accent-light: #67e8f9;
+  --accent-glow: rgba(34, 211, 238, 0.15);
+  --accent-glow-strong: rgba(34, 211, 238, 0.35);
+  --indigo: #6366f1;
+  --indigo-glow: rgba(99, 102, 241, 0.15);
+  --green: #34d399;
+  --green-glow: rgba(52, 211, 153, 0.15);
+  --amber: #fbbf24;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --radius: 14px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
 }
 
-html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  line-height: 1.7;
-  font-size: 16px;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
-/* ── Sidebar ── */
-.sidebar {
+.grid-bg {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: var(--sidebar-width);
-  height: 100vh;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  z-index: 100;
-  padding: 24px 0;
-  transition: transform 0.3s ease;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 70%);
 }
 
-.sidebar-header {
-  padding: 0 20px 20px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(6, 8, 15, 0.8);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+  padding: 0 2rem;
+  transition: box-shadow 0.3s;
 }
+nav.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,0.4); }
 
-.sidebar-logo {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.nav-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between; height: 64px;
 }
-
-.sidebar-logo svg { flex-shrink: 0; }
-
-.sidebar nav { padding: 0 12px; }
-
-.sidebar nav a {
-  display: block;
-  padding: 6px 12px;
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-size: 14px;
-  border-radius: 6px;
-  transition: all 0.15s ease;
-  border-left: 2px solid transparent;
-  margin-bottom: 2px;
+.nav-logo {
+  font-size: 1.3rem; font-weight: 800; color: var(--text);
+  text-decoration: none; letter-spacing: -0.03em;
+  display: flex; align-items: center; gap: 0.5rem;
 }
-
-.sidebar nav a:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
+.nav-logo-icon {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent), var(--indigo));
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
 }
-
-.sidebar nav a.active {
-  color: var(--accent);
-  background: var(--accent-subtle);
-  border-left-color: var(--accent);
+.nav-links { display: flex; gap: 2rem; align-items: center; }
+.nav-links a {
+  color: var(--text-muted); text-decoration: none;
+  font-size: 0.875rem; font-weight: 500; transition: color 0.2s;
 }
+.nav-links a:hover { color: var(--text); }
 
-.sidebar .section-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  padding: 16px 12px 6px;
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.7rem 1.5rem; border-radius: 10px;
+  font-size: 0.9rem; font-weight: 600; text-decoration: none;
+  transition: all 0.25s; border: none; cursor: pointer; font-family: var(--font);
 }
-
-/* ── Mobile toggle ── */
-.menu-toggle {
-  display: none;
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 200;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 18px;
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--indigo));
+  color: #fff;
+  box-shadow: 0 0 20px var(--accent-glow), 0 4px 12px rgba(0,0,0,0.3);
 }
-
-/* ── Main content ── */
-.main { margin-left: var(--sidebar-width); min-height: 100vh; }
-
-.content {
-  max-width: 840px;
-  margin: 0 auto;
-  padding: 48px 40px;
+.btn-primary:hover {
+  box-shadow: 0 0 40px var(--accent-glow-strong), 0 8px 24px rgba(0,0,0,0.4);
+  transform: translateY(-2px);
+}
+.btn-outline {
+  background: rgba(255,255,255,0.03); color: var(--text);
+  border: 1px solid var(--border); backdrop-filter: blur(10px);
+}
+.btn-outline:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: var(--text-dim); transform: translateY(-2px);
 }
 
 /* ── Hero ── */
 .hero {
-  padding: 80px 0 60px;
-  text-align: center;
+  padding: 11rem 2rem 5rem; text-align: center;
+  position: relative; overflow: hidden;
+}
+.hero-orb {
+  position: absolute; border-radius: 50%; filter: blur(80px);
+  pointer-events: none; animation: float 8s ease-in-out infinite;
+}
+.hero-orb-1 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.15) 0%, transparent 70%);
+  top: -100px; left: 50%; transform: translateX(-50%);
+}
+.hero-orb-2 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  top: 100px; right: 10%; animation-delay: -3s;
+}
+.hero-orb-3 {
+  width: 250px; height: 250px;
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.1) 0%, transparent 70%);
+  top: 200px; left: 10%; animation-delay: -5s;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-30px) scale(1.05); }
 }
 
 .hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--accent-subtle);
-  border: 1px solid rgba(56, 139, 253, 0.2);
-  color: var(--accent);
-  padding: 4px 14px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 24px;
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 0.45rem 1.2rem;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 100px; font-size: 0.8rem; font-weight: 500;
+  color: var(--accent-light); margin-bottom: 2rem; position: relative;
+}
+.pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); position: relative;
+}
+.pulse::after {
+  content: ''; position: absolute; inset: -3px;
+  border-radius: 50%; background: var(--green); opacity: 0;
+  animation: pulse-ring 2s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
 }
 
-.hero h1 {
-  font-size: 52px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 16px;
-  line-height: 1.1;
+h1 {
+  font-size: clamp(3rem, 7vw, 4.5rem); font-weight: 900;
+  letter-spacing: -0.04em; line-height: 1.05; margin-bottom: 1.5rem; position: relative;
+}
+h1 .gradient {
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--indigo) 50%, var(--accent-light) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; animation: shimmer 4s linear infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
 }
 
-.hero h1 span { color: var(--accent); }
-
-.hero-tagline {
-  font-size: 20px;
-  color: var(--text-secondary);
-  max-width: 600px;
-  margin: 0 auto 40px;
-  line-height: 1.6;
+.hero-sub {
+  font-size: 1.2rem; color: var(--text-muted);
+  max-width: 620px; margin: 0 auto 3rem; line-height: 1.8;
 }
+.hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; position: relative; }
 
-.hero-buttons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
+/* ── Stats ── */
+.stats { max-width: 900px; margin: -2rem auto 0; padding: 0 2rem; position: relative; z-index: 2; }
+.stats-inner {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
 }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.15s ease;
-  border: 1px solid transparent;
+.stat { padding: 1.5rem; text-align: center; border-right: 1px solid var(--border); }
+.stat:last-child { border-right: none; }
+.stat-value {
+  font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--accent-light), var(--indigo));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
-
-.btn-primary {
-  background: var(--accent-dim);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.btn-primary:hover { background: var(--accent); }
-
-.btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border-color: var(--border);
-}
-
-.btn-secondary:hover {
-  background: var(--border);
-  border-color: var(--border-light);
+.stat-label {
+  font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 600; margin-top: 0.25rem;
 }
 
 /* ── Sections ── */
-section { padding: 48px 0; border-top: 1px solid var(--border); }
-
-section h2 {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 24px;
-  letter-spacing: -0.02em;
+.section { max-width: 1200px; margin: 0 auto; padding: 6rem 2rem; position: relative; }
+.section-label {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.15em; color: var(--accent-light); margin-bottom: 0.75rem;
+  display: flex; align-items: center; gap: 0.5rem;
 }
-
-section h3 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 32px 0 16px;
-  color: var(--text-primary);
+.section-label::before {
+  content: ''; width: 20px; height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--indigo)); border-radius: 1px;
 }
-
-p { color: var(--text-secondary); margin-bottom: 16px; }
-
-/* ── Feature grid ── */
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin: 24px 0;
+.section h2 {
+  font-size: 2.25rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.75rem;
 }
+.section > p { color: var(--text-muted); max-width: 560px; margin-bottom: 3rem; font-size: 1.05rem; }
 
+/* ── Fade ── */
+.fade-up { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.fade-up.visible { opacity: 1; transform: translateY(0); }
+
+/* ── Feature cards ── */
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--border); border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--border);
+}
 .feature-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-  transition: border-color 0.15s ease;
+  background: var(--surface); padding: 2rem;
+  transition: all 0.35s; position: relative; overflow: hidden;
 }
-
-.feature-card:hover { border-color: var(--border-light); }
-
+.feature-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--indigo), transparent);
+  opacity: 0; transition: opacity 0.35s;
+}
+.feature-card:hover { background: var(--surface-hover); }
+.feature-card:hover::before { opacity: 1; }
 .feature-icon {
-  font-size: 24px;
-  margin-bottom: 12px;
-  display: block;
+  width: 44px; height: 44px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;
 }
+.feature-icon.cyan { background: var(--accent-glow); border: 1px solid rgba(34, 211, 238, 0.2); }
+.feature-icon.indigo { background: var(--indigo-glow); border: 1px solid rgba(99, 102, 241, 0.2); }
+.feature-icon.green { background: var(--green-glow); border: 1px solid rgba(52, 211, 153, 0.2); }
+.feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+.feature-card p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.65; }
 
-.feature-card h3 {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0 0 8px;
-  color: var(--text-primary);
+/* ── Terminal ── */
+.terminal {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px var(--accent-glow);
 }
-
-.feature-card p {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.5;
+.terminal-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 18px; background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid var(--border);
 }
+.terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+.terminal-dot.red { background: #f87171; }
+.terminal-dot.yellow { background: #fbbf24; }
+.terminal-dot.green { background: #34d399; }
+.terminal-title {
+  font-family: var(--mono); font-size: 0.8rem;
+  color: var(--text-dim); margin-left: 8px;
+}
+.terminal-body {
+  padding: 1.5rem 1.75rem; font-family: var(--mono);
+  font-size: 0.85rem; line-height: 2; overflow-x: auto;
+}
+.t-prompt { color: var(--green); }
+.t-cmd { color: var(--text); font-weight: 500; }
+.t-flag { color: var(--accent); }
+.t-string { color: var(--amber); }
+.t-comment { color: var(--text-dim); }
+.t-output { color: var(--text-muted); }
+.t-success { color: var(--green); }
+.t-key { color: var(--accent-light); }
+.t-warn { color: var(--amber); }
+.t-header { color: var(--indigo); font-weight: 600; }
+.t-grade { color: var(--green); font-weight: 700; }
+.t-dim { color: var(--text-dim); }
 
 /* ── Command table ── */
 .command-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 16px 0;
-  font-size: 14px;
+  width: 100%; border-collapse: collapse; font-size: 0.9rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
 }
-
 .command-table th {
-  text-align: left;
-  padding: 10px 16px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border);
+  text-align: left; padding: 12px 18px;
+  background: rgba(0,0,0,0.2); color: var(--text-dim);
+  font-weight: 600; font-size: 0.75rem; text-transform: uppercase;
+  letter-spacing: 0.08em; border-bottom: 1px solid var(--border);
 }
-
 .command-table td {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-secondary);
+  padding: 11px 18px; border-bottom: 1px solid var(--border); color: var(--text-muted);
 }
-
+.command-table tr:last-child td { border-bottom: none; }
 .command-table td:first-child {
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--accent);
-  font-size: 13px;
-  white-space: nowrap;
+  font-family: var(--mono); color: var(--accent); font-size: 0.85rem; font-weight: 500; white-space: nowrap;
 }
-
-.command-table tr:hover td { background: var(--bg-card); }
-
-/* ── Code blocks ── */
-pre {
-  background: var(--bg-secondary) !important;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px 20px !important;
-  margin: 16px 0 !important;
-  overflow-x: auto;
-  font-size: 13px !important;
-  line-height: 1.6 !important;
-}
-
-code {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-}
-
-:not(pre) > code {
-  background: var(--bg-tertiary);
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 0.9em;
-  color: var(--accent);
-}
+.command-table tr:hover td { background: rgba(255,255,255,0.02); }
 
 /* ── Format cards ── */
 .format-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin: 20px 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; margin-top: 2rem;
 }
-
 .format-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  text-align: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem; text-align: center;
+  transition: all 0.3s;
 }
-
-.format-card .format-name {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--accent);
-  margin-bottom: 6px;
+.format-card:hover { border-color: var(--border-glow); transform: translateY(-4px); }
+.format-name {
+  font-family: var(--mono); font-size: 1rem; font-weight: 600;
+  color: var(--accent); margin-bottom: 0.25rem;
 }
+.format-flag {
+  font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;
+}
+.format-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
 
-.format-card .format-flag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+/* ── Install block ── */
+.install-block {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 2rem; margin-bottom: 1.5rem;
+}
+.install-block h3 {
+  font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;
+  color: var(--text);
+}
+.install-block pre {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem 1.25rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.85rem; line-height: 1.7;
   color: var(--text-muted);
-  margin-bottom: 8px;
+}
+.install-block pre .cmd { color: var(--accent); }
+.install-block pre .flag { color: var(--indigo); }
+.install-block pre .comment { color: var(--text-dim); }
+
+/* ── CTA ── */
+.cta-section {
+  text-align: center; padding: 7rem 2rem; position: relative; overflow: hidden;
+}
+.cta-section::before {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: 800px; height: 500px;
+  background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-section h2 {
+  font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em;
+  margin-bottom: 1rem; position: relative;
+}
+.cta-section p {
+  color: var(--text-muted); margin-bottom: 2.5rem;
+  max-width: 520px; margin-left: auto; margin-right: auto;
+  position: relative; font-size: 1.1rem;
 }
 
-.format-card .format-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.4;
+/* ── Divider ── */
+.divider {
+  max-width: 1200px; margin: 0 auto; border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
-
-/* ── Output sample ── */
-.output-sample {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  overflow-x: auto;
-  white-space: pre;
-  color: var(--text-secondary);
-}
-
-.output-sample .g { color: var(--teal); }
-.output-sample .b { color: var(--accent); }
-.output-sample .y { color: var(--orange); }
-.output-sample .r { color: var(--red); }
-.output-sample .p { color: var(--purple); }
-.output-sample .w { color: var(--text-primary); font-weight: 600; }
-.output-sample .d { color: var(--text-muted); }
-
-/* ── Info callout ── */
-.callout {
-  background: var(--accent-subtle);
-  border: 1px solid rgba(56, 139, 253, 0.2);
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin: 20px 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.callout strong { color: var(--accent); }
 
 /* ── Footer ── */
 footer {
-  padding: 32px 0;
-  border-top: 1px solid var(--border);
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 14px;
+  border-top: 1px solid var(--border); padding: 2.5rem 2rem;
+  font-size: 0.8rem; color: var(--text-dim); position: relative;
+}
+footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+footer a:hover { color: var(--text); }
+.footer-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+}
+.footer-links { display: flex; gap: 2rem; }
+.footer-logo {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-weight: 700; font-size: 0.9rem; color: var(--text-muted);
 }
 
-footer a { color: var(--accent); text-decoration: none; }
-footer a:hover { text-decoration: underline; }
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .format-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-inner { grid-template-columns: repeat(2, 1fr); }
+  .stat:nth-child(2) { border-right: none; }
+}
+@media (max-width: 640px) {
+  .nav-links a:not(.btn) { display: none; }
+  .hero { padding: 8rem 1.5rem 4rem; }
+  .section { padding: 4rem 1.5rem; }
+  .features-grid { grid-template-columns: 1fr; }
+  .format-grid { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: 1fr; }
+  .stat { border-right: none; border-bottom: 1px solid var(--border); }
+  .stat:last-child { border-bottom: none; }
+  .demo-columns { grid-template-columns: 1fr; }
+}
 
-/* ── Mobile ── */
-@media (max-width: 768px) {
-  .sidebar { transform: translateX(-100%); }
-  .sidebar.open { transform: translateX(0); }
-  .menu-toggle { display: block; }
-  .main { margin-left: 0; }
-  .content { padding: 80px 20px 40px; }
-  .hero { padding: 40px 0; }
-  .hero h1 { font-size: 36px; }
-  .hero-tagline { font-size: 17px; }
-  .feature-grid { grid-template-columns: 1fr; }
+.demo-columns {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;
 }
 </style>
 </head>
 <body>
 
-<button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle navigation">&#9776;</button>
+<div class="grid-bg"></div>
 
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-header">
-    <a href="#" class="sidebar-logo">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+<!-- Nav -->
+<nav id="main-nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <span class="nav-logo-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      </span>
       pki
     </a>
-  </div>
-  <nav id="toc-nav">
-    <div class="section-label">Getting Started</div>
-    <a href="#top">Overview</a>
-    <a href="#install">Install</a>
-    <a href="#quick-start">Quick Start</a>
-
-    <div class="section-label">Usage</div>
-    <a href="#commands">Commands</a>
-    <a href="#output-formats">Output Formats</a>
-    <a href="#forensic-mode">Forensic Mode</a>
-
-    <div class="section-label">Features</div>
-    <a href="#features">Highlights</a>
-    <a href="#pqc">Post-Quantum</a>
-    <a href="#fips">FIPS Mode</a>
-    <a href="#shell-completions">Shell Completions</a>
-
-    <div class="section-label">Project</div>
-    <a href="#building">Building</a>
-    <a href="#architecture">Architecture</a>
-    <a href="#license">License</a>
-  </nav>
-</aside>
-
-<div class="main">
-<div class="content">
-
-  <header class="hero" id="top">
-    <div class="hero-badge">v0.3.0-beta.3 &middot; Pure Rust &middot; MIT</div>
-    <h1>pki</h1>
-    <p class="hero-tagline">
-      Modern PKI operations, made human. Certificate inspection, key management,
-      TLS probing, and enrollment protocols &mdash; no OpenSSL required.
-    </p>
-    <div class="hero-buttons">
-      <a href="#install" class="btn btn-primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Install
-      </a>
-      <a href="https://github.com/rayketcham-lab/pki-client" class="btn btn-secondary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#demo">Demo</a>
+      <a href="#commands">Commands</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/rayketcham-lab/PKI-Client" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         GitHub
       </a>
     </div>
-  </header>
+  </div>
+</nav>
 
-  <!-- ── Install ── -->
-  <section id="install">
-    <h2>Install</h2>
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+  <div class="hero-orb hero-orb-3"></div>
 
+  <div class="hero-badge">
+    <span class="pulse"></span>
+    v0.3.0-beta.3 &middot; Pure Rust &middot; MIT
+  </div>
+
+  <h1>
+    Modern PKI operations,<br>
+    <span class="gradient">made human</span>
+  </h1>
+
+  <p class="hero-sub">
+    Certificate inspection, key management, TLS probing, and enrollment protocols &mdash; no OpenSSL required. Single static binary.
+  </p>
+
+  <div class="hero-actions">
+    <a href="#install" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Install
+    </a>
+    <a href="https://github.com/rayketcham-lab/PKI-Client" class="btn btn-outline">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats fade-up">
+  <div class="stats-inner">
+    <div class="stat">
+      <div class="stat-value">17</div>
+      <div class="stat-label">Subcommands</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">4</div>
+      <div class="stat-label">Output Formats</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">PQC</div>
+      <div class="stat-label">Post-Quantum Ready</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">0</div>
+      <div class="stat-label">C Dependencies</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider" style="margin-top: 4rem;">
+
+<!-- Features -->
+<section class="section fade-up" id="features">
+  <div class="section-label">Features</div>
+  <h2>The PKI Swiss Army knife</h2>
+  <p>Everything you need for certificate operations, from inspection to issuance.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon cyan">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l2.5 2.5"/></svg>
+      </div>
+      <h3>Certificate Inspection</h3>
+      <p>Decode, verify, fingerprint, and check expiry for any X.509 certificate. Auto-detects PEM, DER, and PKCS#12.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon indigo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--indigo)" stroke-width="1.5"><rect x="3" y="8" width="14" height="9" rx="2"/><path d="M6 8V5a4 4 0 018 0v3"/></svg>
+      </div>
+      <h3>Key Management</h3>
+      <p>Generate RSA, ECDSA (P-256, P-384), and Ed25519 key pairs. Inspect existing keys.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon green">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--green)" stroke-width="1.5"><path d="M3 10a7 7 0 0114 0M6 10a4 4 0 018 0"/><circle cx="10" cy="10" r="1.5" fill="var(--green)"/></svg>
+      </div>
+      <h3>TLS Probing</h3>
+      <p>Connect to any TLS server, inspect the handshake, protocols, cipher suites, and lint the configuration.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon cyan">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M4 4h12v12H4z"/><path d="M4 4l6 6m0-6l6 6"/></svg>
+      </div>
+      <h3>Enrollment Protocols</h3>
+      <p>ACME (Let's Encrypt), EST (RFC 7030), and SCEP (RFC 8894) built in. No external tools needed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon indigo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--indigo)" stroke-width="1.5"><path d="M10 2l6 3v5c0 4-3 7-6 8-3-1-6-4-6-8V5l6-3z"/></svg>
+      </div>
+      <h3>Compliance &amp; FIPS</h3>
+      <p>Validate against FIPS 140-3, NIST guidelines, and Federal Bridge policies. Restrict to approved algorithms.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon green">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--green)" stroke-width="1.5"><circle cx="10" cy="10" r="8"/><path d="M7 10h6M10 7v6"/></svg>
+      </div>
+      <h3>Post-Quantum Ready</h3>
+      <p>ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) support behind the <code style="background:var(--indigo-glow);color:var(--accent);padding:2px 6px;border-radius:4px;font-size:0.8em;">pqc</code> feature flag.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Demo -->
+<section class="section fade-up" id="demo">
+  <div class="section-label">In Action</div>
+  <h2>See it work</h2>
+  <p>Human-readable output with security grades, or pipe to JSON for automation.</p>
+
+  <div class="demo-columns">
+    <!-- Quick start terminal -->
+    <div class="terminal">
+      <div class="terminal-header">
+        <span class="terminal-dot red"></span>
+        <span class="terminal-dot yellow"></span>
+        <span class="terminal-dot green"></span>
+        <span class="terminal-title">Quick Start</span>
+      </div>
+      <div class="terminal-body">
+<span class="t-comment"># Inspect any PKI file (auto-detects type)</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">show</span> <span class="t-string">server.pem</span>
+
+<span class="t-comment"># Deep forensic analysis with grades</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">cert show</span> <span class="t-string">server.pem</span> <span class="t-flag">--format forensic</span>
+
+<span class="t-comment"># Certs expiring within 30 days</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">cert expires</span> <span class="t-string">*.pem</span> <span class="t-flag">--within 30d</span>
+
+<span class="t-comment"># Probe a live TLS server</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">probe</span> <span class="t-string">example.com:443</span>
+
+<span class="t-comment"># Generate an EC key pair</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">key gen ec</span> <span class="t-flag">--curve</span> <span class="t-string">P-256</span>
+
+<span class="t-comment"># Enter interactive shell</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span>
+      </div>
+    </div>
+
+    <!-- Forensic output -->
+    <div class="terminal">
+      <div class="terminal-header">
+        <span class="terminal-dot red"></span>
+        <span class="terminal-dot yellow"></span>
+        <span class="terminal-dot green"></span>
+        <span class="terminal-title">Forensic Output</span>
+      </div>
+      <div class="terminal-body">
+<span class="t-output" style="font-weight:600;">Certificate Summary:</span>
+<span class="t-output">  Type:      End Entity (DV)</span>
+<span class="t-output">  Grade:     </span><span class="t-grade">A</span>
+<span class="t-output">  Purpose:   Server</span>
+<span class="t-output">  CA:        Let's Encrypt</span>
+
+<span class="t-header">IDENTITY</span> <span class="t-dim">────────────────────</span>
+<span class="t-output">  Subject:   CN=example.com</span>
+<span class="t-output">  Issuer:    CN=R3, O=Let's Encrypt</span>
+
+<span class="t-header">CRYPTOGRAPHIC STRENGTH</span> <span class="t-dim">──────</span>
+<span class="t-output">  Signature: ecdsa-with-SHA256</span>
+<span class="t-output">             </span><span class="t-success">STRONG</span>
+<span class="t-output">  Key:       EC 256-bit (P-256)</span>
+<span class="t-output">             </span><span class="t-success">STRONG</span>
+
+<span class="t-header">SECURITY ASSESSMENT</span> <span class="t-dim">─────────</span>
+<span class="t-success">  PASS</span><span class="t-output">  Strong signature</span>
+<span class="t-success">  PASS</span><span class="t-output">  Key meets minimum</span>
+<span class="t-success">  PASS</span><span class="t-output">  SAN extension present</span>
+<span class="t-success">  PASS</span><span class="t-output">  Revocation configured</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Commands -->
+<section class="section fade-up" id="commands">
+  <div class="section-label">Commands</div>
+  <h2>17 subcommands</h2>
+  <p>From inspection to enrollment, every PKI operation in one tool.</p>
+
+  <table class="command-table">
+    <thead><tr><th>Command</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>show</td><td>Auto-detect and display any PKI file (cert, key, CSR, CRL, PKCS#12)</td></tr>
+      <tr><td>cert</td><td>Certificate operations &mdash; show, verify, fingerprint, expires</td></tr>
+      <tr><td>key</td><td>Key generation (RSA, EC, Ed25519) and inspection</td></tr>
+      <tr><td>chain</td><td>Certificate chain building and verification</td></tr>
+      <tr><td>csr</td><td>CSR creation and inspection</td></tr>
+      <tr><td>crl</td><td>CRL viewing and revocation checking</td></tr>
+      <tr><td>revoke</td><td>OCSP and CRL revocation status lookups</td></tr>
+      <tr><td>probe</td><td>TLS server inspection with security linting</td></tr>
+      <tr><td>acme</td><td>ACME / Let's Encrypt certificate enrollment</td></tr>
+      <tr><td>est</td><td>EST protocol enrollment (RFC 7030)</td></tr>
+      <tr><td>scep</td><td>SCEP protocol (RFC 8894) &mdash; CA discovery and capabilities</td></tr>
+      <tr><td>compliance</td><td>FIPS 140-3, NIST, and Federal Bridge validation</td></tr>
+      <tr><td>dane</td><td>TLSA record generation (RFC 6698)</td></tr>
+      <tr><td>diff</td><td>Side-by-side certificate comparison</td></tr>
+      <tr><td>convert</td><td>Format conversion (PEM / DER / PKCS#12)</td></tr>
+      <tr><td>completions</td><td>Shell completion scripts (bash, zsh, fish)</td></tr>
+      <tr><td>manpages</td><td>Generate man pages</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr class="divider">
+
+<!-- Output Formats -->
+<section class="section fade-up" id="formats">
+  <div class="section-label">Output Formats</div>
+  <h2>Four ways to see your data</h2>
+  <p>Every command supports four output modes via <code style="background:var(--indigo-glow);color:var(--accent);padding:2px 6px;border-radius:4px;font-size:0.9em;">--format</code>.</p>
+
+  <div class="format-grid">
+    <div class="format-card">
+      <div class="format-name">text</div>
+      <div class="format-flag">-f text (default)</div>
+      <div class="format-desc">Human-readable with colors, OpenSSL-style layout</div>
+    </div>
+    <div class="format-card">
+      <div class="format-name">json</div>
+      <div class="format-flag">-f json</div>
+      <div class="format-desc">Machine-readable for scripting and automation</div>
+    </div>
+    <div class="format-card">
+      <div class="format-name">compact</div>
+      <div class="format-flag">-f compact</div>
+      <div class="format-desc">One line per cert &mdash; status dashboards</div>
+    </div>
+    <div class="format-card">
+      <div class="format-name">forensic</div>
+      <div class="format-flag">-f forensic</div>
+      <div class="format-desc">Deep-dive &mdash; hex dumps, security grades, RFC refs</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Install -->
+<section class="section fade-up" id="install">
+  <div class="section-label">Install</div>
+  <h2>Get started</h2>
+  <p>One command to install. Zero runtime dependencies.</p>
+
+  <div class="install-block">
     <h3>From source (via Cargo)</h3>
-    <pre><code class="language-bash">cargo install --git https://github.com/rayketcham-lab/pki-client.git</code></pre>
+    <pre><span class="cmd">cargo install</span> <span class="flag">--git</span> https://github.com/rayketcham-lab/PKI-Client.git</pre>
+  </div>
 
+  <div class="install-block">
     <h3>Pre-built binaries</h3>
-    <p>Download static Linux binaries from <a href="https://github.com/rayketcham-lab/pki-client/releases" style="color: var(--accent)">GitHub Releases</a>. No runtime dependencies.</p>
-    <pre><code class="language-bash"># Download and install (Linux x86_64, static musl binary)
-curl -sL https://github.com/rayketcham-lab/pki-client/releases/latest/download/pki-x86_64-unknown-linux-musl.tar.gz | tar xz
-sudo mv pki /usr/local/bin/</code></pre>
+    <pre><span class="comment"># Download static Linux binary (no dependencies)</span>
+<span class="cmd">curl</span> -sL https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-x86_64-unknown-linux-musl.tar.gz | <span class="cmd">tar</span> xz
+<span class="cmd">sudo mv</span> pki /usr/local/bin/</pre>
+  </div>
 
+  <div class="install-block">
     <h3>With post-quantum support</h3>
-    <pre><code class="language-bash">cargo install --git https://github.com/rayketcham-lab/pki-client.git --features pqc</code></pre>
-  </section>
+    <pre><span class="cmd">cargo install</span> <span class="flag">--git</span> https://github.com/rayketcham-lab/PKI-Client.git <span class="flag">--features</span> pqc</pre>
+  </div>
 
-  <!-- ── Quick Start ── -->
-  <section id="quick-start">
-    <h2>Quick Start</h2>
+  <div class="install-block">
+    <h3>Shell completions</h3>
+    <pre><span class="comment"># Bash</span>
+<span class="cmd">pki</span> completions bash > /etc/bash_completion.d/pki
 
-    <pre><code class="language-bash"># Inspect any PKI file (auto-detects certificates, keys, CSRs, CRLs)
-pki show server.pem
+<span class="comment"># Zsh</span>
+<span class="cmd">pki</span> completions zsh > ~/.zfunc/_pki
 
-# Deep forensic analysis with security grades
-pki cert show server.pem --format forensic
+<span class="comment"># Fish</span>
+<span class="cmd">pki</span> completions fish > ~/.config/fish/completions/pki.fish</pre>
+  </div>
+</section>
 
-# Check which certs expire within 30 days
-pki cert expires *.pem --within 30d
+<hr class="divider">
 
-# Probe a live TLS server
-pki probe example.com:443
+<!-- Architecture -->
+<section class="section fade-up" id="architecture">
+  <div class="section-label">Architecture</div>
+  <h2>Four crates, clean separation</h2>
+  <p>Modular workspace design with a shared CA engine.</p>
 
-# Generate an EC key pair
-pki key gen ec --curve P-256
+  <table class="command-table">
+    <thead><tr><th>Crate</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>pki-client</td><td>Binary &mdash; CLI entry point, 17 subcommands, interactive shell</td></tr>
+      <tr><td>pki-client-output</td><td>Library &mdash; certificate formatting, OID registry, display</td></tr>
+      <tr><td>pki-probe</td><td>Library &mdash; TLS inspection, cipher analysis, security linting</td></tr>
+      <tr><td>pki-hierarchy</td><td>Library &mdash; declarative PKI hierarchy builder</td></tr>
+      <tr><td>spork-core</td><td>External &mdash; CA crypto engine (git dependency)</td></tr>
+    </tbody>
+  </table>
+</section>
 
-# Build and verify a certificate chain
-pki chain build server.pem
+<hr class="divider">
 
-# Enter interactive shell
-pki</code></pre>
+<!-- CTA -->
+<section class="cta-section fade-up">
+  <h2>Ready to modernize your PKI workflow?</h2>
+  <p>Pure Rust, zero C dependencies, human-friendly output. The PKI tool you've been waiting for.</p>
+  <div class="hero-actions">
+    <a href="#install" class="btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Install Now
+    </a>
+    <a href="https://github.com/rayketcham-lab/PKI-Client" class="btn btn-outline">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      Star on GitHub
+    </a>
+  </div>
+</section>
 
-    <div class="callout">
-      <strong>Tip:</strong> Run <code>pki</code> with no arguments to enter the interactive shell with tab completion and history.
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      <span>MIT License &middot; &copy; 2026 Ray Ketcham</span>
     </div>
-  </section>
-
-  <!-- ── Commands ── -->
-  <section id="commands">
-    <h2>Commands</h2>
-
-    <table class="command-table">
-      <thead><tr><th>Command</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td>show</td><td>Auto-detect and display any PKI file (cert, key, CSR, CRL, PKCS#12)</td></tr>
-        <tr><td>cert</td><td>Certificate operations &mdash; show, verify, fingerprint, expires</td></tr>
-        <tr><td>key</td><td>Key generation (RSA, EC, Ed25519) and inspection</td></tr>
-        <tr><td>chain</td><td>Certificate chain building and verification</td></tr>
-        <tr><td>csr</td><td>CSR creation and inspection</td></tr>
-        <tr><td>crl</td><td>CRL viewing and revocation checking</td></tr>
-        <tr><td>revoke</td><td>OCSP and CRL revocation status lookups</td></tr>
-        <tr><td>probe</td><td>TLS server inspection with security linting</td></tr>
-        <tr><td>acme</td><td>ACME / Let's Encrypt certificate enrollment</td></tr>
-        <tr><td>est</td><td>EST protocol enrollment (RFC 7030)</td></tr>
-        <tr><td>scep</td><td>SCEP protocol enrollment (RFC 8894)</td></tr>
-        <tr><td>compliance</td><td>FIPS 140-3, NIST, and Federal Bridge validation</td></tr>
-        <tr><td>dane</td><td>TLSA record generation (RFC 6698)</td></tr>
-        <tr><td>diff</td><td>Side-by-side certificate comparison</td></tr>
-        <tr><td>convert</td><td>Format conversion (PEM / DER / PKCS#12)</td></tr>
-        <tr><td>completions</td><td>Shell completion scripts (bash, zsh, fish)</td></tr>
-        <tr><td>manpages</td><td>Generate man pages</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- ── Output Formats ── -->
-  <section id="output-formats">
-    <h2>Output Formats</h2>
-    <p>Every command supports four output modes via <code>--format</code> / <code>-f</code>:</p>
-
-    <div class="format-grid">
-      <div class="format-card">
-        <div class="format-name">text</div>
-        <div class="format-flag">-f text (default)</div>
-        <div class="format-desc">Human-readable with colors, OpenSSL-style layout</div>
-      </div>
-      <div class="format-card">
-        <div class="format-name">json</div>
-        <div class="format-flag">-f json</div>
-        <div class="format-desc">Machine-readable for scripting and automation</div>
-      </div>
-      <div class="format-card">
-        <div class="format-name">compact</div>
-        <div class="format-flag">-f compact</div>
-        <div class="format-desc">One line per cert &mdash; status dashboards</div>
-      </div>
-      <div class="format-card">
-        <div class="format-name">forensic</div>
-        <div class="format-flag">-f forensic</div>
-        <div class="format-desc">Deep-dive &mdash; hex dumps, security grades, RFC refs</div>
-      </div>
+    <div class="footer-links">
+      <a href="https://github.com/rayketcham-lab/PKI-Client">Source</a>
+      <a href="https://github.com/rayketcham-lab/PKI-Client/releases">Releases</a>
+      <a href="https://github.com/rayketcham-lab/PKI-Client/issues">Issues</a>
+      <a href="https://github.com/rayketcham-lab/PKI-Client/blob/main/LICENSE">License</a>
     </div>
-  </section>
+  </div>
+</footer>
 
-  <!-- ── Forensic Mode ── -->
-  <section id="forensic-mode">
-    <h2>Forensic Mode</h2>
-    <p>The forensic format decodes every field, assesses cryptographic strength, and flags security concerns:</p>
-
-    <div class="output-sample"><span class="w">Certificate Summary:</span>
-    Type:           End Entity (DV)
-    Grade:          <span class="g">A</span>
-    Purpose:        Server
-    CA Vendor:      Let's Encrypt
-
-<span class="b">IDENTITY</span> <span class="d">──────────────────────────────────────────────────────</span>
-  Subject:          CN=example.com
-  Issuer:           CN=R3, O=Let's Encrypt, C=US
-  Serial:           04:a1:b2:c3:d4:e5:f6
-
-<span class="b">CRYPTOGRAPHIC STRENGTH</span> <span class="d">────────────────────────────────────────────</span>
-  Signature:        ecdsa-with-SHA256
-                    <span class="g">STRONG</span> — current standard
-  Key:              EC 256-bit (P-256)
-                    <span class="g">STRONG</span> — ~128-bit security (P-256)
-
-<span class="b">VALIDITY</span> <span class="d">─────────────────────────────────────────────────────</span>
-  Not Before:       Jan 15 00:00:00 2026 UTC
-  Not After:        Apr 15 23:59:59 2026 UTC
-  Lifetime:         <span class="g">24.7% used</span>  (67 of 90 days remaining)
-
-<span class="b">SECURITY ASSESSMENT</span> <span class="d">──────────────────────────────────────────────</span>
-  <span class="g">PASS</span>  Strong signature algorithm
-  <span class="g">PASS</span>  Key meets minimum requirements
-  <span class="g">PASS</span>  SAN extension present
-  <span class="g">PASS</span>  Revocation endpoints configured</div>
-  </section>
-
-  <!-- ── Features ── -->
-  <section id="features">
-    <h2>Highlights</h2>
-
-    <div class="feature-grid">
-      <div class="feature-card">
-        <span class="feature-icon">&#x1f512;</span>
-        <h3>Pure Rust</h3>
-        <p>No OpenSSL, no C dependencies. Built on rustls, ring, and aws-lc-rs. Single static binary.</p>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">&#x1f50d;</span>
-        <h3>Forensic Analysis</h3>
-        <p>Decode every certificate field. Hex dumps, security grades, RFC references, and CA vendor detection.</p>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">&#x1f310;</span>
-        <h3>TLS Probing</h3>
-        <p>Inspect live servers. Protocol versions, cipher suites, chain validation, and security linting.</p>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">&#x1f4dc;</span>
-        <h3>Enrollment Protocols</h3>
-        <p>ACME (Let's Encrypt), EST (RFC 7030), and SCEP (RFC 8894) built in. No external tools needed.</p>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">&#x1f6e1;&#xfe0f;</span>
-        <h3>Compliance</h3>
-        <p>Validate against FIPS 140-3, NIST guidelines, and Federal Bridge policies in a single command.</p>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">&#x269b;&#xfe0f;</span>
-        <h3>Post-Quantum Ready</h3>
-        <p>ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) support behind the <code>pqc</code> feature flag.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── PQC ── -->
-  <section id="pqc">
-    <h2>Post-Quantum Cryptography</h2>
-    <p>Build with the <code>pqc</code> feature flag to enable NIST post-quantum algorithms:</p>
-    <pre><code class="language-bash">cargo install --git https://github.com/rayketcham-lab/pki-client.git --features pqc</code></pre>
-    <p>Supported algorithms:</p>
-    <table class="command-table">
-      <thead><tr><th>Algorithm</th><th>Standard</th><th>Type</th></tr></thead>
-      <tbody>
-        <tr><td>ML-DSA-44</td><td>FIPS 204</td><td>Lattice-based signature</td></tr>
-        <tr><td>ML-DSA-65</td><td>FIPS 204</td><td>Lattice-based signature</td></tr>
-        <tr><td>ML-DSA-87</td><td>FIPS 204</td><td>Lattice-based signature</td></tr>
-        <tr><td>SLH-DSA</td><td>FIPS 205</td><td>Stateless hash-based signature</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- ── FIPS ── -->
-  <section id="fips">
-    <h2>FIPS Mode</h2>
-    <p>Pass <code>--fips</code> to restrict all operations to FIPS 140-3 approved algorithms. Non-compliant certificates and keys are flagged.</p>
-    <pre><code class="language-bash">pki --fips cert show server.pem
-pki --fips probe example.com:443
-pki --fips compliance check /path/to/certs/</code></pre>
-  </section>
-
-  <!-- ── Shell Completions ── -->
-  <section id="shell-completions">
-    <h2>Shell Completions</h2>
-    <pre><code class="language-bash"># Bash
-pki completions bash > /etc/bash_completion.d/pki
-
-# Zsh
-pki completions zsh > ~/.zfunc/_pki
-echo 'fpath=(~/.zfunc $fpath)' >> ~/.zshrc
-
-# Fish
-pki completions fish > ~/.config/fish/completions/pki.fish</code></pre>
-  </section>
-
-  <!-- ── Building ── -->
-  <section id="building">
-    <h2>Building from Source</h2>
-    <pre><code class="language-bash">git clone https://github.com/rayketcham-lab/pki-client.git
-cd pki-client
-cargo build --release
-# Binary at target/release/pki</code></pre>
-
-    <h3>Static binary (no runtime dependencies)</h3>
-    <pre><code class="language-bash">rustup target add x86_64-unknown-linux-musl
-cargo build --release --target x86_64-unknown-linux-musl
-# Fully static, deploy anywhere</code></pre>
-  </section>
-
-  <!-- ── Architecture ── -->
-  <section id="architecture">
-    <h2>Architecture</h2>
-    <p>Four crates, clean separation of concerns:</p>
-
-    <table class="command-table">
-      <thead><tr><th>Crate</th><th>Role</th></tr></thead>
-      <tbody>
-        <tr><td>pki-client</td><td>Binary &mdash; CLI, interactive shell, 17 subcommands</td></tr>
-        <tr><td>pki-client-output</td><td>Library &mdash; certificate formatting, OID registry</td></tr>
-        <tr><td>pki-probe</td><td>Library &mdash; TLS inspection and security linting</td></tr>
-        <tr><td>pki-hierarchy</td><td>Library &mdash; declarative PKI hierarchy builder</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- ── License ── -->
-  <section id="license">
-    <h2>License</h2>
-    <p>MIT &mdash; see <a href="https://github.com/rayketcham-lab/pki-client/blob/main/LICENSE" style="color: var(--accent)">LICENSE</a> for details.</p>
-  </section>
-
-  <footer>
-    <p>Built by <a href="https://github.com/rayketcham-lab">rayketcham-lab</a> &middot; <a href="https://github.com/rayketcham-lab/pki-client">Source on GitHub</a></p>
-  </footer>
-
-</div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
 <script>
-// Active sidebar link tracking
-const sections = document.querySelectorAll('section[id], header[id]');
-const navLinks = document.querySelectorAll('#toc-nav a');
-
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      navLinks.forEach(link => {
-        link.classList.toggle('active',
-          link.getAttribute('href') === '#' + entry.target.id);
-      });
-    }
-  });
-}, { rootMargin: '-20% 0px -75% 0px' });
-
-sections.forEach(section => observer.observe(section));
-
-// Close sidebar on mobile when clicking a link
-document.querySelectorAll('.sidebar nav a').forEach(link => {
-  link.addEventListener('click', () => {
-    if (window.innerWidth <= 768) {
-      document.getElementById('sidebar').classList.remove('open');
-    }
-  });
+const nav = document.getElementById('main-nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 20);
 });
+
+const fadeEls = document.querySelectorAll('.fade-up');
+const fadeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) entry.target.classList.add('visible');
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+fadeEls.forEach(el => fadeObserver.observe(el));
 </script>
+
 </body>
 </html>
