@@ -1,24 +1,48 @@
-# pki
+# PKI-Client
+
+[![Version](https://img.shields.io/badge/version-0.3.0--beta.3-blue)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-pure-orange)](https://www.rust-lang.org/)
+[![No OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen)]()
+[![CI](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
 
 Modern PKI CLI tool — certificate inspection, key management, TLS probing, and enrollment protocols.
 
 Pure Rust. No OpenSSL dependency. Human-friendly output.
 
-## Install
+---
 
-### From source
+## Table of Contents
 
-```bash
-cargo install --git https://github.com/rayketcham-lab/pki-client.git
-```
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Output Formats](#output-formats)
+- [Commands](#commands)
+- [Architecture](#architecture)
+- [Install](#install)
+- [Shell Completions](#shell-completions)
+- [Building from Source](#building-from-source)
+- [Security](#security)
+- [License](#license)
 
-### Pre-built binaries
+## Features
 
-Download from [GitHub Releases](https://github.com/rayketcham-lab/pki-client/releases).
+- **Certificate inspection** — decode, verify, fingerprint, and expiry checks for X.509 certs
+- **Key management** — generate RSA, ECDSA, Ed25519 key pairs
+- **TLS probing** — connect to any TLS server, inspect the handshake, lint the configuration
+- **Chain building** — construct and verify certificate chains from loose files
+- **CSR / CRL** — create and inspect certificate signing requests and revocation lists
+- **Revocation checking** — OCSP and CRL-based revocation status
+- **Enrollment protocols** — ACME (Let's Encrypt), EST (RFC 7030), SCEP (RFC 8894)
+- **Compliance validation** — FIPS 140-3, NIST, and Federal Bridge policy checks
+- **DANE / TLSA** — generate TLSA DNS records (RFC 6698)
+- **Post-quantum cryptography** — ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) with `--features pqc`
+- **FIPS mode** — restrict operations to FIPS 140-3 approved algorithms with `--fips`
+- **Four output formats** — text, JSON, compact, forensic (deep-dive with hex dumps and security grades)
+- **Interactive shell** — run `pki` with no arguments for a REPL session
+- **Static binaries** — musl builds with zero runtime dependencies
 
-Static Linux binaries (musl) are available — no runtime dependencies.
-
-## Quick start
+## Quick Start
 
 ```bash
 # Inspect any PKI file (auto-detects type)
@@ -43,56 +67,82 @@ pki chain build server.pem
 pki
 ```
 
-## Output formats
+## Output Formats
 
-| Format     | Flag                 | Use case                        |
-|------------|----------------------|---------------------------------|
-| `text`     | `--format text` (default) | Human-readable with colors |
-| `json`     | `--format json`      | Scripting and automation        |
-| `compact`  | `--format compact`   | One-line-per-cert dashboards    |
-| `forensic` | `--format forensic`  | Deep-dive analysis, hex dumps, security grades |
+| Format     | Flag                      | Use case                                          |
+|------------|---------------------------|---------------------------------------------------|
+| `text`     | `--format text` (default) | Human-readable with colors                        |
+| `json`     | `--format json`           | Scripting and automation                          |
+| `compact`  | `--format compact`        | One-line-per-cert dashboards                      |
+| `forensic` | `--format forensic`       | Deep-dive analysis, hex dumps, security grades    |
 
 ## Commands
 
-| Command      | Description                                      |
-|--------------|--------------------------------------------------|
-| `show`       | Auto-detect and display any PKI file             |
-| `cert`       | Certificate operations (show, verify, fingerprint, expires) |
-| `key`        | Key generation and inspection                    |
-| `chain`      | Certificate chain building and verification      |
-| `csr`        | CSR creation and inspection                      |
-| `crl`        | CRL viewing and revocation checking              |
-| `revoke`     | OCSP and CRL revocation status                   |
-| `probe`      | TLS server inspection and linting                |
-| `acme`       | ACME/Let's Encrypt certificate enrollment        |
-| `est`        | EST protocol enrollment (RFC 7030)               |
-| `scep`       | SCEP protocol enrollment (RFC 8894)              |
-| `compliance` | FIPS 140-3, NIST, and Federal Bridge validation  |
-| `dane`       | TLSA record generation (RFC 6698)                |
-| `diff`       | Certificate comparison                           |
-| `convert`    | Format conversion (PEM/DER/PKCS#12)              |
-| `completions`| Shell completion scripts                         |
-| `manpages`   | Generate man pages                               |
+| Command       | Description                                              |
+|---------------|----------------------------------------------------------|
+| `show`        | Auto-detect and display any PKI file                     |
+| `cert`        | Certificate operations (show, verify, fingerprint, expires) |
+| `key`         | Key generation and inspection                            |
+| `chain`       | Certificate chain building and verification              |
+| `csr`         | CSR creation and inspection                              |
+| `crl`         | CRL viewing and revocation checking                      |
+| `revoke`      | OCSP and CRL revocation status                           |
+| `probe`       | TLS server inspection and linting                        |
+| `acme`        | ACME / Let's Encrypt certificate enrollment              |
+| `est`         | EST protocol enrollment (RFC 7030)                       |
+| `scep`        | SCEP protocol enrollment (RFC 8894)                      |
+| `compliance`  | FIPS 140-3, NIST, and Federal Bridge validation          |
+| `dane`        | TLSA record generation (RFC 6698)                        |
+| `diff`        | Certificate comparison                                   |
+| `convert`     | Format conversion (PEM / DER / PKCS#12)                  |
+| `completions` | Shell completion scripts                                 |
+| `manpages`    | Generate man pages                                       |
 
-## Features
+## Architecture
 
-### Post-quantum cryptography
-
-Build with `--features pqc` to enable ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) support.
-
-```bash
-cargo build --release --features pqc
+```
+┌─────────────────────────────────────────────────────┐
+│                    pki (binary)                      │
+│              17 subcommands + shell                  │
+├──────────┬──────────────┬───────────────────────────┤
+│          │              │                           │
+│  pki-client-output      │  pki-probe                │
+│  Formatting, OID        │  TLS inspection           │
+│  registry, display      │  & linting                │
+│          │              │                           │
+│          │   pki-hierarchy                          │
+│          │   Declarative PKI                        │
+│          │   hierarchy builder                      │
+│          │              │                           │
+├──────────┴──────────────┴───────────────────────────┤
+│              spork-core (CA engine)                  │
+│        Crypto primitives, signing, certs             │
+└─────────────────────────────────────────────────────┘
 ```
 
-### FIPS mode
+| Crate              | Role                                        |
+|---------------------|---------------------------------------------|
+| `pki-client`        | Binary — CLI entry point, 17 subcommands    |
+| `pki-client-output` | Library — formatting, OID registry          |
+| `pki-probe`         | Library — TLS inspection and linting        |
+| `pki-hierarchy`     | Library — declarative PKI hierarchy builder |
+| `spork-core`        | External — CA crypto engine (git dependency)|
 
-Run with `--fips` to restrict operations to FIPS 140-3 approved algorithms.
+## Install
+
+### From source
 
 ```bash
-pki --fips cert show server.pem
+cargo install --git https://github.com/rayketcham-lab/PKI-Client.git
 ```
 
-## Shell completions
+### Pre-built binaries
+
+Download from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases).
+
+Static Linux binaries (musl) are available — no runtime dependencies.
+
+## Shell Completions
 
 ```bash
 # Bash
@@ -105,11 +155,11 @@ pki completions zsh > ~/.zfunc/_pki
 pki completions fish > ~/.config/fish/completions/pki.fish
 ```
 
-## Building from source
+## Building from Source
 
 ```bash
-git clone https://github.com/rayketcham-lab/pki-client.git
-cd pki-client
+git clone https://github.com/rayketcham-lab/PKI-Client.git
+cd PKI-Client
 cargo build --release
 # Binary at target/release/pki
 ```
@@ -120,6 +170,30 @@ Static musl binary (no runtime dependencies):
 rustup target add x86_64-unknown-linux-musl
 cargo build --release --target x86_64-unknown-linux-musl
 ```
+
+Post-quantum support:
+
+```bash
+cargo build --release --features pqc
+```
+
+FIPS mode:
+
+```bash
+pki --fips cert show server.pem
+```
+
+## Security
+
+- **No OpenSSL dependency** — pure Rust crypto stack eliminates an entire class of C memory-safety vulnerabilities
+- **No unsafe code** in application logic — only in vetted dependencies (`ring`, `rustls`)
+- **Constant-time comparisons** for cryptographic material via underlying libraries
+- **No secret logging** — keys and private material are never written to stdout or logs
+- **Static binaries** — musl builds eliminate shared-library supply-chain risk
+- **FIPS 140-3 mode** — restrict all operations to approved algorithms when compliance is required
+- **Input validation** — all file parsing uses safe, bounds-checked Rust decoders
+
+To report a security vulnerability, please open a private security advisory on the [GitHub repository](https://github.com/rayketcham-lab/PKI-Client/security/advisories).
 
 ## License
 
