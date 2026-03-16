@@ -172,7 +172,7 @@ jobs:
           git config --unset-all http.https://github.com/.extraheader || true
           git config --global --unset-all http.https://github.com/.extraheader || true
           for i in 1 2 3; do
-            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0398; then
+            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370; then
               break
             fi
             echo "Retry $i: advisory database fetch failed, retrying..."

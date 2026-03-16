@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "pki-client"
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1946,7 +1946,7 @@ dependencies = [
 
 [[package]]
 name = "pki-client-output"
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.3"
 dependencies = [
  "base64",
  "chrono",
@@ -1964,7 +1964,7 @@ dependencies = [
 
 [[package]]
 name = "pki-hierarchy"
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.3"
 dependencies = [
  "const-oid 0.9.6",
  "hex",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "pki-probe"
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.3"
 dependencies = [
  "base64",
  "chrono",

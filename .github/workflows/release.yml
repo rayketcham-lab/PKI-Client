@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    name: Build Linux (${{ matrix.target }})
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          targets: ${{ matrix.target }}
+          cache-prefix: release-${{ matrix.target }}
+          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+      - name: Install musl toolchain
+        if: contains(matrix.target, 'musl')
+        run: |
+          if ! command -v musl-gcc &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools
+          fi
+      - name: Build
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: cargo build --release --target "$BUILD_TARGET"
+      - name: Package
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          cd "target/${BUILD_TARGET}/release"
+          tar czf "../../../pki-${TAG_NAME}-${BUILD_TARGET}.tar.gz" pki
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: pki-${{ matrix.target }}
+          path: pki-*.tar.gz
+
+  release:
+    name: Create Release
+    needs: [build-linux]
+    runs-on: [self-hosted, Linux]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          merge-multiple: true
+      - name: Generate checksums
+        run: sha256sum pki-*.tar.gz > SHA256SUMS.txt
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --generate-notes \
+            pki-*.tar.gz SHA256SUMS.txt
