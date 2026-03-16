@@ -33,9 +33,11 @@ Pure Rust. No OpenSSL dependency. Human-friendly output.
 - **Chain building** — construct and verify certificate chains from loose files
 - **CSR / CRL** — create and inspect certificate signing requests and revocation lists
 - **Revocation checking** — OCSP and CRL-based revocation status
-- **Enrollment protocols** — ACME (Let's Encrypt), EST (RFC 7030), SCEP (RFC 8894)
+- **ACME enrollment** — automated Let's Encrypt certificate issuance and renewal
+- **EST enrollment** — Enrollment over Secure Transport for enterprise CAs
+- **SCEP transport** — CA discovery and capabilities; full enrollment planned ([#1](https://github.com/rayketcham-lab/PKI-Client/issues/1))
 - **Compliance validation** — FIPS 140-3, NIST, and Federal Bridge policy checks
-- **DANE / TLSA** — generate TLSA DNS records (RFC 6698)
+- **DANE / TLSA** — generate and verify TLSA DNS records for DANE
 - **Post-quantum cryptography** — ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) with `--features pqc`
 - **FIPS mode** — restrict operations to FIPS 140-3 approved algorithms with `--fips`
 - **Four output formats** — text, JSON, compact, forensic (deep-dive with hex dumps and security grades)
@@ -88,11 +90,11 @@ pki
 | `crl`         | CRL viewing and revocation checking                      |
 | `revoke`      | OCSP and CRL revocation status                           |
 | `probe`       | TLS server inspection and linting                        |
-| `acme`        | ACME / Let's Encrypt certificate enrollment              |
-| `est`         | EST protocol enrollment (RFC 7030)                       |
-| `scep`        | SCEP protocol enrollment (RFC 8894)                      |
+| `acme`        | Automated Let's Encrypt certificate enrollment           |
+| `est`         | EST enrollment for enterprise CAs                        |
+| `scep`        | SCEP CA discovery and capabilities                       |
 | `compliance`  | FIPS 140-3, NIST, and Federal Bridge validation          |
-| `dane`        | TLSA record generation (RFC 6698)                        |
+| `dane`        | TLSA record generation and verification                  |
 | `diff`        | Certificate comparison                                   |
 | `convert`     | Format conversion (PEM / DER / PKCS#12)                  |
 | `completions` | Shell completion scripts                                 |
@@ -138,9 +140,7 @@ cargo install --git https://github.com/rayketcham-lab/PKI-Client.git
 
 ### Pre-built binaries
 
-Download from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases).
-
-Static Linux binaries (musl) are available — no runtime dependencies.
+Pre-built static Linux binaries will be published to [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases) starting with the first stable release.
 
 ## Shell Completions
 

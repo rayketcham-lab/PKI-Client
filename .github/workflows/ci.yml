@@ -150,6 +150,24 @@ jobs:
             echo "WARN: pki may not be fully static"
           fi
 
+  links:
+    name: Link Check
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install lychee
+        run: which lychee || cargo install lychee --locked
+      - name: Check markdown links
+        run: |
+          lychee \
+            --no-progress \
+            --exclude 'img.shields.io' \
+            --exclude 'github.com/rayketcham-lab/PKI-Client/releases$' \
+            '**/*.md'
+
   audit:
     name: Security Audit
     runs-on: [self-hosted, Linux]
