@@ -1,7 +1,7 @@
 # PKI-Client
 
 [![Version](https://img.shields.io/badge/version-0.3.0--beta.3-blue)](https://github.com/rayketcham-lab/PKI-Client/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-pure-orange)](https://www.rust-lang.org/)
 [![No OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen)]()
 [![CI](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
@@ -197,4 +197,4 @@ To report a security vulnerability, please open a private security advisory on t
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](LICENSE).
