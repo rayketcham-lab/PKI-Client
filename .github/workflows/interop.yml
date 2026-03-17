@@ -1,0 +1,132 @@
+name: Interop Tests
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # 05:00 UTC daily (well after daily-check at 02:30)
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/pki-client/src/acme/**'
+      - 'crates/pki-client/src/est/**'
+      - 'crates/pki-client/src/commands/acme/**'
+      - 'crates/pki-client/src/commands/est.rs'
+      - 'crates/pki-client/src/commands/probe.rs'
+      - 'crates/pki-probe/**'
+      - 'vendor/spork-core/**'
+      - 'tests/interop/**'
+      - '**/Cargo.toml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: interop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────
+  # Build pki binary for interop tests
+  # ──────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: interop
+      - name: Build release binary
+        run: cargo build --release
+      - name: Upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: pki-binary
+          path: target/release/pki
+          retention-days: 1
+
+  # ──────────────────────────────────────────────────────────────────
+  # ACME interop — test against Pebble (Let's Encrypt test server)
+  # ──────────────────────────────────────────────────────────────────
+  acme-pebble:
+    name: ACME vs Pebble
+    if: ${{ vars.HAS_DOCKER == 'true' }}
+    needs: [build]
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 15
+    services:
+      pebble:
+        image: letsencrypt/pebble:latest
+        env:
+          PEBBLE_VA_NOSLEEP: 1
+          PEBBLE_VA_ALWAYS_VALID: 1
+        ports:
+          - 14000:14000   # ACME directory
+          - 15000:15000   # Management / OCSP
+        options: >-
+          --health-cmd "wget -q --no-check-certificate -O /dev/null https://localhost:14000/dir || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: pki-binary
+      - name: Prepare binary
+        run: chmod +x pki
+      - name: Run ACME interop tests
+        env:
+          PKI_BIN: ./pki
+          PEBBLE_URL: https://localhost:14000/dir
+        run: bash tests/interop/acme_pebble.sh
+
+  # ──────────────────────────────────────────────────────────────────
+  # TLS probe interop — test against known public endpoints
+  # ──────────────────────────────────────────────────────────────────
+  tls-probe:
+    name: TLS Probe
+    needs: [build]
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: pki-binary
+      - name: Prepare binary
+        run: chmod +x pki
+      - name: Run TLS probe interop tests
+        env:
+          PKI_BIN: ./pki
+        run: bash tests/interop/tls_probe.sh
+
+  # ──────────────────────────────────────────────────────────────────
+  # Certificate operations — round-trip testing
+  # ──────────────────────────────────────────────────────────────────
+  cert-roundtrip:
+    name: Certificate Round-Trip
+    needs: [build]
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: pki-binary
+      - name: Prepare binary
+        run: chmod +x pki
+      - name: Run certificate round-trip tests
+        env:
+          PKI_BIN: ./pki
+        run: bash tests/interop/cert_roundtrip.sh

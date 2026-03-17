@@ -22,22 +22,29 @@ Modern PKI CLI tool -- certificate inspection, key management, TLS probing, and 
 
 ---
 
-## Architecture (4 crates + 1 tool)
+## Architecture (4 crates + 1 vendored + 1 tool)
 
 ```
 crates/
-  pki-client/          # Binary: pki (17 subcommands + interactive shell)
+  pki-client/          # Binary: pki (19 subcommands + interactive shell)
   pki-client-output/   # Library: formatting, OID registry
   pki-probe/           # Library: TLS inspection + linting
   pki-hierarchy/       # Library: declarative PKI hierarchy builder
 
+vendor/
+  spork-core/          # Vendored CA crypto engine (from spork-ca-engine)
+
 tools/
   gen-signing-certs/   # Test cert generator (PQC + classical -> PFX)
+
+tests/
+  interop/             # Interop test scripts (ACME/Pebble, TLS probe, cert round-trip)
 ```
 
 ## Dependencies
 
-- `spork-core` -- CA crypto engine (git dep from rayketcham-lab/spork-ca-engine)
+- `spork-core` -- CA crypto engine (vendored under vendor/spork-core/)
+- **No git dependencies** -- all deps are vendored or from crates.io (enforced by CI)
 
 ## Features
 

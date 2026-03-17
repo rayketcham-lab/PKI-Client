@@ -1,5 +1,5 @@
 name: 'Rust Setup'
-description: 'Install Rust toolchain, components, configure caching and git auth'
+description: 'Install Rust toolchain, components, and configure caching'
 
 inputs:
   components:
@@ -14,10 +14,6 @@ inputs:
     description: 'Cache key prefix for isolation between job types'
     required: false
     default: 'default'
-  cross-repo-token:
-    description: 'Token for cross-repo git dependency access'
-    required: false
-    default: ''
 
 runs:
   using: 'composite'
@@ -66,36 +62,6 @@ runs:
         rustc --version --verbose
         cargo --version
         echo "::endgroup::"
-
-    - name: Configure git auth for cross-repo deps
-      if: inputs.cross-repo-token != ''
-      shell: bash
-      env:
-        CROSS_REPO_TOKEN: ${{ inputs.cross-repo-token }}
-      run: |
-        # Remove checkout-injected extraheaders
-        git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
-        git config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
-        # Purge ALL stale url.*.insteadOf entries from global config
-        # (previous CI runs accumulated expired ghs_ tokens that shadow new entries)
-        git config --global --get-regexp "url\..*\.insteadof" | awk '{print $1}' | while IFS= read -r key; do
-          section="${key%.*}"
-          git config --global --remove-section "$section" 2>/dev/null || true
-        done
-        # Set fresh auth URL (single entry, no stale competition)
-        AUTH_URL="https://x-access-token:${CROSS_REPO_TOKEN}@github.com/"
-        git config --global url."${AUTH_URL}".insteadOf "https://github.com/"
-        git config --global --add url."${AUTH_URL}".insteadOf "ssh://git@github.com/"
-        # Verify
-        echo "insteadOf entries after cleanup:"
-        git config --global --get-regexp "url.*insteadof" | wc -l
-
-    - name: Configure cargo to use git CLI for fetches
-      shell: bash
-      env:
-        CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-      run: |
-        echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
 
     - name: Cache cargo registry + build artifacts
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3

@@ -12,44 +12,44 @@ env:
 
 jobs:
   build-linux:
-    name: Build Linux (${{ matrix.target }})
+    name: Build Linux (static musl)
     runs-on: [self-hosted, Linux]
     timeout-minutes: 30
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          targets: ${{ matrix.target }}
-          cache-prefix: release-${{ matrix.target }}
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+          targets: x86_64-unknown-linux-musl
+          cache-prefix: release-musl
       - name: Install musl toolchain
-        if: contains(matrix.target, 'musl')
         run: |
           if ! command -v musl-gcc &> /dev/null; then
             sudo apt-get update
             sudo apt-get install -y musl-tools
           fi
-      - name: Build
-        env:
-          BUILD_TARGET: ${{ matrix.target }}
-        run: cargo build --release --target "$BUILD_TARGET"
+      - name: Build static binary
+        run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: Strip binary
+        run: strip target/x86_64-unknown-linux-musl/release/pki
+      - name: Verify static linking
+        run: |
+          if ldd target/x86_64-unknown-linux-musl/release/pki 2>&1 | grep -q "not a dynamic"; then
+            echo "OK: statically linked"
+          else
+            echo "WARN: may not be fully static"
+          fi
+          ls -lh target/x86_64-unknown-linux-musl/release/pki
       - name: Package
         env:
-          BUILD_TARGET: ${{ matrix.target }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          cd "target/${BUILD_TARGET}/release"
-          tar czf "../../../pki-${TAG_NAME}-${BUILD_TARGET}.tar.gz" pki
+          cd target/x86_64-unknown-linux-musl/release
+          tar czf "../../../pki-${TAG_NAME}-x86_64-linux.tar.gz" pki
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: pki-${{ matrix.target }}
+          name: pki-linux
           path: pki-*.tar.gz
 
   release:

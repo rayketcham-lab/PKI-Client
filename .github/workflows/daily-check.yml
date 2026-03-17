@@ -1,0 +1,186 @@
+name: Daily Health Check
+
+on:
+  schedule:
+    - cron: '30 2 * * *'  # 02:30 UTC daily
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: daily-check
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────
+  # Feature permutations — test every supported feature combination
+  # ──────────────────────────────────────────────────────────────────
+  feature-matrix:
+    name: Features (${{ matrix.name }})
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            features: ""
+          - name: pqc
+            features: "--features pqc"
+          - name: fips
+            features: "--features fips"
+          - name: pqc+fips
+            features: "--features pqc,fips"
+          - name: no-default
+            features: "--no-default-features"
+          - name: all-features
+            features: "--all-features"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+          cache-prefix: daily-${{ matrix.name }}
+      - name: Check compilation
+        env:
+          FEATURES: ${{ matrix.features }}
+        run: cargo check --all-targets $FEATURES
+      - name: Clippy
+        env:
+          FEATURES: ${{ matrix.features }}
+        run: cargo clippy --all-targets $FEATURES -- -D warnings
+      - name: Test
+        env:
+          FEATURES: ${{ matrix.features }}
+        run: cargo test --all $FEATURES
+
+  # ──────────────────────────────────────────────────────────────────
+  # MSRV — ensure minimum supported Rust version still compiles
+  # ──────────────────────────────────────────────────────────────────
+  msrv:
+    name: MSRV (1.75.0) ${{ matrix.name }}
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            features: ""
+          - name: pqc
+            features: "--features pqc"
+          - name: fips
+            features: "--features fips"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install MSRV toolchain
+        run: |
+          rustup install 1.75.0
+          rustup default 1.75.0
+      - name: Check MSRV compilation
+        env:
+          FEATURES: ${{ matrix.features }}
+        run: cargo check --all $FEATURES
+
+  # ──────────────────────────────────────────────────────────────────
+  # Security — advisory database and dependency audit
+  # ──────────────────────────────────────────────────────────────────
+  security-audit:
+    name: Security Audit
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: daily-audit
+      - name: Install audit tools
+        run: |
+          which cargo-audit || cargo install cargo-audit --locked
+          which cargo-deny || cargo install cargo-deny --locked
+      - name: cargo audit
+        run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370
+      - name: cargo deny
+        run: cargo deny check
+
+  # ──────────────────────────────────────────────────────────────────
+  # Documentation — ensure docs build without warnings
+  # ──────────────────────────────────────────────────────────────────
+  doc-build:
+    name: Documentation
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 15
+    env:
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: daily-docs
+      - name: Build documentation
+        run: cargo doc --all --no-deps
+
+  # ──────────────────────────────────────────────────────────────────
+  # Binary size tracking — catch unexpected bloat
+  # ──────────────────────────────────────────────────────────────────
+  binary-size:
+    name: Binary Size
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: daily-size
+      - name: Build release binary
+        run: cargo build --release
+      - name: Report binary size
+        run: |
+          SIZE=$(stat --printf="%s" target/release/pki)
+          SIZE_MB=$(echo "scale=2; $SIZE / 1048576" | bc)
+          echo "## Binary Size Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Binary | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| pki (release) | ${SIZE_MB} MB |" >> "$GITHUB_STEP_SUMMARY"
+          # Fail if binary exceeds 50 MB (sanity check for unexpected bloat)
+          if [ "$SIZE" -gt 52428800 ]; then
+            echo "ERROR: Binary size ${SIZE_MB} MB exceeds 50 MB threshold"
+            exit 1
+          fi
+          echo "OK: pki binary is ${SIZE_MB} MB"
+
+  # ──────────────────────────────────────────────────────────────────
+  # Dependency freshness — check for outdated deps
+  # ──────────────────────────────────────────────────────────────────
+  dependency-freshness:
+    name: Dependency Freshness
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: daily-outdated
+      - name: Install cargo-outdated
+        run: which cargo-outdated || cargo install cargo-outdated --locked
+      - name: Check outdated dependencies
+        run: |
+          echo "## Dependency Freshness Report" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cargo outdated --root-deps-only 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Advisory only — does not fail the build

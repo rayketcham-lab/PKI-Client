@@ -6,6 +6,7 @@ members = [
     "crates/pki-probe",
     "crates/pki-hierarchy",
     "tools/gen-signing-certs",
+    "vendor/spork-core",
 ]
 
 [workspace.package]
@@ -63,13 +64,14 @@ pki-client-output = { path = "crates/pki-client-output" }
 pki-probe = { path = "crates/pki-probe" }
 pki-hierarchy = { path = "crates/pki-hierarchy" }
 
-# External CA engine (git dep)
-spork-core = { git = "https://github.com/rayketcham-lab/spork-ca-engine.git", tag = "v0.3.0-beta.15" }
+# CA engine (vendored from spork-ca-engine)
+spork-core = { path = "vendor/spork-core" }
 
 [profile.release]
 lto = true
 codegen-units = 1
 panic = "abort"
+strip = true
 
 [profile.dev]
 opt-level = 1  # Faster crypto operations in dev

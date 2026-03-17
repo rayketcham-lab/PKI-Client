@@ -16,8 +16,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  self-contained:
+    name: Self-Contained Check
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: self-contained
+      - name: Reject git dependencies
+        run: |
+          # Use cargo metadata for authoritative dependency source checking.
+          # This cannot be bypassed with string tricks unlike grep-based approaches.
+          GIT_DEPS=$(cargo metadata --format-version 1 2>/dev/null \
+            | python3 -c "
+          import json, sys
+          meta = json.load(sys.stdin)
+          git_deps = []
+          for p in meta['packages']:
+              src = p.get('source') or ''
+              if src.startswith('git+'):
+                  git_deps.append(p['name'] + ' (' + src + ')')
+          for d in git_deps:
+              print(d)
+          sys.exit(1 if git_deps else 0)
+          ")
+          if [ $? -ne 0 ]; then
+            echo ""
+            echo "ERROR: Found git-sourced dependencies:"
+            echo "$GIT_DEPS"
+            echo ""
+            echo "All external dependencies must be vendored under vendor/ or published to crates.io."
+            echo "See: https://github.com/rayketcham-lab/PKI-Client/issues/5 (self-contained build policy)"
+            exit 1
+          fi
+          echo "OK: All dependencies are from crates.io or local paths — build is fully self-contained."
+
   fmt:
     name: Format
+    needs: [self-contained]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 5
     steps:
@@ -27,7 +67,6 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: rustfmt
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
       - name: cargo fmt --check
         run: cargo fmt --all --check
 
@@ -44,7 +83,7 @@ jobs:
         with:
           components: clippy
           cache-prefix: clippy
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
 
@@ -61,7 +100,7 @@ jobs:
         with:
           components: clippy
           cache-prefix: clippy-pqc
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: cargo clippy --features pqc
         run: cargo clippy --all-targets --features pqc -- -D warnings
 
@@ -77,7 +116,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: test
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: cargo test
         run: cargo test --all
 
@@ -93,7 +132,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: test-pqc
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: cargo test --features pqc
         run: cargo test --all --features pqc
 
@@ -109,7 +148,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: build
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: cargo build --release
         run: cargo build --release
       - name: Verify pki binary
@@ -133,7 +172,7 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl
           cache-prefix: build-musl
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: Install musl toolchain
         run: |
           if ! command -v musl-gcc &> /dev/null; then
@@ -170,6 +209,7 @@ jobs:
 
   audit:
     name: Security Audit
+    needs: [self-contained]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
@@ -179,7 +219,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: audit
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: Install cargo-audit
         run: which cargo-audit || cargo install cargo-audit --locked
       - name: Run cargo audit
@@ -189,16 +229,23 @@ jobs:
         run: |
           git config --unset-all http.https://github.com/.extraheader || true
           git config --global --unset-all http.https://github.com/.extraheader || true
+          AUDIT_OK=false
           for i in 1 2 3; do
             if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370; then
+              AUDIT_OK=true
               break
             fi
-            echo "Retry $i: advisory database fetch failed, retrying..."
+            echo "Attempt $i failed, retrying in 5s..."
             sleep 5
           done
+          if [ "$AUDIT_OK" != "true" ]; then
+            echo "ERROR: cargo audit failed after 3 attempts"
+            exit 1
+          fi
 
   cargo-deny:
     name: Dependency Audit (cargo-deny)
+    needs: [self-contained]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
@@ -208,7 +255,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           cache-prefix: deny
-          cross-repo-token: ${{ secrets.CROSS_REPO_TOKEN || github.token }}
+
       - name: Install cargo-deny
         run: which cargo-deny || cargo install cargo-deny --locked
       - name: Run cargo deny

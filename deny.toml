@@ -7,8 +7,12 @@
 
 [advisories]
 ignore = [
-    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack: pki-client only uses RSA signing, not decryption" },
-    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained: transitive via tabled_derive, compile-time only" },
+    # Review by 2026-09-01: rsa Marvin attack — pki-client only uses RSA signing, not decryption.
+    # If we ever add RSA decryption/key-exchange, this MUST be revisited.
+    { id = "RUSTSEC-2023-0071", reason = "pki-client only uses RSA signing, not decryption (review by 2026-09-01)" },
+    # Review by 2026-09-01: proc-macro-error is unmaintained but compile-time only.
+    # Track tabled crate for migration away from proc-macro-error.
+    { id = "RUSTSEC-2024-0370", reason = "transitive via tabled_derive, compile-time only (review by 2026-09-01)" },
 ]
 yanked = "warn"  # digest 0.11.1 yanked, transitive via spork-core PQC deps
 
@@ -32,7 +36,6 @@ allow = [
     "Unicode-3.0",
     "OpenSSL",
     "0BSD",
-    "LicenseRef-BSL-1.1",
     "CDLA-Permissive-2.0",
 ]
 
@@ -101,7 +104,7 @@ skip-tree = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/rayketcham-lab/spork-ca-engine.git"]
+allow-git = []
 
 [sources.allow-org]
 

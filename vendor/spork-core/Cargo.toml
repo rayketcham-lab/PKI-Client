@@ -1,0 +1,102 @@
+[package]
+name = "spork-core"
+version = "0.3.0-beta.15"
+edition = "2021"
+license = "Apache-2.0"
+description = "SPORK Certificate Authority core operations"
+repository = "https://github.com/rayketcham-lab/spork-ca-engine"
+
+[dependencies]
+# PQC Algorithms (FIPS 204/205) - using pre-release versions, optional due to rand_core conflicts
+ml-dsa = { version = "0.1.0-rc.7", features = ["pkcs8", "zeroize"], optional = true }
+slh-dsa = { version = "0.2.0-rc.1", features = ["zeroize"], optional = true }
+
+# EdDSA (RFC 8410/8032)
+ed25519-dalek = { version = "2.1", features = ["rand_core", "pkcs8"] }
+
+# Legacy Algorithms
+p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+p384 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+rsa = { version = "0.9", features = ["std", "pem", "sha2"] }
+
+# X.509 / ASN.1 (x509-cert includes CSR/PKCS#10 support)
+x509-cert = { version = "0.2", features = ["builder", "pem"] }
+der = { version = "0.7", features = ["std", "alloc", "pem", "oid"] }
+pkcs8 = { version = "0.10", features = ["std", "pem", "encryption"] }
+spki = { version = "0.7", features = ["std", "pem"] }
+const-oid = { version = "0.9", features = ["db"] }
+
+# FIPS 140-3 certified crypto backend (optional, gated behind `fips` feature)
+aws-lc-rs = { version = "1.15", optional = true }
+
+# Core crypto utilities
+sha1 = "0.10"
+sha2 = { version = "0.10" }
+sha3 = "0.10"
+hmac = "0.12"
+rand = { version = "0.8" }
+zeroize = { version = "1.8", features = ["derive"] }
+
+# Shamir Secret Sharing for recovery
+sharks = { version = "0.5", optional = true }
+
+# Password hashing for recovery secret verification
+argon2 = { version = "0.5", optional = true }
+
+# Secure random for token generation
+getrandom = { version = "0.2", optional = true }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Pattern matching for policies
+regex = "1.10"
+
+# UUID for policy IDs
+uuid = { version = "1.8", features = ["v4", "serde"] }
+
+# IDNA2008 domain name processing (RFC 9549)
+idna = "1.1"
+
+# Hex encoding
+hex = "0.4"
+
+# Base64 encoding
+base64 = "0.22"
+
+# PEM encoding
+pem = "3.0"
+
+# HTTP client for AIA chasing (optional — gated behind aia-chasing feature)
+reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots", "rustls-tls-webpki-roots", "blocking"], default-features = false, optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = true }
+
+[dev-dependencies]
+tempfile = "3.14"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[features]
+default = ["legacy"]
+pqc = ["ml-dsa", "slh-dsa", "getrandom"]
+legacy = []
+recovery = ["sharks", "argon2", "getrandom"]
+tpm = []
+# Gate CA key generation behind this feature.
+# Network-facing crates (spork-api, spork-ocsp, etc.) MUST NOT enable this.
+# Only local CLI tools (spork-shell, spork-ceremony, spork-setup) should.
+ceremony = []
+# AIA chasing: fetch missing intermediate certificates via HTTP (RFC 5280 §4.2.2.1)
+aia-chasing = ["reqwest", "tokio"]
+# FIPS 140-3 compile-time mode: restricts algorithms to FIPS-approved classical set.
+# When enabled, ML-DSA, SLH-DSA, and composite algorithms are rejected at compile time.
+# Runtime FIPS mode can be enabled independently via enable_fips_mode().
+# When enabled, ECDSA/RSA/Ed25519 use FIPS 140-3 certified aws-lc-rs backend.
+fips = ["aws-lc-rs"]
+

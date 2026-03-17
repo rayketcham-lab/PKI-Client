@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Daily health checker workflow — feature matrix (6 permutations), MSRV check, security audit, doc build, binary size tracking, dependency freshness ([#6](https://github.com/rayketcham-lab/PKI-Client/issues/6))
+- Interop test suite — ACME vs Pebble, TLS probe against public endpoints, certificate round-trip tests (49 tests total) ([#7](https://github.com/rayketcham-lab/PKI-Client/issues/7))
+- Self-contained build check in CI — rejects git dependencies, gates entire pipeline ([#5](https://github.com/rayketcham-lab/PKI-Client/issues/5))
+- README redesign with health dashboard, badge system, and interop section ([#8](https://github.com/rayketcham-lab/PKI-Client/issues/8))
+
+### Changed
+- Vendored `spork-core` as local path dependency — eliminates private git repo requirement ([#5](https://github.com/rayketcham-lab/PKI-Client/issues/5))
+- Removed `cross-repo-token` plumbing from all CI workflows and rust-setup action ([#9](https://github.com/rayketcham-lab/PKI-Client/issues/9))
+- Updated `deny.toml` to reject all git sources (`allow-git = []`)
+
 ## [0.3.0-beta.3] - 2026-03-15
 
 ### Fixed
