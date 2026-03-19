@@ -13,7 +13,8 @@ env:
 jobs:
   build-linux:
     name: Build Linux (static musl)
-    runs-on: [self-hosted, Linux]
+    # Pinned to ubuntu3-runner: musl-tools not available on Rocky Linux
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -63,6 +64,24 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           merge-multiple: true
+      - name: Install gh CLI
+        run: |
+          if ! command -v gh &> /dev/null; then
+            if command -v dnf &> /dev/null; then
+              sudo dnf install -y 'dnf-command(config-manager)'
+              sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+              sudo rpm --import https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x23F3D4EA75716059
+              sudo dnf install -y gh
+            elif command -v apt-get &> /dev/null; then
+              curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+              sudo apt-get update
+              sudo apt-get install -y gh
+            else
+              echo "ERROR: No supported package manager found (dnf or apt-get)"
+              exit 1
+            fi
+          fi
       - name: Generate checksums
         run: sha256sum pki-*.tar.gz > SHA256SUMS.txt
       - name: Create GitHub Release

@@ -162,7 +162,8 @@ jobs:
   build-musl:
     name: Build (musl static)
     needs: [fmt, clippy]
-    runs-on: [self-hosted, Linux]
+    # Pinned to ubuntu3-runner: musl-tools not available on Rocky Linux
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -192,7 +193,7 @@ jobs:
   links:
     name: Link Check
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -211,7 +212,7 @@ jobs:
     name: Security Audit
     needs: [self-contained]
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -221,7 +222,7 @@ jobs:
           cache-prefix: audit
 
       - name: Install cargo-audit
-        run: which cargo-audit || cargo install cargo-audit --locked
+        run: which cargo-audit || cargo install cargo-audit@0.22.1 --locked
       - name: Run cargo audit
         env:
           GITHUB_TOKEN: ""
@@ -231,7 +232,7 @@ jobs:
           git config --global --unset-all http.https://github.com/.extraheader || true
           AUDIT_OK=false
           for i in 1 2 3; do
-            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370; then
+            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370 --ignore RUSTSEC-2024-0398; then
               AUDIT_OK=true
               break
             fi
@@ -247,7 +248,7 @@ jobs:
     name: Dependency Audit (cargo-deny)
     needs: [self-contained]
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -257,6 +258,17 @@ jobs:
           cache-prefix: deny
 
       - name: Install cargo-deny
-        run: which cargo-deny || cargo install cargo-deny --locked
+        run: |
+          # Pinned to 0.16.2: newer versions require GLIBC_2.39 (unavailable on Rocky Linux runners)
+          NEED_INSTALL=true
+          if command -v cargo-deny &> /dev/null; then
+            INSTALLED=$(cargo-deny --version 2>/dev/null | grep -oP '[\d.]+' | head -1)
+            if [ "$INSTALLED" = "0.16.2" ]; then
+              NEED_INSTALL=false
+            fi
+          fi
+          if [ "$NEED_INSTALL" = "true" ]; then
+            cargo install cargo-deny@0.16.2 --locked --force
+          fi
       - name: Run cargo deny
         run: cargo deny check

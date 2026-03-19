@@ -13,6 +13,9 @@ ignore = [
     # Review by 2026-09-01: proc-macro-error is unmaintained but compile-time only.
     # Track tabled crate for migration away from proc-macro-error.
     { id = "RUSTSEC-2024-0370", reason = "transitive via tabled_derive, compile-time only (review by 2026-09-01)" },
+    # Review by 2026-09-01: sharks crate (Shamir Secret Sharing) — no fixed upgrade available.
+    # Transitive via spork-core. Monitor for upstream fix.
+    { id = "RUSTSEC-2024-0398", reason = "transitive via spork-core/sharks, recovery feature not enabled so never compiled, no fix available (review by 2026-09-01)" },
 ]
 yanked = "warn"  # digest 0.11.1 yanked, transitive via spork-core PQC deps
 
