@@ -14,7 +14,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output.
 | **Daily Check** | [![Daily Health Check](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/daily-check.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/daily-check.yml) |
 | **Interop** | [![Interop Tests](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/interop.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/interop.yml) |
 | **Version** | [![Version](https://img.shields.io/badge/version-0.3.0--beta.3-blue)](https://github.com/rayketcham-lab/PKI-Client/releases) |
-| **License** | [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) |
+| **License** | [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE) |
 | **MSRV** | [![MSRV](https://img.shields.io/badge/MSRV-1.75.0-orange)](https://blog.rust-lang.org/) |
 | **Rust** | [![Rust](https://img.shields.io/badge/rust-pure-orange)](https://www.rust-lang.org/) |
 | **OpenSSL** | [![No OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen)]() |
