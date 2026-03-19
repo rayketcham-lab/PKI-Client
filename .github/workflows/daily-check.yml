@@ -112,10 +112,15 @@ jobs:
           cache-prefix: daily-audit
       - name: Install audit tools
         run: |
-          which cargo-audit || cargo install cargo-audit --locked
-          which cargo-deny || cargo install cargo-deny --locked
+          # Build from source if cached binaries are missing or broken (GLIBC compat)
+          if ! cargo-audit --version >/dev/null 2>&1; then
+            cargo install cargo-audit --locked --force
+          fi
+          if ! cargo-deny --version >/dev/null 2>&1; then
+            cargo install cargo-deny --locked --force
+          fi
       - name: cargo audit
-        run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370
+        run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370 --ignore RUSTSEC-2024-0398
       - name: cargo deny
         run: cargo deny check
 

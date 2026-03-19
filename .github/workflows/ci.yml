@@ -228,7 +228,13 @@ jobs:
           cache-prefix: audit
 
       - name: Install cargo-audit
-        run: which cargo-audit || cargo install cargo-audit@0.22.1 --locked
+        run: |
+          # Build from source if cached binary is missing or broken (GLIBC compat)
+          if cargo-audit --version >/dev/null 2>&1; then
+            echo "cargo-audit $(cargo-audit --version) OK"
+          else
+            cargo install cargo-audit --locked --force
+          fi
       - name: Run cargo audit
         env:
           GITHUB_TOKEN: ""
@@ -265,8 +271,12 @@ jobs:
 
       - name: Install cargo-deny
         run: |
-          # Build from source: avoids GLIBC_2.39 issue with pre-built binaries on Rocky Linux
-          # and ensures CVSS 4.0 advisory DB support (0.16.2 cannot parse CVSS 4.0 entries)
-          which cargo-deny || cargo install cargo-deny --locked
+          # Build from source if cached binary is missing or broken (GLIBC compat)
+          # Must be recent enough for CVSS 4.0 advisory DB support
+          if cargo-deny --version >/dev/null 2>&1; then
+            echo "cargo-deny $(cargo-deny --version) OK"
+          else
+            cargo install cargo-deny --locked --force
+          fi
       - name: Run cargo deny
         run: cargo deny check
