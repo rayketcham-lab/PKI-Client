@@ -271,11 +271,20 @@ jobs:
 
       - name: Install cargo-deny
         run: |
-          # Build from source if cached binary is missing or broken (GLIBC compat)
-          # Must be recent enough for CVSS 4.0 advisory DB support
+          # Require cargo-deny >= 0.17 for CVSS 4.0 advisory DB support
+          # Build from source to avoid GLIBC_2.39 issue with pre-built binaries
+          NEED_INSTALL=true
           if cargo-deny --version >/dev/null 2>&1; then
-            echo "cargo-deny $(cargo-deny --version) OK"
-          else
+            VER=$(cargo-deny --version | grep -oP '\d+\.\d+' | head -1)
+            MAJOR=$(echo "$VER" | cut -d. -f1)
+            MINOR=$(echo "$VER" | cut -d. -f2)
+            if [ "$MAJOR" -gt 0 ] || [ "$MINOR" -ge 17 ]; then
+              NEED_INSTALL=false
+              echo "cargo-deny $(cargo-deny --version) OK"
+            fi
+          fi
+          if [ "$NEED_INSTALL" = "true" ]; then
+            echo "Installing cargo-deny from source (need >= 0.17 for CVSS 4.0)..."
             cargo install cargo-deny --locked --force
           fi
       - name: Run cargo deny

@@ -116,7 +116,16 @@ jobs:
           if ! cargo-audit --version >/dev/null 2>&1; then
             cargo install cargo-audit --locked --force
           fi
-          if ! cargo-deny --version >/dev/null 2>&1; then
+          # Require cargo-deny >= 0.17 for CVSS 4.0 advisory DB support
+          NEED_DENY=true
+          if cargo-deny --version >/dev/null 2>&1; then
+            VER=$(cargo-deny --version | grep -oP '\d+\.\d+' | head -1)
+            MINOR=$(echo "$VER" | cut -d. -f2)
+            if [ "$MINOR" -ge 17 ]; then
+              NEED_DENY=false
+            fi
+          fi
+          if [ "$NEED_DENY" = "true" ]; then
             cargo install cargo-deny --locked --force
           fi
       - name: cargo audit
