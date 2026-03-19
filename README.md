@@ -17,8 +17,8 @@ Pure Rust. No OpenSSL dependency. Human-friendly output.
 [![Security Audit](https://img.shields.io/badge/cargo--audit-passing-brightgreen?logo=hackthebox&logoColor=white)](https://rustsec.org/)
 [![Supply Chain](https://img.shields.io/badge/cargo--deny-passing-brightgreen?logo=checkmarx&logoColor=white)](https://embarkstudios.github.io/cargo-deny/)
 [![License Scan](https://img.shields.io/badge/license%20scan-clean-brightgreen?logo=opensourceinitiative&logoColor=white)](https://embarkstudios.github.io/cargo-deny/)
-[![No Unsafe](https://img.shields.io/badge/unsafe-zero-brightgreen?logo=rust&logoColor=white)]()
-[![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)]()
+[![No Unsafe](https://img.shields.io/badge/unsafe-zero-brightgreen?logo=rust&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
+[![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
 [![Version](https://img.shields.io/badge/version-0.3.0--beta.3-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
@@ -27,11 +27,11 @@ Pure Rust. No OpenSSL dependency. Human-friendly output.
 [![MSRV](https://img.shields.io/badge/MSRV-1.75.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
 
 <!-- Build & Quality -->
-[![Clippy](https://img.shields.io/badge/clippy--D%20warnings-passing-brightgreen?logo=rust&logoColor=white)]()
-[![Formatting](https://img.shields.io/badge/rustfmt-checked-brightgreen?logo=rust&logoColor=white)]()
-[![PQC](https://img.shields.io/badge/post--quantum-supported-blueviolet?logo=quantcast&logoColor=white)]()
-[![FIPS](https://img.shields.io/badge/FIPS%20140--3-optional-blue?logo=nist&logoColor=white)]()
-[![Static Binary](https://img.shields.io/badge/static%20binary-musl-blue?logo=linux&logoColor=white)]()
+[![Clippy](https://img.shields.io/badge/clippy--D%20warnings-passing-brightgreen?logo=rust&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
+[![Formatting](https://img.shields.io/badge/rustfmt-checked-brightgreen?logo=rust&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
+[![PQC](https://img.shields.io/badge/post--quantum-supported-blueviolet?logo=quantcast&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
+[![FIPS](https://img.shields.io/badge/FIPS%20140--3-optional-blue?logo=nist&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
+[![Static Binary](https://img.shields.io/badge/static%20binary-musl-blue?logo=linux&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 
 ---
 

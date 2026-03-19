@@ -92,6 +92,9 @@ jobs:
     needs: [fmt]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 15
+    env:
+      # Use CMake builder to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
+      AWS_LC_SYS_CMAKE_BUILDER: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -125,6 +128,9 @@ jobs:
     needs: [fmt, clippy-pqc]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 20
+    env:
+      # Use CMake builder to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
+      AWS_LC_SYS_CMAKE_BUILDER: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -259,16 +265,8 @@ jobs:
 
       - name: Install cargo-deny
         run: |
-          # Pinned to 0.16.2: newer versions require GLIBC_2.39 (unavailable on Rocky Linux runners)
-          NEED_INSTALL=true
-          if command -v cargo-deny &> /dev/null; then
-            INSTALLED=$(cargo-deny --version 2>/dev/null | grep -oP '[\d.]+' | head -1)
-            if [ "$INSTALLED" = "0.16.2" ]; then
-              NEED_INSTALL=false
-            fi
-          fi
-          if [ "$NEED_INSTALL" = "true" ]; then
-            cargo install cargo-deny@0.16.2 --locked --force
-          fi
+          # Build from source: avoids GLIBC_2.39 issue with pre-built binaries on Rocky Linux
+          # and ensures CVSS 4.0 advisory DB support (0.16.2 cannot parse CVSS 4.0 entries)
+          which cargo-deny || cargo install cargo-deny --locked
       - name: Run cargo deny
         run: cargo deny check

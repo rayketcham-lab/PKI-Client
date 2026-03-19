@@ -21,6 +21,9 @@ jobs:
     name: Features (${{ matrix.name }})
     runs-on: [self-hosted, Linux]
     timeout-minutes: 30
+    env:
+      # Use CMake builder to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
+      AWS_LC_SYS_CMAKE_BUILDER: 1
     strategy:
       fail-fast: false
       matrix:
@@ -83,6 +86,11 @@ jobs:
         run: |
           rustup install 1.75.0
           rustup default 1.75.0
+      - name: Regenerate lockfile for MSRV compatibility
+        run: |
+          # Cargo.lock v4 is not parseable by Cargo 1.75.0 — regenerate with the MSRV toolchain
+          rm Cargo.lock
+          cargo generate-lockfile
       - name: Check MSRV compilation
         env:
           FEATURES: ${{ matrix.features }}
