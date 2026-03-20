@@ -192,7 +192,7 @@ mod integration_tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ceremony", feature = "pqc"))]
+    #[cfg(all(feature = "ceremony", feature = "pqc", not(feature = "fips")))]
     fn test_pqc_full_workflow() {
         // PQC Root CA
         let root_config = CaConfig::root("PQC Root CA", AlgorithmId::MlDsa65);
@@ -263,7 +263,7 @@ mod integration_tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ceremony", feature = "pqc"))]
+    #[cfg(all(feature = "ceremony", feature = "pqc", not(feature = "fips")))]
     fn test_pqc_algorithm_parity() {
         // Test that all PQC algorithms work for CA creation
         let algorithms = [

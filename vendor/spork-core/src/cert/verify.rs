@@ -3217,7 +3217,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "pqc")]
+    #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_valid_chain_mldsa65() {
         let (root_cert, mut root_ca) = create_root_ca("ML-DSA Root", AlgorithmId::MlDsa65);
         let (_int_cert, mut int_ca) =
@@ -3502,7 +3502,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "pqc")]
+    #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_pqc_cross_algorithm_chain() {
         // ML-DSA-65 root signs P-256 intermediate signs P-256 end-entity
         // Tests PQC→classical migration scenario
@@ -3524,7 +3524,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "pqc")]
+    #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_valid_chain_mldsa44() {
         let (root_cert, mut root_ca) = create_root_ca("ML-DSA-44 Root", AlgorithmId::MlDsa44);
         let (_int_cert, mut int_ca) =
@@ -3540,7 +3540,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "pqc")]
+    #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_valid_chain_mldsa87() {
         // ML-DSA-87 has very large keys/signatures — needs bigger stack
         let result = std::thread::Builder::new()

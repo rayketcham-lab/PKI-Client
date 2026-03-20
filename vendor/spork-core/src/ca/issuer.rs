@@ -740,7 +740,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "pqc")]
+    #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_issue_pqc_cert() {
         let config = CaConfig::root("PQC CA", AlgorithmId::MlDsa65);
         let mut ca = CaCeremony::init_root(config).unwrap().ca;

@@ -461,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "pqc")]
+    #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_pqc_root_ca() {
         let config = CaConfig::root("PQC Test Root", AlgorithmId::MlDsa65);
         let result = CaCeremony::init_root(config).unwrap();
