@@ -75,7 +75,6 @@ runs:
         key: ${{ runner.os }}-cargo-${{ inputs.cache-prefix }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-${{ inputs.cache-prefix }}-
-          ${{ runner.os }}-cargo-
 
     - name: Prune stale cargo caches
       shell: bash
