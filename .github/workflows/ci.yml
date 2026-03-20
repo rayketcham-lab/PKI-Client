@@ -84,7 +84,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-          cache-prefix: v2-clippy
+          cache-prefix: v3-clippy
 
       - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
@@ -101,7 +101,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-          cache-prefix: v2-clippy-pqc
+          cache-prefix: v3-clippy-pqc
 
       - name: cargo clippy --features pqc
         run: cargo clippy --all-targets --features pqc -- -D warnings
@@ -117,7 +117,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-test
+          cache-prefix: v3-test
 
       - name: cargo test
         run: cargo test --all
@@ -133,7 +133,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-test-pqc
+          cache-prefix: v3-test-pqc
 
       - name: cargo test --features pqc
         run: cargo test --all --features pqc
@@ -149,7 +149,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-build
+          cache-prefix: v3-build
 
       - name: cargo build --release
         run: cargo build --release
@@ -174,7 +174,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           targets: x86_64-unknown-linux-musl
-          cache-prefix: v2-build-musl
+          cache-prefix: v3-build-musl
 
       - name: Install musl toolchain
         run: |
@@ -221,7 +221,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-audit
+          cache-prefix: v3-audit
 
       - name: Install cargo-audit
         run: |
@@ -263,7 +263,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-deny
+          cache-prefix: v3-deny
 
       - name: Install cargo-deny
         run: |

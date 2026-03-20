@@ -124,7 +124,7 @@ pub enum AcmeCommands {
   pki acme http-token abc123
 
 Place the output at:
-  http://<domain>/.well-known/acme-challenge/<token>")]
+  http://DOMAIN/.well-known/acme-challenge/TOKEN")]
     HttpToken {
         /// Challenge token
         token: String,
@@ -139,7 +139,7 @@ Place the output at:
   pki acme dns-record abc123
 
 Create TXT record:
-  _acme-challenge.<domain> TXT \"<value>\"")]
+  _acme-challenge.DOMAIN TXT \"VALUE\"")]
     DnsRecord {
         /// Challenge token
         token: String,
@@ -306,7 +306,7 @@ Create TXT record:
     /// Request a certificate (like certbot certonly).
     ///
     /// Performs full ACME flow: register, order, challenge, finalize, download.
-    /// Saves certificate and key to ~/.pki-client/certs/<domain>/.
+    /// Saves certificate and key to `~/.pki-client/certs/<domain>/`.
     #[command(after_help = "Examples:
   pki acme certonly -d example.com --server https://acme.internal:6446/directory
   pki acme certonly -d example.com -d www.example.com --webroot /var/www/html

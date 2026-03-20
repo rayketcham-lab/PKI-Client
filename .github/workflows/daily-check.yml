@@ -46,7 +46,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-          cache-prefix: v2-daily-${{ matrix.name }}
+          cache-prefix: v3-daily-${{ matrix.name }}
       - name: Check compilation
         env:
           FEATURES: ${{ matrix.features }}
@@ -91,11 +91,12 @@ jobs:
         run: |
           rustup install 1.75.0
           rustup default 1.75.0
-      - name: Patch lockfile for MSRV compatibility
+      - name: Regenerate lockfile for MSRV compatibility
         run: |
-          # Cargo.lock v4 format not parseable by Cargo 1.75.0 — downgrade format version
-          # but keep pinned dependency versions (unlike regenerating which resolves to latest)
-          sed -i 's/^version = 4$/version = 3/' Cargo.lock
+          # Cargo 1.75.0 can't parse lockfile v4 and some pinned deps need edition2024.
+          # Regenerate with MSRV toolchain to get compatible versions.
+          rm -f Cargo.lock
+          cargo generate-lockfile
       - name: Check MSRV compilation
         env:
           FEATURES: ${{ matrix.features }}
@@ -114,7 +115,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-daily-audit
+          cache-prefix: v3-daily-audit
       - name: Install audit tools
         run: |
           # Build from source if cached binaries are missing or broken (GLIBC compat)
@@ -153,7 +154,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-daily-docs
+          cache-prefix: v3-daily-docs
       - name: Build documentation
         run: |
           # Exclude vendored spork-core (has doc link warnings from bracket syntax in comments)
@@ -176,7 +177,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-daily-size
+          cache-prefix: v3-daily-size
       - name: Build release binary
         run: cargo build --release
       - name: Report binary size
@@ -207,7 +208,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v2-daily-outdated
+          cache-prefix: v3-daily-outdated
       - name: Install cargo-outdated
         run: |
           if ! cargo-outdated --version >/dev/null 2>&1; then

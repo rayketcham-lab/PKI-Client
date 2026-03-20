@@ -27,7 +27,7 @@ pub enum EstCommands {
         #[arg(long, short = 'o', value_name = "FILE")]
         output: Option<PathBuf>,
 
-        /// Custom EST label (for /.well-known/est/<label>/ paths)
+        /// Custom EST label (for `/.well-known/est/<label>/` paths)
         #[arg(long)]
         label: Option<String>,
 
