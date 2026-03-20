@@ -20,6 +20,8 @@
 #[cfg(feature = "aia-chasing")]
 use std::collections::HashSet;
 
+#[cfg(feature = "aia-chasing")]
+use der::Decode;
 use x509_cert::Certificate;
 
 #[cfg(feature = "aia-chasing")]

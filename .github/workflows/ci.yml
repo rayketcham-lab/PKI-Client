@@ -57,6 +57,56 @@ jobs:
           fi
           echo "OK: All dependencies are from crates.io or local paths — build is fully self-contained."
 
+  vendor-check:
+    name: Vendor Freshness
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: vendor-check
+      - name: Verify vendored deps are up-to-date
+        run: |
+          # Re-run cargo vendor and check for diff
+          cargo vendor vendor/crates-io --versioned-dirs 2>/dev/null || cargo vendor vendor/crates-io
+          if [ -n "$(git status --porcelain vendor/crates-io/)" ]; then
+            echo ""
+            echo "ERROR: Vendored dependencies are out of date!"
+            echo "Changed files:"
+            git status --porcelain vendor/crates-io/ | head -30
+            echo ""
+            echo "Run 'cargo vendor vendor/crates-io' locally and commit the result."
+            exit 1
+          fi
+          echo "OK: All vendored dependencies match Cargo.lock."
+
+  offline-build:
+    name: Offline Build
+    needs: [vendor-check]
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 20
+    env:
+      CARGO_NET_OFFLINE: "true"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: v3-offline
+      - name: Build with no network access
+        run: cargo build --release --frozen
+      - name: Verify binary exists
+        run: |
+          if [ ! -f "target/release/pki" ]; then
+            echo "ERROR: Offline build did not produce pki binary"
+            exit 1
+          fi
+          echo "OK: Offline build produced pki ($(du -h target/release/pki | cut -f1))"
+
   fmt:
     name: Format
     needs: [self-contained]
@@ -74,7 +124,7 @@ jobs:
 
   clippy:
     name: Clippy
-    needs: [fmt]
+    needs: [fmt, offline-build]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:

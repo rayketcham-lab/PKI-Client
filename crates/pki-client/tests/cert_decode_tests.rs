@@ -346,6 +346,7 @@ fn test_decode_ecdsa_p384_root_ca() {
 }
 
 #[test]
+#[cfg(not(feature = "fips"))] // RSA-2048 rejected in FIPS mode (minimum 3072-bit)
 fn test_decode_rsa_2048_root_ca() {
     let (_, der, pem) = build_root_ca(AlgorithmId::Rsa2048, "RSA 2048 Root CA");
     let cert = decode_and_verify(&der, &pem);
@@ -380,6 +381,7 @@ fn test_decode_rsa_4096_root_ca() {
 }
 
 #[test]
+#[cfg(not(feature = "fips"))] // Ed25519 not FIPS-approved
 fn test_decode_ed25519_root_ca() {
     let (_, der, pem) = build_root_ca(AlgorithmId::Ed25519, "Ed25519 Root CA");
     let cert = decode_and_verify(&der, &pem);
@@ -436,6 +438,7 @@ fn test_decode_cross_algo_chain_rsa_to_ec() {
 }
 
 #[test]
+#[cfg(not(feature = "fips"))] // Ed25519 not FIPS-approved
 fn test_decode_cross_algo_chain_ec_to_ed25519() {
     let (root_key, _, _) = build_root_ca(AlgorithmId::EcdsaP384, "EC Root");
     let (_, der, pem) = build_intermediate_ca(
@@ -1092,6 +1095,7 @@ fn test_ee_ecdsa_p384() {
 }
 
 #[test]
+#[cfg(not(feature = "fips"))] // RSA-2048 rejected in FIPS mode (minimum 3072-bit)
 fn test_ee_rsa_2048() {
     test_ee_with_algo(AlgorithmId::Rsa2048, "RSA");
 }
@@ -1107,6 +1111,7 @@ fn test_ee_rsa_4096() {
 }
 
 #[test]
+#[cfg(not(feature = "fips"))] // Ed25519 not FIPS-approved
 fn test_ee_ed25519() {
     test_ee_with_algo(AlgorithmId::Ed25519, "Ed25519");
 }
@@ -1130,9 +1135,9 @@ fn test_full_three_tier_chain_decode() {
     );
     let int_cert = Certificate::from_der(&int_der).unwrap();
 
-    // End-entity (RSA 2048)
+    // End-entity (RSA 3072 — FIPS-approved minimum for RSA)
     let (ee_der, _) = EeCertBuilder::new(
-        AlgorithmId::Rsa2048,
+        AlgorithmId::Rsa3072,
         "three-tier.example.com",
         &int_key,
         "Three-Tier Intermediate CA",
@@ -1287,11 +1292,19 @@ fn test_unique_fingerprints_per_cert() {
 
 #[test]
 fn test_decode_many_certs_sequentially() {
+    #[cfg(not(feature = "fips"))]
     let algos = [
         AlgorithmId::EcdsaP256,
         AlgorithmId::EcdsaP384,
         AlgorithmId::Ed25519,
         AlgorithmId::Rsa2048,
+    ];
+    #[cfg(feature = "fips")]
+    let algos = [
+        AlgorithmId::EcdsaP256,
+        AlgorithmId::EcdsaP384,
+        AlgorithmId::Rsa3072,
+        AlgorithmId::Rsa4096,
     ];
 
     for (i, algo) in algos.iter().enumerate() {

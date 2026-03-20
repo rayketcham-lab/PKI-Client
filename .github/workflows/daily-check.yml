@@ -58,7 +58,8 @@ jobs:
       - name: Test
         env:
           FEATURES: ${{ matrix.features }}
-        run: cargo test --all $FEATURES
+        # Exclude gen-signing-certs: tool binary hits GLIBC_2.39 on older runners
+        run: cargo test --workspace --exclude gen-signing-certs $FEATURES
 
   # ──────────────────────────────────────────────────────────────────
   # MSRV — ensure minimum supported Rust version still compiles

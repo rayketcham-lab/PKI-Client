@@ -303,14 +303,18 @@ mod tests {
         assert!(RecoveryConfig::with_thresholds(3, 3).is_ok());
 
         // Invalid: level1 < 2
-        let mut config = RecoveryConfig::default();
-        config.level1_threshold = 1;
+        let config = RecoveryConfig {
+            level1_threshold: 1,
+            ..RecoveryConfig::default()
+        };
         assert!(config.validate().is_err());
 
         // Invalid: level2 < level1
-        let mut config = RecoveryConfig::default();
-        config.level1_threshold = 3;
-        config.level2_threshold = 2;
+        let config = RecoveryConfig {
+            level1_threshold: 3,
+            level2_threshold: 2,
+            ..RecoveryConfig::default()
+        };
         assert!(config.validate().is_err());
     }
 
