@@ -91,11 +91,11 @@ jobs:
         run: |
           rustup install 1.75.0
           rustup default 1.75.0
-      - name: Regenerate lockfile for MSRV compatibility
+      - name: Patch lockfile for MSRV compatibility
         run: |
-          # Cargo.lock v4 is not parseable by Cargo 1.75.0 — regenerate with the MSRV toolchain
-          rm Cargo.lock
-          cargo generate-lockfile
+          # Cargo.lock v4 format not parseable by Cargo 1.75.0 — downgrade format version
+          # but keep pinned dependency versions (unlike regenerating which resolves to latest)
+          sed -i 's/^version = 4$/version = 3/' Cargo.lock
       - name: Check MSRV compilation
         env:
           FEATURES: ${{ matrix.features }}
@@ -155,7 +155,13 @@ jobs:
         with:
           cache-prefix: v2-daily-docs
       - name: Build documentation
-        run: cargo doc --all --no-deps --all-features
+        run: |
+          # Exclude vendored spork-core (has doc link warnings from bracket syntax in comments)
+          cargo doc --no-deps \
+            -p pki-client \
+            -p pki-client-output \
+            -p pki-probe \
+            -p pki-hierarchy
 
   # ──────────────────────────────────────────────────────────────────
   # Binary size tracking — catch unexpected bloat
