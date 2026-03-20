@@ -81,6 +81,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           persist-credentials: false
+      - name: Clean stale cargo config
+        run: |
+          if [ -f "$HOME/.cargo/config.toml" ]; then
+            echo "Removing stale ~/.cargo/config.toml"
+            rm -f "$HOME/.cargo/config.toml"
+          fi
       - name: Install MSRV toolchain
         run: |
           rustup install 1.75.0
@@ -149,7 +155,7 @@ jobs:
         with:
           cache-prefix: v2-daily-docs
       - name: Build documentation
-        run: cargo doc --all --no-deps
+        run: cargo doc --all --no-deps --all-features
 
   # ──────────────────────────────────────────────────────────────────
   # Binary size tracking — catch unexpected bloat
@@ -197,7 +203,10 @@ jobs:
         with:
           cache-prefix: v2-daily-outdated
       - name: Install cargo-outdated
-        run: which cargo-outdated || cargo install cargo-outdated --locked
+        run: |
+          if ! cargo-outdated --version >/dev/null 2>&1; then
+            cargo install cargo-outdated --locked --force
+          fi
       - name: Check outdated dependencies
         run: |
           echo "## Dependency Freshness Report" >> "$GITHUB_STEP_SUMMARY"

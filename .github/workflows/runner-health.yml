@@ -1,0 +1,129 @@
+name: Runner Health Monitor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-runners:
+    name: Check Self-Hosted Runner Status
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 5
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Fetch runner status from org API
+        id: fetch-runners
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api orgs/rayketcham-lab/actions/runners --paginate > /tmp/runners.json
+
+      - name: Identify offline runners
+        id: check-status
+        run: |
+          offline=$(jq -r '.runners[] | select(.status == "offline") | .name' /tmp/runners.json)
+          total=$(jq '.total_count' /tmp/runners.json)
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+          if [[ -n "$offline" ]]; then
+            echo "has_offline=true" >> "$GITHUB_OUTPUT"
+            # Encode newlines for multi-line output
+            offline_escaped="${offline//$'\n'/'%0A'}"
+            echo "offline_runners=$offline_escaped" >> "$GITHUB_OUTPUT"
+            echo "Offline runners detected:"
+            echo "$offline"
+          else
+            echo "has_offline=false" >> "$GITHUB_OUTPUT"
+            echo "All $total runner(s) are online."
+          fi
+
+      - name: Check for existing runner-offline issue
+        id: find-issue
+        if: steps.check-status.outputs.has_offline == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          issue_number=$(gh issue list \
+            --label runner-offline \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [[ -n "$issue_number" ]]; then
+            echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+            echo "existing_issue=true" >> "$GITHUB_OUTPUT"
+            echo "Existing open issue #$issue_number found — skipping creation."
+          else
+            echo "existing_issue=false" >> "$GITHUB_OUTPUT"
+            echo "No existing open issue found."
+          fi
+
+      - name: Create runner-offline issue
+        if: >
+          steps.check-status.outputs.has_offline == 'true' &&
+          steps.find-issue.outputs.existing_issue == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          offline_list="${{ steps.check-status.outputs.offline_runners }}"
+          # Restore newlines from encoded form
+          offline_display="${offline_list//'%0A'/$'\n'}"
+          gh issue create \
+            --title "Self-hosted runner(s) offline" \
+            --label runner-offline \
+            --body "## Runner Health Alert
+
+One or more self-hosted runners in the \`rayketcham-lab\` org are **offline**.
+
+### Offline runners
+
+\`\`\`
+${offline_display}
+\`\`\`
+
+### Details
+
+- **Detected at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+- **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+### Resolution
+
+Please check the runner host(s) listed above and restart the GitHub Actions runner service.
+
+Once all runners are back online, this issue will be closed automatically by the next scheduled health check."
+
+      - name: Find open runner-offline issues (for auto-close)
+        id: find-issues-to-close
+        if: steps.check-status.outputs.has_offline == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          issue_numbers=$(gh issue list \
+            --label runner-offline \
+            --state open \
+            --json number \
+            --jq '[.[].number] | join(" ")')
+          echo "issue_numbers=$issue_numbers" >> "$GITHUB_OUTPUT"
+          if [[ -n "$issue_numbers" ]]; then
+            echo "Open runner-offline issues to close: $issue_numbers"
+          else
+            echo "No open runner-offline issues to close."
+          fi
+
+      - name: Close runner-offline issues
+        if: >
+          steps.check-status.outputs.has_offline == 'false' &&
+          steps.find-issues-to-close.outputs.issue_numbers != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for issue_number in ${{ steps.find-issues-to-close.outputs.issue_numbers }}; do
+            gh issue close "$issue_number" \
+              --comment "All self-hosted runners in \`rayketcham-lab\` are back online as of $(date -u '+%Y-%m-%d %H:%M:%S UTC'). Closing automatically."
+            echo "Closed issue #$issue_number"
+          done
