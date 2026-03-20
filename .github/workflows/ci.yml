@@ -258,6 +258,7 @@ jobs:
             --no-progress \
             --exclude 'img.shields.io' \
             --exclude 'github.com/rayketcham-lab/PKI-Client/releases$' \
+            --exclude-path 'vendor/crates-io' \
             '**/*.md'
 
   audit:
