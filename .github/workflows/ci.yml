@@ -96,9 +96,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: v3-offline-clean
-      - name: Clean stale build scripts
-        run: rm -rf target/release/build/aws-lc-sys-*
+          cache-prefix: v3-offline
       - name: Build with no network access
         run: cargo build --release --frozen
       - name: Verify binary exists

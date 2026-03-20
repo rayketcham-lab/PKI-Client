@@ -76,6 +76,13 @@ runs:
         restore-keys: |
           ${{ runner.os }}-cargo-${{ inputs.cache-prefix }}-
 
+    - name: Clean stale aws-lc-sys build scripts
+      shell: bash
+      run: |
+        # aws-lc-sys build scripts cached from a runner with newer glibc (2.39)
+        # fail on Rocky Linux runners with GLIBC_2.39 not found. Force recompile.
+        rm -rf target/debug/build/aws-lc-sys-* target/release/build/aws-lc-sys-* 2>/dev/null || true
+
     - name: Prune stale cargo caches
       shell: bash
       run: |
