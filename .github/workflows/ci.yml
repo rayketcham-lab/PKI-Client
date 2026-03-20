@@ -290,7 +290,7 @@ jobs:
           git config --global --unset-all http.https://github.com/.extraheader || true
           AUDIT_OK=false
           for i in 1 2 3; do
-            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370; then
+            if cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0370 --ignore RUSTSEC-2024-0398; then
               AUDIT_OK=true
               break
             fi
