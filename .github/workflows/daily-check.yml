@@ -46,7 +46,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-          cache-prefix: daily-${{ matrix.name }}
+          cache-prefix: v2-daily-${{ matrix.name }}
       - name: Check compilation
         env:
           FEATURES: ${{ matrix.features }}
@@ -108,7 +108,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: daily-audit
+          cache-prefix: v2-daily-audit
       - name: Install audit tools
         run: |
           # Build from source if cached binaries are missing or broken (GLIBC compat)
@@ -147,7 +147,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: daily-docs
+          cache-prefix: v2-daily-docs
       - name: Build documentation
         run: cargo doc --all --no-deps
 
@@ -164,7 +164,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: daily-size
+          cache-prefix: v2-daily-size
       - name: Build release binary
         run: cargo build --release
       - name: Report binary size
@@ -195,7 +195,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: daily-outdated
+          cache-prefix: v2-daily-outdated
       - name: Install cargo-outdated
         run: which cargo-outdated || cargo install cargo-outdated --locked
       - name: Check outdated dependencies

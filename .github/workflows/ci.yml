@@ -84,7 +84,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-          cache-prefix: clippy
+          cache-prefix: v2-clippy
 
       - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
@@ -101,7 +101,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           components: clippy
-          cache-prefix: clippy-pqc
+          cache-prefix: v2-clippy-pqc
 
       - name: cargo clippy --features pqc
         run: cargo clippy --all-targets --features pqc -- -D warnings
@@ -117,7 +117,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: test
+          cache-prefix: v2-test
 
       - name: cargo test
         run: cargo test --all
@@ -133,7 +133,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: test-pqc
+          cache-prefix: v2-test-pqc
 
       - name: cargo test --features pqc
         run: cargo test --all --features pqc
@@ -149,7 +149,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: build
+          cache-prefix: v2-build
 
       - name: cargo build --release
         run: cargo build --release
@@ -174,7 +174,7 @@ jobs:
       - uses: ./.github/actions/rust-setup
         with:
           targets: x86_64-unknown-linux-musl
-          cache-prefix: build-musl
+          cache-prefix: v2-build-musl
 
       - name: Install musl toolchain
         run: |
@@ -221,7 +221,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: audit
+          cache-prefix: v2-audit
 
       - name: Install cargo-audit
         run: |
@@ -263,7 +263,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: deny
+          cache-prefix: v2-deny
 
       - name: Install cargo-deny
         run: |
