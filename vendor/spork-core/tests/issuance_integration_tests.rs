@@ -577,7 +577,7 @@ fn test_subordinate_csr_signing_and_chain() {
 // ============================================================================
 
 /// ML-DSA-65 CSR-based full chain issuance
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_csr_based_full_chain_mldsa65() {
     // 1. Create PQC Root CA
@@ -621,7 +621,7 @@ fn test_csr_based_full_chain_mldsa65() {
 }
 
 /// ML-DSA-44 CSR-based issuance
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_csr_based_full_chain_mldsa44() {
     let (root_cert, mut root_ca) = root_ca("ML-DSA-44 Root", AlgorithmId::MlDsa44);
@@ -649,7 +649,7 @@ fn test_csr_based_full_chain_mldsa44() {
 }
 
 /// ML-DSA-87 CSR-based issuance
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_csr_based_full_chain_mldsa87() {
     // ML-DSA-87 has very large keys/signatures — needs bigger stack
@@ -685,7 +685,7 @@ fn test_csr_based_full_chain_mldsa87() {
 }
 
 /// SLH-DSA-SHA2-128s CSR-based issuance
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_csr_based_full_chain_slhdsa_128s() {
     let (root_cert, mut root_ca) = root_ca("SLH-DSA Root", AlgorithmId::SlhDsaSha2_128s);
@@ -720,7 +720,7 @@ fn test_csr_based_full_chain_slhdsa_128s() {
 }
 
 /// Cross-algorithm: PQC Root (ML-DSA-65) → Classical Intermediate (P-256) → Classical EE
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_cross_algorithm_pqc_root_classical_intermediate() {
     let (root_cert, mut root_ca) = root_ca("PQC Cross Root", AlgorithmId::MlDsa65);
@@ -763,7 +763,7 @@ fn test_cross_algorithm_pqc_root_classical_intermediate() {
 
 /// ML-DSA-65 + ECDSA P-256 composite CSR-based issuance
 /// Uses larger stack thread because composite keys are large (~16KB per key).
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_composite_mldsa65_p256_csr_issuance() {
     std::thread::Builder::new()
@@ -811,7 +811,7 @@ fn test_composite_mldsa65_p256_csr_issuance() {
 }
 
 /// ML-DSA-87 + ECDSA P-384 composite issuance
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_composite_mldsa87_p384_csr_issuance() {
     std::thread::Builder::new()
@@ -857,7 +857,7 @@ fn test_composite_mldsa87_p384_csr_issuance() {
 
 /// Cross-algorithm: Composite Root → Classical Intermediate → Classical EE
 /// Tests that composite CA can sign classical subordinate certs
-#[cfg(feature = "pqc")]
+#[cfg(all(feature = "pqc", not(feature = "fips")))]
 #[test]
 fn test_composite_root_classical_subordinate() {
     std::thread::Builder::new()
