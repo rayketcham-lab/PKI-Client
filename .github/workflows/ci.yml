@@ -10,6 +10,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Use CMake builder for aws-lc-sys to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
+  AWS_LC_SYS_CMAKE_BUILDER: 1
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -92,9 +94,6 @@ jobs:
     needs: [fmt]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 15
-    env:
-      # Use CMake builder to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
-      AWS_LC_SYS_CMAKE_BUILDER: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -128,9 +127,6 @@ jobs:
     needs: [fmt, clippy-pqc]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 20
-    env:
-      # Use CMake builder to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
-      AWS_LC_SYS_CMAKE_BUILDER: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
