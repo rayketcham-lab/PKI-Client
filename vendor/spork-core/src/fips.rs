@@ -1039,6 +1039,9 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))] // Ed25519 rejected by FIPS algorithm validation
     fn test_key_import_self_test_ed25519() {
+        // Guard against runtime FIPS mode set by parallel tests
+        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        FIPS_MODE.store(false, Ordering::SeqCst);
         let key = crate::algo::KeyPair::generate(AlgorithmId::Ed25519)
             .expect("Ed25519 keygen should work");
         let result = key_import_self_test(&key);
