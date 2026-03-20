@@ -24,7 +24,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output.
 [![Version](https://img.shields.io/badge/version-0.3.0--beta.3-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![MSRV](https://img.shields.io/badge/MSRV-1.75.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
 
 <!-- Build & Quality -->
 [![Clippy](https://img.shields.io/badge/clippy--D%20warnings-passing-brightgreen?logo=rust&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)

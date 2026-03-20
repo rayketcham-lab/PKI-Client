@@ -13,7 +13,7 @@ members = [
 version = "0.3.0-beta.3"
 edition = "2021"
 license = "Apache-2.0"
-rust-version = "1.75.0"
+rust-version = "1.85.0"
 repository = "https://github.com/rayketcham-lab/pki-client"
 
 [workspace.dependencies]
