@@ -106,7 +106,7 @@ pub enum ColorMode {
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub enum Commands {
     /// Quick view of any PKI file (auto-detects type)
     ///
     /// Automatically detects: certificates, CRLs, keys, CSRs, PKCS#7, PKCS#12
@@ -423,4 +423,71 @@ fn main() -> Result<()> {
             std::process::exit(1)
         }
     }
+}
+
+/// Run a CLI command from pre-built args (used by the interactive shell).
+///
+/// Parses the args as if they were passed on the command line, then dispatches.
+/// Does NOT call `std::process::exit` — returns errors for the shell to handle.
+pub fn run_from_args(args: &[String], config: &GlobalConfig) -> Result<()> {
+    let cli = Cli::try_parse_from(args).map_err(|e| {
+        // Print clap's help/error message directly (don't wrap in anyhow)
+        let _ = e.print();
+        anyhow::anyhow!("") // empty error since clap already printed
+    })?;
+
+    let result = match cli.command {
+        Some(Commands::Show {
+            file,
+            check,
+            issuer_cert,
+            lint,
+            interactive,
+            all,
+            no_chain,
+        }) => {
+            match show::auto_show(&file, config)? {
+                Some(result) => Ok(result),
+                None => cert::run(
+                    cert::CertCommands::Show(cert::ShowArgs {
+                        file,
+                        subject: false,
+                        san: false,
+                        issuer: false,
+                        check,
+                        issuer_cert,
+                        lint,
+                        interactive,
+                        all,
+                        no_chain,
+                    }),
+                    config,
+                ),
+            }
+        }
+        Some(Commands::Cert(cmd)) => cert::run(cmd, config),
+        Some(Commands::Key(cmd)) => key::run(cmd, config),
+        Some(Commands::Chain(cmd)) => chain::run(cmd, config),
+        Some(Commands::Csr(cmd)) => csr::run(cmd, config),
+        Some(Commands::Crl(cmd)) => crl::run(cmd, config),
+        Some(Commands::Revoke(cmd)) => revoke::run(cmd, config),
+        Some(Commands::Probe(cmd)) => probe::run(cmd, config),
+        Some(Commands::Acme(cmd)) => acme_cmd::run(cmd, config),
+        Some(Commands::Est(cmd)) => est_cmd::run(cmd, config),
+        Some(Commands::Scep(cmd)) => scep_cmd::run(cmd, config),
+        Some(Commands::Pki(cmd)) => pki::run(cmd, config),
+        Some(Commands::Compliance(cmd)) => {
+            compliance::execute(cmd)?;
+            Ok(CmdResult::Success)
+        }
+        Some(Commands::Dane(cmd)) => dane::run(cmd, config),
+        Some(Commands::Diff(args)) => diff::run(args, config),
+        Some(Commands::Convert(args)) => convert::run(args, config),
+        Some(Commands::Completions { .. }) | Some(Commands::Manpages { .. }) => {
+            Ok(CmdResult::Success)
+        }
+        Some(Commands::Shell) | None => Ok(CmdResult::Success),
+    };
+
+    result.map(|_| ())
 }

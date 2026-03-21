@@ -35,6 +35,9 @@ Commands:
   cert expires <file>           Check certificate expiration
   cert fingerprint <file>       Show certificate fingerprint
 
+  csr create --key <file> --cn <name>   Create a CSR
+  csr show <file>               Show CSR details
+
   key gen ec|rsa|ed25519        Generate private key
   key show <file>               Show key information
   key match <key> <cert>        Check if key matches certificate
@@ -42,6 +45,16 @@ Commands:
   chain build <file>            Build certificate chain
   chain show <file>             Display chain as tree
   chain verify <file>           Verify chain integrity
+
+  convert <file> --to pem|der   Convert certificate format
+  diff <file1> <file2>          Compare two certs or CSRs
+  probe server <host:port>      Probe TLS server
+  probe check <host:port>       Quick TLS connectivity check
+
+  scep cacaps <url>             SCEP: CA capabilities
+  scep enroll <url> -s <cn>     SCEP: automated enrollment
+  acme certonly <domain>        ACME: get certificate
+  est enroll <url>              EST: simple enrollment
 
 Shell commands:
   help, ?                       Show this help
@@ -52,7 +65,7 @@ Shell commands:
 Tips:
   - Use Tab for file path completion
   - Use Up/Down arrows for history
-  - Most commands support --help for more options
+  - The "pki" prefix is optional (e.g., "key gen ec" works)
   - Paste PEM certificates directly to view them
 "#;
 
@@ -71,15 +84,21 @@ const FILE_COMMANDS: &[&str] = &[
 
 /// Top-level commands for completion
 const TOP_COMMANDS: &[&str] = &[
-    "show", "cert", "key", "chain", "help", "clear", "exit", "quit", "history",
+    "show", "cert", "csr", "key", "chain", "convert", "diff", "probe", "scep", "acme", "est",
+    "help", "clear", "exit", "quit", "history",
 ];
 
 /// Subcommands for each top-level command
 fn get_subcommands(cmd: &str) -> &'static [&'static str] {
     match cmd {
         "cert" => &["show", "expires", "fingerprint"],
+        "csr" => &["create", "show"],
         "key" => &["gen", "show", "match"],
         "chain" => &["build", "show", "verify"],
+        "probe" => &["check", "server"],
+        "scep" => &["cacaps", "cacert", "enroll", "pkiop"],
+        "acme" => &["certonly", "directory", "register"],
+        "est" => &["cacerts", "enroll", "reenroll"],
         _ => &[],
     }
 }
@@ -346,6 +365,17 @@ fn handle_shell_command(line: &str, _config: &GlobalConfig) -> ShellAction {
         return ShellAction::Continue;
     }
 
+    // Strip "pki" prefix — users often type "pki key gen" inside the shell
+    let parts: Vec<&str> = if parts.first().map(|s| s.eq_ignore_ascii_case("pki")) == Some(true) {
+        parts[1..].to_vec()
+    } else {
+        parts
+    };
+
+    if parts.is_empty() && pem_content.is_none() {
+        return ShellAction::Continue;
+    }
+
     // Handle case where only PEM is pasted (implicit "show")
     #[allow(clippy::unnecessary_unwrap)]
     if parts.is_empty() && pem_content.is_some() {
@@ -381,7 +411,7 @@ fn handle_shell_command(line: &str, _config: &GlobalConfig) -> ShellAction {
 }
 
 fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
-    use crate::commands::{cert, chain, key};
+    use crate::commands::{cert, chain, csr, key};
 
     if args.is_empty() {
         return Ok(());
@@ -636,13 +666,98 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                 }
             }
         }
+        "csr" => {
+            if args.len() < 2 {
+                println!("Usage: csr <create|show> [args]");
+                return Ok(());
+            }
+            match args[1].as_str() {
+                "create" => {
+                    if args.len() < 3 || !args.iter().any(|a| a == "--cn") {
+                        println!("Usage: csr create --key <file> --cn <name> [options]");
+                        println!("Options:");
+                        println!("  --key <file>    Private key file (required)");
+                        println!("  --cn <name>     Common Name (required)");
+                        println!("  --san <san>     Subject Alternative Name (repeatable)");
+                        println!("  --org <org>     Organization");
+                        println!("  --country <CC>  Country code");
+                        println!("  -o <file>       Output file");
+                        return Ok(());
+                    }
+                    let get_arg = |flag: &str| {
+                        args.iter()
+                            .position(|a| a == flag)
+                            .and_then(|i| args.get(i + 1))
+                            .cloned()
+                    };
+                    let key = get_arg("--key").or_else(|| get_arg("-k"));
+                    let cn = get_arg("--cn");
+                    let Some(key) = key else {
+                        println!("Missing required: --key <file>");
+                        return Ok(());
+                    };
+                    let Some(cn) = cn else {
+                        println!("Missing required: --cn <name>");
+                        return Ok(());
+                    };
+                    let san: Vec<String> = args
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, a)| *a == "--san")
+                        .filter_map(|(i, _)| args.get(i + 1).cloned())
+                        .collect();
+                    let cmd = csr::CsrCommands::Create(csr::CreateArgs {
+                        key: key.into(),
+                        cn,
+                        org: get_arg("--org"),
+                        ou: get_arg("--ou"),
+                        country: get_arg("--country"),
+                        state: get_arg("--state"),
+                        locality: get_arg("--locality"),
+                        san,
+                        output: get_arg("-o")
+                            .or_else(|| get_arg("--output"))
+                            .map(|s| s.into()),
+                    });
+                    csr::run(cmd, config)?;
+                }
+                "show" => {
+                    if args.len() < 3 {
+                        println!("Usage: csr show <file>");
+                        return Ok(());
+                    }
+                    let cmd = csr::CsrCommands::Show(csr::ShowArgs {
+                        file: args[2].clone().into(),
+                    });
+                    csr::run(cmd, config)?;
+                }
+                other => {
+                    println!("Unknown csr command: {other}");
+                    println!("Available: create, show");
+                }
+            }
+        }
+        // Passthrough: run any other command via the full CLI parser
         other => {
-            println!("Unknown command: {other}");
-            println!("Type 'help' for available commands");
+            passthrough_to_cli(args, config).unwrap_or_else(|_| {
+                println!("Unknown command: {other}");
+                println!("Type 'help' for available commands");
+            });
         }
     }
 
     Ok(())
+}
+
+/// Passthrough commands to the full CLI dispatcher for commands not
+/// explicitly handled in the shell (probe, diff, convert, scep, acme, est, etc.)
+fn passthrough_to_cli(args: &[String], config: &GlobalConfig) -> Result<()> {
+    // Reconstruct CLI args as "pki <command> [args...]" and dispatch
+    let cli_args: Vec<String> = std::iter::once("pki".to_string())
+        .chain(args.iter().cloned())
+        .collect();
+
+    crate::run_from_args(&cli_args, config)
 }
 
 // Helper function to get data directory
