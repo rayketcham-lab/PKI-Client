@@ -6,8 +6,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write        # Sigstore OIDC (cosign keyless signing)
-  attestations: write    # GitHub build provenance attestations
+  id-token: write        # Sigstore OIDC (cosign keyless signing) + attestations
 
 env:
   CARGO_TERM_COLOR: always
