@@ -53,14 +53,13 @@ jobs:
           name: pki-linux
           path: pki-*.tar.gz
 
-  sign-and-release:
-    name: Sign and Release
+  release:
+    name: Create Release
     needs: [build-linux]
     runs-on: [self-hosted, Linux]
     permissions:
       contents: write
       id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -88,18 +87,6 @@ jobs:
           fi
       - name: Generate checksums
         run: sha256sum pki-*.tar.gz > SHA256SUMS.txt
-
-      # --- Supply chain security: SLSA provenance ---
-      - name: Attest build provenance (tarball)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: pki-*.tar.gz
-      - name: Attest build provenance (checksums)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: SHA256SUMS.txt
-
-      # --- Supply chain security: Sigstore cosign signing ---
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
       - name: Sign artifacts with cosign (keyless)
@@ -107,12 +94,10 @@ jobs:
           for f in pki-*.tar.gz SHA256SUMS.txt; do
             cosign sign-blob --yes --bundle "${f}.bundle" "$f"
           done
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
         run: |
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
