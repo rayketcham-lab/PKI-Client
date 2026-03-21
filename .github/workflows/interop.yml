@@ -20,6 +20,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Use CMake builder for aws-lc-sys to avoid __isoc23_sscanf (C23) unavailable on Rocky Linux GLIBC
+  AWS_LC_SYS_CMAKE_BUILDER: 1
 
 concurrency:
   group: interop-${{ github.ref }}
@@ -31,7 +33,8 @@ jobs:
   # ──────────────────────────────────────────────────────────────────
   build:
     name: Build
-    runs-on: [self-hosted, Linux]
+    # Pin to ubuntu3-runner: binary must match GLIBC of consuming jobs
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -56,7 +59,7 @@ jobs:
     name: ACME vs Pebble
     if: ${{ vars.HAS_DOCKER == 'true' }}
     needs: [build]
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 15
     services:
       pebble:
@@ -93,7 +96,7 @@ jobs:
   tls-probe:
     name: TLS Probe
     needs: [build]
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -115,7 +118,7 @@ jobs:
   cert-roundtrip:
     name: Certificate Round-Trip
     needs: [build]
-    runs-on: [self-hosted, Linux]
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
