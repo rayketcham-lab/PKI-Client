@@ -4,7 +4,8 @@
 
 | Version       | Supported |
 |---------------|-----------|
-| 0.3.x (beta)  | Yes       |
+| 0.5.x (beta)  | Yes       |
+| 0.3.x (beta)  | No        |
 | < 0.3         | No        |
 
 ## Reporting a vulnerability
@@ -20,6 +21,37 @@ Include:
 - Impact assessment (if known)
 
 You should receive an acknowledgment within 48 hours. We aim to release a fix within 7 days for critical issues.
+
+## Supply chain security
+
+Every release binary is built, signed, and published by GitHub Actions — no human touches the artifact.
+
+| Protection | Tool | How to verify |
+|---|---|---|
+| **Checksum** | SHA-256 | `sha256sum -c SHA256SUMS.txt` |
+| **Build provenance** | [SLSA](https://slsa.dev/) via GitHub Attestations | `gh attestation verify <file> --repo rayketcham-lab/PKI-Client` |
+| **Artifact signing** | [Sigstore cosign](https://www.sigstore.dev/) (keyless) | `cosign verify-blob --bundle <file>.bundle ...` |
+| **Dependency vendoring** | Cargo vendor | CI enforces vendored deps match `Cargo.lock`; zero git dependencies |
+| **Dependency audit** | `cargo-audit` + `cargo-deny` | Runs on every commit; zero-tolerance policy |
+| **Action pinning** | SHA-pinned GitHub Actions | Org-enforced full commit SHA pins on all CI actions |
+
+### Verifying a release
+
+```bash
+# 1. SHA256 checksum
+curl -fSL -o SHA256SUMS.txt https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt
+
+# 2. GitHub attestation (proves binary was built from this repo by CI)
+gh attestation verify pki-*.tar.gz --repo rayketcham-lab/PKI-Client
+
+# 3. Cosign signature (Sigstore — independent of GitHub)
+cosign verify-blob \
+  --bundle pki-*.tar.gz.bundle \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
+  pki-*.tar.gz
+```
 
 ## Security design
 

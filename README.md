@@ -21,7 +21,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output.
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.3.0--beta.3-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.5.0--beta.1-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -204,13 +204,38 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 Or download manually from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases):
 
 ```bash
-# Download, verify, install
-curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.3.0-beta.3-x86_64-linux.tar.gz
+# Download and install
+curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.5.0-beta.1-x86_64-linux.tar.gz
 tar xzf pki.tar.gz
 sudo mv pki /usr/local/bin/
 ```
 
 **Platform:** x86_64 Linux. The binary is statically linked (musl) — zero runtime dependencies.
+
+### Verify release integrity
+
+Every release includes SHA256 checksums, [SLSA build provenance](https://slsa.dev/), and [Sigstore](https://www.sigstore.dev/) cosign signatures. All artifacts are built by GitHub Actions from source — no human touches the binary.
+
+**SHA256 checksum:**
+```bash
+curl -fSL -o SHA256SUMS.txt https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt
+```
+
+**GitHub attestation (SLSA provenance):**
+```bash
+gh attestation verify pki-v0.5.0-beta.1-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
+```
+
+**Cosign signature (Sigstore):**
+```bash
+curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.5.0-beta.1-x86_64-linux.tar.gz.bundle
+cosign verify-blob \
+  --bundle pki-v0.5.0-beta.1-x86_64-linux.tar.gz.bundle \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
+  pki-v0.5.0-beta.1-x86_64-linux.tar.gz
+```
 
 ### Shell completions
 
@@ -300,6 +325,8 @@ bash tests/interop/tls_probe.sh
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms
 - **Input validation** — all file parsing uses safe, bounds-checked Rust decoders
 - **Dependency auditing** — `cargo audit` and `cargo deny` run in CI with zero-tolerance policy
+- **Signed releases** — every binary is signed with [Sigstore cosign](https://www.sigstore.dev/) (keyless) and includes [SLSA provenance](https://slsa.dev/) attestations via GitHub Actions
+- **Vendored dependencies** — all crate dependencies are vendored and verified against `Cargo.lock` in CI; no git dependencies allowed
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
