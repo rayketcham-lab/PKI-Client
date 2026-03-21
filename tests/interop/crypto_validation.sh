@@ -752,6 +752,51 @@ convert_cert_roundtrip "${ROOT_CERT}" "conv_root" "Root cert"
 convert_cert_roundtrip "${INT_CERT}" "conv_int" "Intermediate cert"
 convert_cert_roundtrip "${ISS_CERT}" "conv_iss" "Issuing cert"
 
+# ── Category 7: DER CSR Auto-Detection (#24) ─────────────────────────────────
+
+section "DER CSR Auto-Detection"
+
+if [[ -f "${WORK}/csr-rsa2048.pem" ]]; then
+    der_csr="${WORK}/csr-rsa2048.der"
+    if "${PKI}" convert "${WORK}/csr-rsa2048.pem" --to der -o "${der_csr}" > /dev/null 2>&1; then
+        pass "der_csr_convert" "CSR PEM to DER conversion succeeded"
+
+        # pki show should auto-detect DER CSR (regression test for #24)
+        show_out=$("${PKI}" show "${der_csr}" 2>&1 || true)
+        if echo "${show_out}" | grep -qiE "CSR|Request|Subject"; then
+            pass "der_csr_autodetect" "pki show auto-detected DER CSR"
+        else
+            fail "der_csr_autodetect" "pki show did not auto-detect DER CSR (#24)" \
+                "$(echo "${show_out}" | head -3)"
+        fi
+
+        # pki csr show must always work for DER CSRs
+        explicit_out=$("${PKI}" csr show "${der_csr}" 2>&1 || true)
+        if echo "${explicit_out}" | grep -qiE "Subject|CN"; then
+            pass "der_csr_explicit" "pki csr show handles DER CSR"
+        else
+            fail "der_csr_explicit" "pki csr show failed on DER CSR" \
+                "$(echo "${explicit_out}" | head -3)"
+        fi
+    else
+        fail "der_csr_convert" "CSR PEM to DER conversion failed" ""
+    fi
+fi
+
+# ── Category 8: Key Match CSR Handling (#25) ──────────────────────────────────
+
+section "Key Match Error Handling"
+
+if [[ -f "${WORK}/key-rsa2048.pem" ]] && [[ -f "${WORK}/csr-rsa2048.pem" ]]; then
+    match_out=$("${PKI}" key match "${WORK}/key-rsa2048.pem" "${WORK}/csr-rsa2048.pem" 2>&1 || true)
+    if echo "${match_out}" | grep -q "InvalidAlgorithmIdentifier"; then
+        fail "key_match_csr" "key match crashes on CSR with InvalidAlgorithmIdentifier (#25)" \
+            "Should give a clear error or support CSR files"
+    else
+        pass "key_match_csr" "key match handles CSR input without crashing"
+    fi
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 TOTAL=$(( PASS + FAIL ))
