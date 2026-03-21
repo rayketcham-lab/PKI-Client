@@ -242,6 +242,200 @@ jobs:
             echo "WARN: pki may not be fully static"
           fi
 
+  binary-output-validation:
+    name: Binary Output Validation
+    needs: [build]
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: v3-build
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Verify binary exists
+        run: |
+          set -euo pipefail
+          if [ ! -f "target/release/pki" ]; then
+            echo "ERROR: pki binary not found at target/release/pki"
+            exit 1
+          fi
+          echo "OK: pki binary present ($(du -h target/release/pki | cut -f1))"
+
+      - name: Check version output
+        run: |
+          set -euo pipefail
+          VERSION_OUT=$(target/release/pki --version)
+          echo "Version output: $VERSION_OUT"
+          if ! echo "$VERSION_OUT" | grep -qF "0.5.0-beta.2"; then
+            echo "ERROR: version output did not contain expected '0.5.0-beta.2'"
+            echo "Got: $VERSION_OUT"
+            exit 1
+          fi
+          echo "OK: version check passed"
+
+      - name: Generate RSA-4096 key
+        run: |
+          set -euo pipefail
+          target/release/pki key gen rsa --bits 4096 -o /tmp/ci-test.key
+          if [ ! -f /tmp/ci-test.key ]; then
+            echo "ERROR: RSA key file not created"
+            exit 1
+          fi
+          echo "OK: RSA-4096 key generated"
+
+      - name: Generate EC P-256 key
+        run: |
+          set -euo pipefail
+          target/release/pki key gen ec --curve p256 -o /tmp/ci-test-ec.key
+          if [ ! -f /tmp/ci-test-ec.key ]; then
+            echo "ERROR: EC key file not created"
+            exit 1
+          fi
+          echo "OK: EC P-256 key generated"
+
+      - name: Create RSA CSR
+        run: |
+          set -euo pipefail
+          target/release/pki csr create --key /tmp/ci-test.key --cn "CI Test" -o /tmp/ci-test.csr
+          if [ ! -f /tmp/ci-test.csr ]; then
+            echo "ERROR: RSA CSR file not created"
+            exit 1
+          fi
+          echo "OK: RSA CSR created"
+
+      - name: Create EC CSR
+        run: |
+          set -euo pipefail
+          target/release/pki csr create --key /tmp/ci-test-ec.key --cn "CI Test EC" -o /tmp/ci-test-ec.csr
+          if [ ! -f /tmp/ci-test-ec.csr ]; then
+            echo "ERROR: EC CSR file not created"
+            exit 1
+          fi
+          echo "OK: EC CSR created"
+
+      - name: Validate pki show key output (RSA-4096 and 4096 bits)
+        run: |
+          set -euo pipefail
+          SHOW_OUT=$(target/release/pki show /tmp/ci-test.key)
+          echo "$SHOW_OUT"
+          if ! echo "$SHOW_OUT" | grep -q "RSA-4096"; then
+            echo "ERROR: 'pki show' key output did not contain 'RSA-4096'"
+            exit 1
+          fi
+          if ! echo "$SHOW_OUT" | grep -q "4096 bits"; then
+            echo "ERROR: 'pki show' key output did not contain '4096 bits'"
+            exit 1
+          fi
+          echo "OK: RSA key show output is correct"
+
+      - name: Validate pki show RSA CSR output (RSA algorithm, no raw OID)
+        run: |
+          set -euo pipefail
+          SHOW_OUT=$(target/release/pki show /tmp/ci-test.csr)
+          echo "$SHOW_OUT"
+          if ! echo "$SHOW_OUT" | grep -q "RSA"; then
+            echo "ERROR: 'pki show' CSR output did not contain 'RSA'"
+            exit 1
+          fi
+          if echo "$SHOW_OUT" | grep -q "1.2.840.113549"; then
+            echo "ERROR: 'pki show' CSR output contains raw OID '1.2.840.113549' — OID leak detected"
+            exit 1
+          fi
+          echo "OK: RSA CSR show output is correct (human-readable, no raw OID leak)"
+
+      - name: Validate pki show EC CSR output (EC algorithm)
+        run: |
+          set -euo pipefail
+          SHOW_OUT=$(target/release/pki show /tmp/ci-test-ec.csr)
+          echo "$SHOW_OUT"
+          if ! echo "$SHOW_OUT" | grep -q "EC"; then
+            echo "ERROR: 'pki show' EC CSR output did not contain 'EC'"
+            exit 1
+          fi
+          echo "OK: EC CSR show output is correct"
+
+      - name: Validate pki diff CSR comparison (exit 0)
+        run: |
+          set -euo pipefail
+          DIFF_OUT=$(target/release/pki diff /tmp/ci-test.csr /tmp/ci-test-ec.csr)
+          echo "$DIFF_OUT"
+          echo "OK: pki diff exited cleanly"
+
+      - name: Cleanup temp files
+        if: always()
+        run: |
+          rm -f /tmp/ci-test.key /tmp/ci-test-ec.key /tmp/ci-test.csr /tmp/ci-test-ec.csr
+
+  binary-validation:
+    name: Binary Validation
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: v3-binary-validation
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Verify version
+        run: |
+          set -euo pipefail
+          ./target/release/pki --version
+
+      - name: Generate test keys
+        run: |
+          set -euo pipefail
+          ./target/release/pki key gen rsa --bits 4096 -o /tmp/ci-rsa.key
+          ./target/release/pki key gen ec --curve p256 -o /tmp/ci-ec.key
+
+      - name: Create test CSRs
+        run: |
+          set -euo pipefail
+          ./target/release/pki csr create --key /tmp/ci-rsa.key --cn "CI RSA Test" -o /tmp/ci-rsa.csr
+          ./target/release/pki csr create --key /tmp/ci-ec.key --cn "CI EC Test" -o /tmp/ci-ec.csr
+
+      - name: Validate RSA CSR display
+        run: |
+          set -euo pipefail
+          output=$(./target/release/pki show /tmp/ci-rsa.csr)
+          echo "$output"
+          echo "$output" | grep -q "RSA"
+          echo "$output" | grep -q "4096"
+          if echo "$output" | grep -q "1.2.840.113549.1.1.1"; then
+            echo "FAIL: Raw OID found in output"
+            exit 1
+          fi
+
+      - name: Validate EC CSR display
+        run: |
+          set -euo pipefail
+          output=$(./target/release/pki show /tmp/ci-ec.csr)
+          echo "$output"
+          echo "$output" | grep -q "EC"
+          if echo "$output" | grep -q "1.2.840.10045.2.1"; then
+            echo "FAIL: Raw OID found in output"
+            exit 1
+          fi
+
+      - name: Validate CSR diff
+        run: |
+          set -euo pipefail
+          ./target/release/pki diff /tmp/ci-rsa.csr /tmp/ci-ec.csr
+
+      - name: Cleanup test files
+        if: always()
+        run: rm -f /tmp/ci-rsa.key /tmp/ci-ec.key /tmp/ci-rsa.csr /tmp/ci-ec.csr
+
   links:
     name: Link Check
     runs-on: [self-hosted, Linux]
