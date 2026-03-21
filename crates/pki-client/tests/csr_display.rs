@@ -1000,3 +1000,112 @@ fn issue_25_key_match_csr_gives_clear_message() {
         "pki key match gave no useful output for CSR:\nstdout: {stdout}\nstderr: {stderr}"
     );
 }
+
+// ============================================================================
+// Issue #26: Interactive shell must handle version/help commands
+// ============================================================================
+
+/// Helper: run the interactive shell with piped input and return stdout.
+fn shell_input(input: &str) -> (String, String, bool) {
+    use std::io::Write;
+
+    let mut cmd = pki_cmd();
+    cmd.stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    let mut child = cmd.spawn().expect("failed to spawn pki shell");
+    if let Some(ref mut stdin) = child.stdin {
+        let _ = stdin.write_all(input.as_bytes());
+        let _ = stdin.write_all(b"\nexit\n");
+    }
+    let out = child.wait_with_output().expect("failed to read shell output");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    (stdout, stderr, out.status.success())
+}
+
+#[test]
+fn issue_26_shell_version_command() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("version");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("0.5.0"),
+        "shell 'version' did not print version string:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell 'version' returned Unknown command"
+    );
+}
+
+#[test]
+fn issue_26_shell_dash_v_flag() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("-V");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("0.5.0"),
+        "shell '-V' did not print version:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell '-V' returned Unknown command"
+    );
+}
+
+#[test]
+fn issue_26_shell_double_dash_version() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("--version");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("0.5.0"),
+        "shell '--version' did not print version:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell '--version' returned Unknown command"
+    );
+}
+
+#[test]
+fn issue_26_shell_double_dash_help() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("--help");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("Commands:") || combined.contains("PKI Interactive Shell"),
+        "shell '--help' did not show help:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell '--help' returned Unknown command"
+    );
+}
+
+#[test]
+fn issue_26_shell_dash_h() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("-h");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("Commands:") || combined.contains("PKI Interactive Shell"),
+        "shell '-h' did not show help:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell '-h' returned Unknown command"
+    );
+}

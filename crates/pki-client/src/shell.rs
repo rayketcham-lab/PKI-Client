@@ -58,6 +58,7 @@ Commands:
 
 Shell commands:
   help, ?                       Show this help
+  version                       Show version
   history                       Show command history
   clear                         Clear screen
   exit, quit, q                 Exit shell
@@ -384,8 +385,12 @@ fn handle_shell_command(line: &str, _config: &GlobalConfig) -> ShellAction {
 
     match parts.first().map(|s| s.to_lowercase()).as_deref() {
         Some("exit") | Some("quit") | Some("q") => ShellAction::Exit,
-        Some("help") | Some("?") => {
+        Some("help") | Some("?") | Some("--help") | Some("-h") => {
             println!("{}", HELP_TEXT);
+            ShellAction::Continue
+        }
+        Some("version") | Some("--version") | Some("-v") => {
+            println!("pki {}", env!("CARGO_PKG_VERSION"));
             ShellAction::Continue
         }
         Some("clear") | Some("cls") => {
