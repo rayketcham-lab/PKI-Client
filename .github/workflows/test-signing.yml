@@ -1,0 +1,57 @@
+name: Test Signing Diagnostics
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-id-token:
+    name: Test id-token permission
+    runs-on: [self-hosted, Linux]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Verify id-token permission works
+        run: echo "id-token works"
+
+  test-cosign:
+    name: Test cosign installer
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: read
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Verify cosign version
+        run: cosign version
+
+  test-attest:
+    name: Test attest-build-provenance
+    runs-on: [self-hosted, Linux]
+    permissions:
+      id-token: write
+      attestations: write
+      contents: read
+    steps:
+      - name: Create dummy artifact
+        run: echo "dummy" > /tmp/dummy-artifact.txt
+      - name: Attest dummy artifact
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: /tmp/dummy-artifact.txt
+
+  test-combined:
+    name: Test id-token + cosign combined
+    runs-on: [self-hosted, Linux]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Verify cosign version
+        run: cosign version
+      - name: Create dummy file
+        run: echo "dummy" > /tmp/combined-test.txt
+      - name: Sign dummy file with cosign keyless
+        run: cosign sign-blob --yes --bundle /tmp/combined-test.txt.bundle /tmp/combined-test.txt
