@@ -238,13 +238,27 @@ fn show(args: ShowArgs, config: &GlobalConfig) -> Result<CmdResult> {
 }
 
 fn key_match(args: MatchArgs, config: &GlobalConfig) -> Result<CmdResult> {
-    use crate::compat::load_certificate;
+    use crate::compat::{load_certificate, DetectedFileType};
     use base64::engine::general_purpose::STANDARD as B64;
     use base64::Engine;
     use sha2::{Digest, Sha256};
 
     let key = load_private_key(&args.key)
         .with_context(|| format!("Failed to load key: {}", args.key.display()))?;
+
+    // Detect file type before parsing to give clear errors for CSRs
+    let cert_data = std::fs::read(&args.cert)
+        .with_context(|| format!("Failed to read: {}", args.cert.display()))?;
+    let detected = DetectedFileType::detect_with_confidence(&cert_data, &args.cert);
+    if detected.file_type == DetectedFileType::Csr {
+        anyhow::bail!(
+            "{} is a CSR, not a certificate. \
+             key match compares a private key against a certificate.\n\
+             Try: pki csr show {} to inspect the CSR instead",
+            args.cert.display(),
+            args.cert.display()
+        );
+    }
 
     let cert = load_certificate(&args.cert)
         .with_context(|| format!("Failed to load certificate: {}", args.cert.display()))?;

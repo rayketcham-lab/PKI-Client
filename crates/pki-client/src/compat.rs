@@ -206,12 +206,21 @@ impl DetectedFileType {
             }
         }
 
-        // Try DER parsing
-        if data.len() > 2 && data[0] == 0x30 && x509_parser::parse_x509_certificate(data).is_ok() {
-            return DetectionResult {
-                file_type: Self::Certificate,
-                confidence: 90,
-            };
+        // Try DER parsing — certificate first, then CSR
+        if data.len() > 2 && data[0] == 0x30 {
+            if x509_parser::parse_x509_certificate(data).is_ok() {
+                return DetectionResult {
+                    file_type: Self::Certificate,
+                    confidence: 90,
+                };
+            }
+            if x509_parser::certification_request::X509CertificationRequest::from_der(data).is_ok()
+            {
+                return DetectionResult {
+                    file_type: Self::Csr,
+                    confidence: 90,
+                };
+            }
         }
 
         DetectionResult {

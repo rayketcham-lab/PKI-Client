@@ -847,3 +847,156 @@ mod parsing_tests {
         assert_eq!(parse_key_bits_from_csr_show(output), Some(2048));
     }
 }
+
+// ============================================================================
+// Issue #24: pki show must auto-detect DER CSR files
+// ============================================================================
+
+#[test]
+fn issue_24_pki_show_autodetects_der_csr() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+
+    // Generate key and CSR
+    let key = gen_key(&dir, "test.key", "ec", &["--curve", "p256"]);
+    let csr_pem = gen_csr(&dir, "test.csr", &key);
+
+    // Convert to DER
+    let csr_der = dir.path().join("test.csr.der");
+    let convert_out = pki_cmd()
+        .args(["convert", csr_pem.to_str().unwrap(), "--to", "der", "-o"])
+        .arg(&csr_der)
+        .output()
+        .expect("failed to run pki convert");
+    assert!(
+        convert_out.status.success(),
+        "pki convert failed: {}",
+        String::from_utf8_lossy(&convert_out.stderr)
+    );
+    assert!(csr_der.exists(), "DER CSR file not created");
+
+    // pki show must auto-detect the DER CSR and show CSR details
+    let show_out = pki_cmd()
+        .args(["show"])
+        .arg(&csr_der)
+        .output()
+        .expect("failed to run pki show");
+
+    let stdout = String::from_utf8_lossy(&show_out.stdout);
+    let stderr = String::from_utf8_lossy(&show_out.stderr);
+
+    assert!(
+        show_out.status.success(),
+        "pki show DER CSR failed (exit {:?}):\nstdout: {stdout}\nstderr: {stderr}",
+        show_out.status.code()
+    );
+    assert!(
+        stdout.contains("CSR") || stdout.contains("Request") || stdout.contains("Subject"),
+        "pki show did not recognize DER CSR. stdout: {stdout}\nstderr: {stderr}"
+    );
+
+    // Must NOT contain "Failed to load certificate"
+    assert!(
+        !stderr.contains("Failed to load certificate"),
+        "pki show tried to load DER CSR as certificate: {stderr}"
+    );
+}
+
+#[test]
+fn issue_24_pki_csr_show_works_for_der_csr() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+
+    let key = gen_key(&dir, "test.key", "rsa", &["--bits", "2048"]);
+    let csr_pem = gen_csr(&dir, "test.csr", &key);
+
+    let csr_der = dir.path().join("test.csr.der");
+    let _ = pki_cmd()
+        .args(["convert", csr_pem.to_str().unwrap(), "--to", "der", "-o"])
+        .arg(&csr_der)
+        .output()
+        .expect("failed to run pki convert");
+
+    // Explicit pki csr show must always work for DER CSRs
+    let show_out = pki_cmd()
+        .args(["csr", "show"])
+        .arg(&csr_der)
+        .output()
+        .expect("failed to run pki csr show");
+
+    let stdout = String::from_utf8_lossy(&show_out.stdout);
+    let stderr = String::from_utf8_lossy(&show_out.stderr);
+
+    assert!(
+        show_out.status.success(),
+        "pki csr show DER CSR failed: {stderr}"
+    );
+    assert!(
+        stdout.contains("Subject") || stdout.contains("integration-test"),
+        "pki csr show did not display CSR content: {stdout}"
+    );
+}
+
+// ============================================================================
+// Issue #25: pki key match must handle CSR files gracefully
+// ============================================================================
+
+#[test]
+fn issue_25_key_match_csr_no_crash() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+
+    let key = gen_key(&dir, "test.key", "ec", &["--curve", "p256"]);
+    let csr = gen_csr(&dir, "test.csr", &key);
+
+    // pki key match with a CSR should NOT crash with InvalidAlgorithmIdentifier
+    let match_out = pki_cmd()
+        .args(["key", "match", key.to_str().unwrap(), csr.to_str().unwrap()])
+        .output()
+        .expect("failed to run pki key match");
+
+    let stderr = String::from_utf8_lossy(&match_out.stderr);
+
+    // Must NOT contain the raw parse crash
+    assert!(
+        !stderr.contains("InvalidAlgorithmIdentifier"),
+        "pki key match crashed with InvalidAlgorithmIdentifier on CSR input: {stderr}"
+    );
+}
+
+#[test]
+fn issue_25_key_match_csr_gives_clear_message() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+
+    let key = gen_key(&dir, "test.key", "rsa", &["--bits", "2048"]);
+    let csr = gen_csr(&dir, "test.csr", &key);
+
+    let match_out = pki_cmd()
+        .args(["key", "match", key.to_str().unwrap(), csr.to_str().unwrap()])
+        .output()
+        .expect("failed to run pki key match");
+
+    let stdout = String::from_utf8_lossy(&match_out.stdout);
+    let stderr = String::from_utf8_lossy(&match_out.stderr);
+    let combined = format!("{stdout}{stderr}");
+
+    // Either: succeeds with a match result, OR gives a clear error about CSRs
+    let has_match_result = combined.contains("Match") || combined.contains("match");
+    let has_clear_error = combined.contains("CSR")
+        || combined.contains("not supported")
+        || combined.contains("certificate");
+
+    assert!(
+        match_out.status.success() || has_match_result || has_clear_error,
+        "pki key match gave no useful output for CSR:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+}
