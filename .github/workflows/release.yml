@@ -6,7 +6,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write        # Sigstore OIDC (cosign keyless signing) + attestations
 
 env:
   CARGO_TERM_COLOR: always
@@ -85,65 +84,12 @@ jobs:
           fi
       - name: Generate checksums
         run: sha256sum pki-*.tar.gz > SHA256SUMS.txt
-
-      # --- Supply chain security: SLSA provenance ---
-      - name: Attest build provenance (tarball)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: pki-*.tar.gz
-      - name: Attest build provenance (checksums)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: SHA256SUMS.txt
-
-      # --- Supply chain security: Sigstore cosign signing ---
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
-      - name: Sign artifacts with cosign (keyless)
-        run: |
-          for f in pki-*.tar.gz SHA256SUMS.txt; do
-            cosign sign-blob --yes --bundle "${f}.bundle" "$f"
-          done
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
         run: |
-          cat > release-notes.md <<NOTES
-          ## Install
-
-          \`\`\`bash
-          curl -LO "https://github.com/${REPO}/releases/download/${TAG_NAME}/pki-${TAG_NAME}-x86_64-linux.tar.gz"
-          tar xzf "pki-${TAG_NAME}-x86_64-linux.tar.gz"
-          ./pki --version
-          \`\`\`
-
-          ## Verify integrity
-
-          **SHA256 checksum:**
-          \`\`\`bash
-          curl -LO "https://github.com/${REPO}/releases/download/${TAG_NAME}/SHA256SUMS.txt"
-          sha256sum -c SHA256SUMS.txt
-          \`\`\`
-
-          **GitHub attestation (SLSA provenance):**
-          \`\`\`bash
-          gh attestation verify "pki-${TAG_NAME}-x86_64-linux.tar.gz" --repo "${REPO}"
-          \`\`\`
-
-          **Cosign signature (Sigstore):**
-          \`\`\`bash
-          cosign verify-blob \\
-            --bundle "pki-${TAG_NAME}-x86_64-linux.tar.gz.bundle" \\
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \\
-            --certificate-identity-regexp "github.com/${REPO}" \\
-            "pki-${TAG_NAME}-x86_64-linux.tar.gz"
-          \`\`\`
-          NOTES
-
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
-            --notes-file release-notes.md \
-            pki-*.tar.gz SHA256SUMS.txt *.bundle
+            --generate-notes \
+            pki-*.tar.gz SHA256SUMS.txt
