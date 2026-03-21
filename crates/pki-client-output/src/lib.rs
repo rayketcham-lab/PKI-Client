@@ -27,7 +27,9 @@ pub mod oid_registry;
 
 pub use cert::CertFormatter;
 pub use format::{Formatter, OutputFormat};
-pub use oid_registry::{eku_name, extension_name, init_registry, policy_name, signature_name};
+pub use oid_registry::{
+    eku_name, extension_name, init_registry, key_algorithm_name, policy_name, signature_name,
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};

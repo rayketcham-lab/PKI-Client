@@ -303,6 +303,41 @@ impl OidRegistry {
             _ => oid.to_string(),
         }
     }
+
+    /// Look up a key algorithm OID name.
+    pub fn key_algorithm_name(&self, oid: &str) -> String {
+        // Check custom first
+        if let Some(name) = self.custom.key.get(oid) {
+            return name.clone();
+        }
+
+        // Fall back to built-in
+        match oid {
+            // RSA (PKCS#1)
+            "1.2.840.113549.1.1.1" => "RSA".to_string(),
+            // EC public key
+            "1.2.840.10045.2.1" => "EC".to_string(),
+            // Named curves (when used as standalone key type OIDs)
+            "1.2.840.10045.3.1.7" => "P-256".to_string(),
+            "1.3.132.0.34" => "P-384".to_string(),
+            "1.3.132.0.35" => "P-521".to_string(),
+            // EdDSA
+            "1.3.101.112" => "Ed25519".to_string(),
+            "1.3.101.113" => "Ed448".to_string(),
+            // ML-DSA (FIPS 204)
+            "2.16.840.1.101.3.4.3.17" => "ML-DSA-44".to_string(),
+            "2.16.840.1.101.3.4.3.18" => "ML-DSA-65".to_string(),
+            "2.16.840.1.101.3.4.3.19" => "ML-DSA-87".to_string(),
+            // SLH-DSA (FIPS 205)
+            "2.16.840.1.101.3.4.3.20" => "SLH-DSA-SHA2-128s".to_string(),
+            "2.16.840.1.101.3.4.3.21" => "SLH-DSA-SHA2-128f".to_string(),
+            "2.16.840.1.101.3.4.3.22" => "SLH-DSA-SHA2-192s".to_string(),
+            "2.16.840.1.101.3.4.3.23" => "SLH-DSA-SHA2-192f".to_string(),
+            "2.16.840.1.101.3.4.3.24" => "SLH-DSA-SHA2-256s".to_string(),
+            "2.16.840.1.101.3.4.3.25" => "SLH-DSA-SHA2-256f".to_string(),
+            _ => oid.to_string(),
+        }
+    }
 }
 
 impl Default for OidRegistry {
@@ -372,6 +407,14 @@ pub fn signature_name(oid: &str) -> String {
     let mut reg = registry.write().unwrap_or_else(|e| e.into_inner());
     reg.check_reload();
     reg.signature_name(oid)
+}
+
+/// Look up a key algorithm OID name (global function).
+pub fn key_algorithm_name(oid: &str) -> String {
+    let registry = get_registry();
+    let mut reg = registry.write().unwrap_or_else(|e| e.into_inner());
+    reg.check_reload();
+    reg.key_algorithm_name(oid)
 }
 
 /// Reload the registry from its TOML file (if configured).

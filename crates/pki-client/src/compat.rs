@@ -1441,40 +1441,32 @@ impl Csr {
         let (_, csr) = x509_parser::certification_request::X509CertificationRequest::from_der(der)
             .map_err(|e| format!("Failed to parse CSR: {e}"))?;
 
-        // Try to determine key size
-        let key_size = {
-            let spk_data = csr
-                .certification_request_info
-                .subject_pki
-                .subject_public_key
-                .data;
-            let algo = csr
-                .certification_request_info
-                .subject_pki
-                .algorithm
-                .algorithm
-                .to_string();
-            if algo.contains("1.2.840.113549.1.1.1") {
-                // RSA - approximate size from key data
-                Some((spk_data.len() * 8) as u32)
-            } else if algo.contains("1.2.840.10045.2.1") {
-                // EC - check curve
-                Some(256) // Default to P-256
-            } else {
-                None
-            }
-        };
+        let spki = &csr.certification_request_info.subject_pki;
+        let key_algo_oid = spki.algorithm.algorithm.to_string();
+
+        // Derive the true key size by parsing the public key structure rather than
+        // using the raw bit-string length, which includes DER encoding overhead.
+        let key_size = spki
+            .parsed()
+            .ok()
+            .and_then(|pk| {
+                let bits = pk.key_size();
+                if bits > 0 {
+                    Some(bits as u32)
+                } else {
+                    None
+                }
+            });
+
+        let sig_algo_oid = csr.signature_algorithm.algorithm.to_string();
 
         Ok(Csr {
             subject: csr.certification_request_info.subject.to_string(),
-            key_algorithm: csr
-                .certification_request_info
-                .subject_pki
-                .algorithm
-                .algorithm
-                .to_string(),
+            // Resolve the key algorithm OID to a human-readable name.
+            key_algorithm: pki_client_output::key_algorithm_name(&key_algo_oid),
             key_size,
-            signature_algorithm: csr.signature_algorithm.algorithm.to_string(),
+            // Resolve the signature algorithm OID to a human-readable name.
+            signature_algorithm: pki_client_output::signature_name(&sig_algo_oid),
             san: Vec::new(),
             pem: String::new(),
             der: der.to_vec(),
