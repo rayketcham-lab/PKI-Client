@@ -244,10 +244,10 @@ validate_csr() {
         fail "${test_prefix}_verify" "${display_name} CSR: openssl verify failed" "${verify_out}"
     fi
 
-    # Verify subject CN
+    # Verify subject CN (OpenSSL 3.0 uses "CN = X", 3.2+ uses "CN=X")
     local subject_out
     subject_out=$(openssl req -in "${csr_file}" -noout -subject 2>&1)
-    if echo "${subject_out}" | grep -q "CN = ${cn}"; then
+    if echo "${subject_out}" | grep -qE "CN\s*=\s*${cn}"; then
         pass "${test_prefix}_cn" "${display_name} CSR: correct subject CN"
     else
         fail "${test_prefix}_cn" "${display_name} CSR: wrong subject CN" \
@@ -399,7 +399,7 @@ if [[ -f "${ROOT_CERT}" ]]; then
     fi
 
     # Root cert: subject contains expected CN
-    if echo "${root_text}" | grep -q "CN = Crypto Validation Root CA"; then
+    if echo "${root_text}" | grep -qE "CN\s*=\s*Crypto Validation Root CA"; then
         pass "hier_root_subject" "Root cert: correct subject CN"
     else
         fail "hier_root_subject" "Root cert: wrong subject CN" \
@@ -443,7 +443,7 @@ if [[ -f "${INT_CERT}" ]]; then
     fi
 
     # Intermediate: subject contains expected CN
-    if echo "${int_text}" | grep -q "CN = Crypto Validation Intermediate CA"; then
+    if echo "${int_text}" | grep -qE "CN\s*=\s*Crypto Validation Intermediate CA"; then
         pass "hier_int_subject" "Intermediate cert: correct subject CN"
     else
         fail "hier_int_subject" "Intermediate cert: wrong subject CN" \
@@ -487,7 +487,7 @@ if [[ -f "${ISS_CERT}" ]]; then
     fi
 
     # Issuing: subject contains expected CN
-    if echo "${iss_text}" | grep -q "CN = Crypto Validation Issuing CA"; then
+    if echo "${iss_text}" | grep -qE "CN\s*=\s*Crypto Validation Issuing CA"; then
         pass "hier_iss_subject" "Issuing cert: correct subject CN"
     else
         fail "hier_iss_subject" "Issuing cert: wrong subject CN" \
@@ -601,7 +601,7 @@ crossval_cert_cn() {
     # openssl subject
     local ossl_sub
     ossl_sub=$(openssl x509 -in "${cert_file}" -noout -subject 2>&1 || true)
-    if echo "${ossl_sub}" | grep -q "CN = ${expected_cn}"; then
+    if echo "${ossl_sub}" | grep -qE "CN\s*=\s*${expected_cn}"; then
         pass "${test_id}_ossl" "${display_name}: openssl confirms subject CN"
     else
         fail "${test_id}_ossl" "${display_name}: openssl subject CN mismatch" \

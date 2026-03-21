@@ -266,7 +266,7 @@ validate_csr_structure() {
     # Subject CN must match
     local subject_out
     subject_out=$(openssl req -in "${csr_file}" -noout -subject 2>&1)
-    if echo "${subject_out}" | grep -q "CN = ${expected_cn}"; then
+    if echo "${subject_out}" | grep -qE "CN\s*=\s*${expected_cn}"; then
         pass "${test_id}_cn" "${display_name} CSR: subject CN is correct"
     else
         fail "${test_id}_cn" "${display_name} CSR: subject CN mismatch" \
