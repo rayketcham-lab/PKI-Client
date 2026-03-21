@@ -4,7 +4,8 @@
 
 use crate::commands::CmdResult;
 use crate::config::GlobalConfig;
-use crate::scep::ScepClient;
+use crate::scep::envelope::ScepKeyType;
+use crate::scep::{EnrollConfig, ScepClient};
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Subcommand;
@@ -77,11 +78,58 @@ pub enum ScepCommands {
         ca_cert: Option<PathBuf>,
     },
 
-    /// Send PKI operation message (enrollment/query).
+    /// Enroll for a certificate via SCEP (RFC 8894).
     ///
-    /// Note: The message must be a properly formatted PKCS#7 SignedData
-    /// containing an enveloped CSR. SCEP message generation is planned
-    /// for a future pki-client release.
+    /// Performs automated SCEP enrollment: generates a key pair, builds a CSR,
+    /// constructs the PKCS#7 PKCSReq message, submits it, and retrieves the
+    /// issued certificate. If the request is pending, polls automatically.
+    #[command(after_help = "Examples:
+  pki scep enroll https://scep.example.com/scep -s device.corp.example.com
+  pki scep enroll https://scep.example.com/scep -s device.corp --challenge secret -o /tmp/certs
+  pki scep enroll https://scep.example.com/scep -s host --key-type rsa4096 --san host.example.com")]
+    Enroll {
+        /// SCEP server URL
+        #[arg(value_name = "URL")]
+        url: String,
+
+        /// Subject Common Name (CN) for the certificate
+        #[arg(long, short = 's', value_name = "CN")]
+        subject: String,
+
+        /// Challenge password for enrollment authorization
+        #[arg(long, value_name = "PASSWORD")]
+        challenge: Option<String>,
+
+        /// Key type: rsa2048 (default), rsa4096, ec-p256
+        #[arg(long, default_value = "rsa2048", value_name = "TYPE")]
+        key_type: String,
+
+        /// Subject Alternative Name (DNS name, repeatable)
+        #[arg(long, value_name = "DNS")]
+        san: Vec<String>,
+
+        /// Output directory for certificate and private key files
+        #[arg(long, short = 'o', value_name = "DIR")]
+        output: Option<PathBuf>,
+
+        /// Seconds between polling attempts when enrollment is pending
+        #[arg(long, default_value = "10", value_name = "SECONDS")]
+        poll_interval: u64,
+
+        /// Maximum number of polling attempts
+        #[arg(long, default_value = "30", value_name = "COUNT")]
+        max_polls: u32,
+
+        /// Accept invalid TLS certificates (for self-signed servers)
+        #[arg(long)]
+        insecure: bool,
+
+        /// CA certificate for server TLS verification (PEM file)
+        #[arg(long, value_name = "FILE")]
+        ca_cert: Option<PathBuf>,
+    },
+
+    /// Send PKI operation message (enrollment/query).
     #[command(after_help = "Examples:
   pki scep pkiop https://scep.example.com/scep -m request.p7 -o response.p7
   pki scep pkiop https://scep.example.com/scep -m request.p7 --method post")]
@@ -140,6 +188,30 @@ pub fn run(cmd: ScepCommands, config: &GlobalConfig) -> Result<CmdResult> {
         } => get_nextcacert(
             &url,
             output.as_deref(),
+            insecure,
+            ca_cert.as_deref(),
+            config,
+        ),
+        ScepCommands::Enroll {
+            url,
+            subject,
+            challenge,
+            key_type,
+            san,
+            output,
+            poll_interval,
+            max_polls,
+            insecure,
+            ca_cert,
+        } => enroll(
+            &url,
+            &subject,
+            challenge.as_deref(),
+            &key_type,
+            &san,
+            output.as_deref(),
+            poll_interval,
+            max_polls,
             insecure,
             ca_cert.as_deref(),
             config,
@@ -350,6 +422,136 @@ fn pki_operation(
     }
 
     Ok(CmdResult::Success)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn enroll(
+    url: &str,
+    subject: &str,
+    challenge: Option<&str>,
+    key_type_str: &str,
+    san_names: &[String],
+    output_dir: Option<&Path>,
+    poll_interval_secs: u64,
+    max_polls: u32,
+    insecure: bool,
+    ca_cert: Option<&Path>,
+    config: &GlobalConfig,
+) -> Result<CmdResult> {
+    let key_type: ScepKeyType = key_type_str
+        .parse()
+        .with_context(|| format!("Invalid key type: {}", key_type_str))?;
+
+    let enroll_config = EnrollConfig {
+        subject_cn: subject.to_string(),
+        challenge: challenge.map(|s| s.to_string()),
+        san_names: san_names.to_vec(),
+        key_type,
+        poll_interval_secs,
+        max_polls,
+    };
+
+    if !config.quiet {
+        println!("Starting SCEP enrollment for '{}' at {}...", subject, url);
+    }
+
+    let client = ScepClient::with_options(url, insecure, ca_cert);
+    let response = client
+        .enroll(&enroll_config)
+        .context("SCEP enrollment failed")?;
+
+    match config.format {
+        OutputFormat::Json => {
+            let json = serde_json::json!({
+                "transaction_id": response.transaction_id,
+                "status": response.status.to_string(),
+                "certificate": response.certificate,
+                "private_key": response.private_key_pem,
+            });
+            println!("{}", serde_json::to_string_pretty(&json)?);
+        }
+        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+            println!("{} SCEP enrollment succeeded!", "Success!".green().bold());
+            println!("  Transaction ID: {}", response.transaction_id);
+
+            if let Some(dir) = &output_dir {
+                save_enrollment_files(dir, subject, &response)?;
+                if !config.quiet {
+                    println!(
+                        "  Certificate: {}/{}.pem",
+                        dir.display(),
+                        sanitize_filename(subject)
+                    );
+                    println!(
+                        "  Private key: {}/{}-key.pem",
+                        dir.display(),
+                        sanitize_filename(subject)
+                    );
+                }
+            } else {
+                // Print to stdout
+                if let Some(ref cert) = response.certificate {
+                    println!("\n{}", cert);
+                }
+                if !config.quiet {
+                    if let Some(ref key) = response.private_key_pem {
+                        println!("{}", key);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(CmdResult::Success)
+}
+
+/// Save certificate and private key to output directory.
+fn save_enrollment_files(
+    dir: &Path,
+    subject: &str,
+    response: &crate::scep::EnrollmentResponse,
+) -> Result<()> {
+    std::fs::create_dir_all(dir)
+        .with_context(|| format!("Failed to create output directory: {}", dir.display()))?;
+
+    let base = sanitize_filename(subject);
+
+    if let Some(ref cert_pem) = response.certificate {
+        let cert_path = dir.join(format!("{}.pem", base));
+        std::fs::write(&cert_path, cert_pem)
+            .with_context(|| format!("Failed to write certificate: {}", cert_path.display()))?;
+    }
+
+    if let Some(ref key_pem) = response.private_key_pem {
+        let key_path = dir.join(format!("{}-key.pem", base));
+        std::fs::write(&key_path, key_pem)
+            .with_context(|| format!("Failed to write private key: {}", key_path.display()))?;
+
+        // Set restrictive permissions on the key file (Unix only)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            std::fs::set_permissions(&key_path, perms).with_context(|| {
+                format!("Failed to set key file permissions: {}", key_path.display())
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Convert a subject CN to a safe filename.
+fn sanitize_filename(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 fn format_bool(b: bool) -> colored::ColoredString {

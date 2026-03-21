@@ -54,6 +54,11 @@ sha2 = "0.10"
 sha1 = "0.10"
 hex = { workspace = true }
 rand = { workspace = true }
+der = { workspace = true }
+
+# AES encryption for SCEP EnvelopedData
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
 
 # Crypto for ACME (JWS signing)
 p256 = { version = "0.13", features = ["ecdsa", "pem"] }

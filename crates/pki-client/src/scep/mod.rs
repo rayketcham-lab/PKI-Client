@@ -5,6 +5,9 @@
 //! network devices and MDM systems.
 
 mod client;
+pub mod envelope;
+mod response;
 mod types;
 
 pub use client::ScepClient;
+pub use types::{EnrollConfig, EnrollmentResponse};

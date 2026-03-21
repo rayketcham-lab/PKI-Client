@@ -215,4 +215,23 @@ pub struct EnrollmentResponse {
     pub fail_info: Option<FailInfo>,
     /// Issued certificate (PEM, if status is Success)
     pub certificate: Option<String>,
+    /// Private key PEM (generated during enrollment)
+    pub private_key_pem: Option<String>,
+}
+
+/// Configuration for SCEP enrollment.
+#[derive(Debug, Clone)]
+pub struct EnrollConfig {
+    /// Subject Common Name (CN)
+    pub subject_cn: String,
+    /// Challenge password (optional)
+    pub challenge: Option<String>,
+    /// Subject Alternative Names (DNS names)
+    pub san_names: Vec<String>,
+    /// Key type for enrollment
+    pub key_type: crate::scep::envelope::ScepKeyType,
+    /// Seconds between polling attempts (for PENDING responses)
+    pub poll_interval_secs: u64,
+    /// Maximum number of polling attempts
+    pub max_polls: u32,
 }
