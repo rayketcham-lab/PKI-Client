@@ -272,8 +272,8 @@ jobs:
           set -euo pipefail
           VERSION_OUT=$(target/release/pki --version)
           echo "Version output: $VERSION_OUT"
-          if ! echo "$VERSION_OUT" | grep -qF "0.5.0-beta.2"; then
-            echo "ERROR: version output did not contain expected '0.5.0-beta.2'"
+          if ! echo "$VERSION_OUT" | grep -qF "0.5.0-beta.3"; then
+            echo "ERROR: version output did not contain expected '0.5.0-beta.3'"
             echo "Got: $VERSION_OUT"
             exit 1
           fi
