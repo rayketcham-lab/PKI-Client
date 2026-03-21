@@ -69,33 +69,40 @@ jobs:
           steps.find-issue.outputs.existing_issue == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          OFFLINE_RUNNERS: ${{ steps.check-status.outputs.offline_runners }}
         run: |
-          offline_list="${{ steps.check-status.outputs.offline_runners }}"
-          # Restore newlines from encoded form
-          offline_display="${offline_list//'%0A'/$'\n'}"
+          offline_display="${OFFLINE_RUNNERS//'%0A'/$'\n'}"
+          cat > /tmp/issue-body.md <<ISSUEBODY
+          ## Runner Health Alert
+
+          One or more self-hosted runners in the \`rayketcham-lab\` org are **offline**.
+
+          ### Offline runners
+
+          \`\`\`
+          ${offline_display}
+          \`\`\`
+
+          ### Details
+
+          - **Detected at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - **Workflow run:** ${SERVER_URL}/${REPO}/actions/runs/${RUN_ID}
+
+          ### Resolution
+
+          Please check the runner host(s) listed above and restart the GitHub Actions runner service.
+
+          Once all runners are back online, this issue will be closed automatically by the next scheduled health check.
+          ISSUEBODY
           gh issue create \
             --title "Self-hosted runner(s) offline" \
             --label runner-offline \
-            --body "## Runner Health Alert
-
-One or more self-hosted runners in the \`rayketcham-lab\` org are **offline**.
-
-### Offline runners
-
-\`\`\`
-${offline_display}
-\`\`\`
-
-### Details
-
-- **Detected at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-- **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-### Resolution
-
-Please check the runner host(s) listed above and restart the GitHub Actions runner service.
-
-Once all runners are back online, this issue will be closed automatically by the next scheduled health check."
+            --body-file /tmp/issue-body.md
 
       - name: Find open runner-offline issues (for auto-close)
         id: find-issues-to-close
@@ -121,8 +128,11 @@ Once all runners are back online, this issue will be closed automatically by the
           steps.find-issues-to-close.outputs.issue_numbers != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBERS: ${{ steps.find-issues-to-close.outputs.issue_numbers }}
         run: |
-          for issue_number in ${{ steps.find-issues-to-close.outputs.issue_numbers }}; do
+          for issue_number in $ISSUE_NUMBERS; do
             gh issue close "$issue_number" \
               --comment "All self-hosted runners in \`rayketcham-lab\` are back online as of $(date -u '+%Y-%m-%d %H:%M:%S UTC'). Closing automatically."
             echo "Closed issue #$issue_number"
