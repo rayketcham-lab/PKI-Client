@@ -89,17 +89,17 @@ jobs:
 
       # --- Supply chain security: SLSA provenance ---
       - name: Attest build provenance (tarball)
-        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184ef8acf0cec  # v2.1.0
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45  # v2
         with:
           subject-path: pki-*.tar.gz
       - name: Attest build provenance (checksums)
-        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184ef8acf0cec  # v2.1.0
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45  # v2
         with:
           subject-path: SHA256SUMS.txt
 
       # --- Supply chain security: Sigstore cosign signing ---
       - name: Install cosign
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb  # v3.8.2
+        uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9  # v3
       - name: Sign artifacts with cosign (keyless)
         run: |
           for f in pki-*.tar.gz SHA256SUMS.txt; do
