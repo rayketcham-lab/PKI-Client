@@ -1446,17 +1446,14 @@ impl Csr {
 
         // Derive the true key size by parsing the public key structure rather than
         // using the raw bit-string length, which includes DER encoding overhead.
-        let key_size = spki
-            .parsed()
-            .ok()
-            .and_then(|pk| {
-                let bits = pk.key_size();
-                if bits > 0 {
-                    Some(bits as u32)
-                } else {
-                    None
-                }
-            });
+        let key_size = spki.parsed().ok().and_then(|pk| {
+            let bits = pk.key_size();
+            if bits > 0 {
+                Some(bits as u32)
+            } else {
+                None
+            }
+        });
 
         let sig_algo_oid = csr.signature_algorithm.algorithm.to_string();
 

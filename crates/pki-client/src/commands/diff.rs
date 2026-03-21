@@ -1,12 +1,12 @@
-//! Certificate diff command - compare two certificates.
+//! Certificate diff command - compare two certificates or CSRs.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::Args;
 use colored::Colorize;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use crate::compat::{load_certificate, Certificate};
+use crate::compat::{load_certificate, load_csr, Certificate, Csr, DetectedFileType};
 
 use super::CmdResult;
 use crate::config::GlobalConfig;
@@ -14,12 +14,12 @@ use crate::config::GlobalConfig;
 /// Arguments for 'diff' command
 #[derive(Args)]
 pub struct DiffArgs {
-    /// First certificate file
-    #[arg(value_name = "CERT1")]
+    /// First certificate or CSR file
+    #[arg(value_name = "FILE1")]
     pub cert1: PathBuf,
 
-    /// Second certificate file
-    #[arg(value_name = "CERT2")]
+    /// Second certificate or CSR file
+    #[arg(value_name = "FILE2")]
     pub cert2: PathBuf,
 
     /// Interactive comparison mode
@@ -37,6 +37,47 @@ pub struct DiffArgs {
 
 /// Run the diff command.
 pub fn run(args: DiffArgs, config: &GlobalConfig) -> Result<CmdResult> {
+    // Detect file types before attempting to parse so we give a clear error
+    // instead of a confusing InvalidAlgorithmIdentifier from the certificate parser.
+    let data1 = std::fs::read(&args.cert1)
+        .with_context(|| format!("Failed to read: {}", args.cert1.display()))?;
+    let data2 = std::fs::read(&args.cert2)
+        .with_context(|| format!("Failed to read: {}", args.cert2.display()))?;
+
+    let type1 = DetectedFileType::detect_with_confidence(&data1, &args.cert1).file_type;
+    let type2 = DetectedFileType::detect_with_confidence(&data2, &args.cert2).file_type;
+
+    match (&type1, &type2) {
+        (DetectedFileType::Csr, DetectedFileType::Csr) => {
+            // Both are CSRs — run CSR comparison path
+            let csr1 = load_csr(&args.cert1)
+                .with_context(|| format!("Failed to load CSR: {}", args.cert1.display()))?;
+            let csr2 = load_csr(&args.cert2)
+                .with_context(|| format!("Failed to load CSR: {}", args.cert2.display()))?;
+            print_csr_comparison(&csr1, &csr2, &args);
+            return Ok(CmdResult::Success);
+        }
+        (DetectedFileType::Csr, _) => {
+            bail!(
+                "{} is a CSR but {} is a {}; diff only supports comparing two files of the same type",
+                args.cert1.display(),
+                args.cert2.display(),
+                type2,
+            );
+        }
+        (_, DetectedFileType::Csr) => {
+            bail!(
+                "{} is a {} but {} is a CSR; diff only supports comparing two files of the same type",
+                args.cert1.display(),
+                type1,
+                args.cert2.display(),
+            );
+        }
+        _ => {
+            // Both treated as certificates (the original path)
+        }
+    }
+
     let cert1 = load_certificate(&args.cert1)
         .with_context(|| format!("Failed to load: {}", args.cert1.display()))?;
     let cert2 = load_certificate(&args.cert2)
@@ -55,6 +96,115 @@ pub fn run(args: DiffArgs, config: &GlobalConfig) -> Result<CmdResult> {
     }
 
     Ok(CmdResult::Success)
+}
+
+/// Print comparison between two CSRs.
+fn print_csr_comparison(csr1: &Csr, csr2: &Csr, args: &DiffArgs) {
+    let file1 = args
+        .cert1
+        .file_name()
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_default();
+    let file2 = args
+        .cert2
+        .file_name()
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_default();
+
+    println!("{}:", "CSR Comparison".cyan().bold());
+    println!("    File 1:         {}", file1);
+    println!("    File 2:         {}", file2);
+    println!();
+
+    let mut matches = 0usize;
+    let mut differs = 0usize;
+
+    // Subject
+    let (is_match, indicator) = compare_match(&csr1.subject, &csr2.subject);
+    if is_match {
+        matches += 1;
+    } else {
+        differs += 1;
+    }
+    println!("{}:", "Subject".cyan());
+    println!("    CSR 1:          {}", csr1.subject);
+    println!("    CSR 2:          {}  {}", csr2.subject, indicator);
+    println!();
+
+    // Key algorithm
+    let k1 = format!(
+        "{} {}",
+        csr1.key_algorithm,
+        csr1.key_size
+            .map(|s| format!("{}-bit", s))
+            .unwrap_or_default()
+    );
+    let k2 = format!(
+        "{} {}",
+        csr2.key_algorithm,
+        csr2.key_size
+            .map(|s| format!("{}-bit", s))
+            .unwrap_or_default()
+    );
+    let (is_match, indicator) = compare_match(&k1, &k2);
+    if is_match {
+        matches += 1;
+    } else {
+        differs += 1;
+    }
+    println!("{}:", "Key Algorithm".cyan());
+    println!("    CSR 1:          {}", k1);
+    println!("    CSR 2:          {}  {}", k2, indicator);
+    println!();
+
+    // Signature algorithm
+    let (is_match, indicator) = compare_match(&csr1.signature_algorithm, &csr2.signature_algorithm);
+    if is_match {
+        matches += 1;
+    } else {
+        differs += 1;
+    }
+    println!("{}:", "Signature Algorithm".cyan());
+    println!("    CSR 1:          {}", csr1.signature_algorithm);
+    println!(
+        "    CSR 2:          {}  {}",
+        csr2.signature_algorithm, indicator
+    );
+    println!();
+
+    // SANs
+    let sans1 = csr1.san.join(", ");
+    let sans2 = csr2.san.join(", ");
+    let (is_match, indicator) = compare_match(&sans1, &sans2);
+    if is_match {
+        matches += 1;
+    } else {
+        differs += 1;
+    }
+    println!("{}:", "SANs".cyan());
+    println!(
+        "    CSR 1:          {}",
+        if sans1.is_empty() {
+            "(none)".dimmed().to_string()
+        } else {
+            sans1.clone()
+        }
+    );
+    println!(
+        "    CSR 2:          {}  {}",
+        if sans2.is_empty() {
+            "(none)".dimmed().to_string()
+        } else {
+            sans2.clone()
+        },
+        indicator
+    );
+    println!();
+
+    // Summary
+    println!("{}:", "Summary".cyan().bold());
+    println!("    Matches:        {} fields", matches.to_string().green());
+    println!("    Differs:        {} fields", differs.to_string().red());
 }
 
 /// Compare two values and return a match indicator.
@@ -884,5 +1034,146 @@ mod tests {
             extract_cn("DC=com, DC=example, OU=PKI, CN=Root CA"),
             "Root CA"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // CSR detection and diff tests
+    // -----------------------------------------------------------------------
+
+    /// EC P-256 CSR (EC key, self-signed with ECDSA, SAN for test.rusticata.fr)
+    const CSR_EC_PEM: &str = "-----BEGIN CERTIFICATE REQUEST-----\n\
+MIIBBjCBrQIBADAcMRowGAYDVQQDDBF0ZXN0LnJ1c3RpY2F0YS5mcjBZMBMGByqG\n\
+SM49AgEGCCqGSM49AwEHA0IABMP1frFxwJLXiLU6UoqOPf31ucCm2NqR2yqpcHo6\n\
+W7iWJe31OzYs0izP2qeUvdKfz2fpAbuGiRjwvN+H10dQQEGgLzAtBgkqhkiG9w0B\n\
+CQ4xIDAeMBwGA1UdEQQVMBOCEXRlc3QucnVzdGljYXRhLmZyMAoGCCqGSM49BAMC\n\
+A0gAMEUCIGqQHPHgpeyZa5YMLP2X5IwfmrvpIcg5fQ2xkXotGAa0AiEAydeBwr4r\n\
+Iu7XDe015h8uz8xZs2QUEgRdr73lJXTX+Ck=\n\
+-----END CERTIFICATE REQUEST-----\n";
+
+    /// Write content to a temp file and return its path.
+    fn write_temp_file(content: &str, suffix: &str) -> std::path::PathBuf {
+        use std::io::Write;
+        let mut f = tempfile::Builder::new()
+            .suffix(suffix)
+            .tempfile()
+            .expect("create tempfile");
+        f.write_all(content.as_bytes()).expect("write tempfile");
+        // Keep the file alive by persisting it; tests are short-lived
+        f.into_temp_path().keep().expect("persist tempfile")
+    }
+
+    #[test]
+    fn test_detect_csr_pem_type() {
+        let data = CSR_EC_PEM.as_bytes();
+        let detection =
+            DetectedFileType::detect_with_confidence(data, std::path::Path::new("x.csr"));
+        assert!(
+            matches!(detection.file_type, DetectedFileType::Csr),
+            "EC CSR PEM should be detected as Csr, got {:?}",
+            detection.file_type
+        );
+    }
+
+    #[test]
+    fn test_run_csr_vs_csr_identical() {
+        let path1 = write_temp_file(CSR_EC_PEM, ".csr");
+        let path2 = write_temp_file(CSR_EC_PEM, ".csr");
+
+        let args = DiffArgs {
+            cert1: path1.clone(),
+            cert2: path2.clone(),
+            interactive: false,
+            only_diff: false,
+            side_by_side: false,
+        };
+        let config = crate::config::GlobalConfig::default();
+        let result = run(args, &config);
+        assert!(
+            result.is_ok(),
+            "diff of two identical CSRs should succeed: {:?}",
+            result
+        );
+
+        let _ = std::fs::remove_file(&path1);
+        let _ = std::fs::remove_file(&path2);
+    }
+
+    #[test]
+    fn test_run_csr_vs_cert_returns_clear_error() {
+        // A minimal self-signed RSA cert PEM (2048-bit, CN=Test, valid for testing)
+        // We use the test CSR path for file 1 and a non-CSR text file for file 2
+        // to trigger the mixed-type error path.
+        // Instead of embedding a real cert, we write a file with a CERTIFICATE header
+        // to trigger detection as Certificate type, then let load_certificate fail
+        // naturally — but we only care that the mixed-type bail fires first.
+        let fake_cert_pem = "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n-----END CERTIFICATE-----\n";
+
+        let csr_path = write_temp_file(CSR_EC_PEM, ".csr");
+        let cert_path = write_temp_file(fake_cert_pem, ".crt");
+
+        let args = DiffArgs {
+            cert1: csr_path.clone(),
+            cert2: cert_path.clone(),
+            interactive: false,
+            only_diff: false,
+            side_by_side: false,
+        };
+        let config = crate::config::GlobalConfig::default();
+        let result = run(args, &config);
+        assert!(result.is_err(), "diff of CSR vs cert should fail");
+
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("CSR") && err_msg.contains("same type"),
+            "error should mention CSR and same type, got: {err_msg}"
+        );
+
+        let _ = std::fs::remove_file(&csr_path);
+        let _ = std::fs::remove_file(&cert_path);
+    }
+
+    #[test]
+    fn test_run_cert_vs_csr_returns_clear_error() {
+        let fake_cert_pem = "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n-----END CERTIFICATE-----\n";
+
+        let cert_path = write_temp_file(fake_cert_pem, ".crt");
+        let csr_path = write_temp_file(CSR_EC_PEM, ".csr");
+
+        let args = DiffArgs {
+            cert1: cert_path.clone(),
+            cert2: csr_path.clone(),
+            interactive: false,
+            only_diff: false,
+            side_by_side: false,
+        };
+        let config = crate::config::GlobalConfig::default();
+        let result = run(args, &config);
+        assert!(result.is_err(), "diff of cert vs CSR should fail");
+
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("CSR") && err_msg.contains("same type"),
+            "error should mention CSR and same type, got: {err_msg}"
+        );
+
+        let _ = std::fs::remove_file(&cert_path);
+        let _ = std::fs::remove_file(&csr_path);
+    }
+
+    #[test]
+    fn test_print_csr_comparison_runs_without_panic() {
+        let csr1 = crate::compat::Csr::from_pem(CSR_EC_PEM.as_bytes()).expect("parse CSR1");
+        let csr2 = crate::compat::Csr::from_pem(CSR_EC_PEM.as_bytes()).expect("parse CSR2");
+
+        let path = std::path::PathBuf::from("/tmp/a.csr");
+        let args = DiffArgs {
+            cert1: path.clone(),
+            cert2: path.clone(),
+            interactive: false,
+            only_diff: false,
+            side_by_side: false,
+        };
+        // Should not panic
+        print_csr_comparison(&csr1, &csr2, &args);
     }
 }
