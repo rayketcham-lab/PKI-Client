@@ -86,7 +86,7 @@ const FILE_COMMANDS: &[&str] = &[
 /// Top-level commands for completion
 const TOP_COMMANDS: &[&str] = &[
     "show", "cert", "csr", "key", "chain", "convert", "diff", "probe", "scep", "acme", "est",
-    "help", "clear", "exit", "quit", "history",
+    "help", "clear", "exit", "quit", "history", "version",
 ];
 
 /// Subcommands for each top-level command
@@ -474,10 +474,71 @@ fn handle_shell_command(line: &str, _config: &GlobalConfig) -> ShellAction {
             ShellAction::Continue
         }
         _ => {
-            // Pass to CLI command handler
-            let mut args: Vec<String> = parts.iter().map(|s| (*s).to_string()).collect();
+            let cmd = parts[0];
 
-            // If we have PEM content, add it as the file argument
+            // Skip lines that are clearly not commands (comments, TOML, etc.)
+            if cmd.starts_with('#')
+                || cmd.starts_with('[')
+                || cmd.starts_with("//")
+                || cmd.contains('=')
+            {
+                return ShellAction::Continue;
+            }
+
+            // Fuzzy prefix match: if the input is a unique prefix of a known command, use it
+            let cmd_lower = cmd.to_lowercase();
+            let matches: Vec<&&str> = TOP_COMMANDS
+                .iter()
+                .filter(|c| c.starts_with(&cmd_lower))
+                .collect();
+
+            if matches.len() == 1 {
+                let resolved = *matches[0];
+                // If it resolves to a shell builtin, handle directly
+                match resolved {
+                    "version" => {
+                        println!("pki {}", env!("CARGO_PKG_VERSION"));
+                        return ShellAction::Continue;
+                    }
+                    "help" => {
+                        println!("{}", HELP_TEXT);
+                        return ShellAction::Continue;
+                    }
+                    "exit" | "quit" => return ShellAction::Exit,
+                    "clear" => {
+                        print!("\x1B[2J\x1B[1;1H");
+                        return ShellAction::Continue;
+                    }
+                    "history" => {
+                        println!("Use Up/Down arrows to navigate history");
+                        return ShellAction::Continue;
+                    }
+                    _ => {
+                        // CLI command — substitute the full name
+                        let mut args: Vec<String> =
+                            parts.iter().map(|s| (*s).to_string()).collect();
+                        args[0] = resolved.to_string();
+                        if let Some(pem) = pem_content {
+                            args.push(pem);
+                        }
+                        return ShellAction::RunCommand(args);
+                    }
+                }
+            }
+
+            // Multiple prefix matches — suggest
+            if matches.len() > 1 {
+                let suggestions: Vec<&str> = matches.iter().map(|s| **s).collect();
+                println!(
+                    "Unknown command: {} — did you mean {}?",
+                    cmd,
+                    suggestions.join(" or ")
+                );
+                return ShellAction::Continue;
+            }
+
+            // No prefix match — pass to CLI handler
+            let mut args: Vec<String> = parts.iter().map(|s| (*s).to_string()).collect();
             if let Some(pem) = pem_content {
                 args.push(pem);
             }
