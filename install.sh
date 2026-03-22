@@ -29,10 +29,13 @@ if [[ "$ACTION" == "uninstall" ]]; then
     echo "Removing: $CURRENT"
     echo "Location: $INSTALL_DIR/pki"
 
-    if [[ -w "$INSTALL_DIR/pki" ]]; then
-        rm -f "$INSTALL_DIR/pki"
+    if rm -f "$INSTALL_DIR/pki" 2>/dev/null; then
+        true
+    elif sudo rm -f "$INSTALL_DIR/pki" 2>/dev/null; then
+        true
     else
-        sudo rm -f "$INSTALL_DIR/pki"
+        echo "ERROR: Cannot remove $INSTALL_DIR/pki — try: sudo bash -s -- uninstall"
+        exit 1
     fi
 
     echo ""
@@ -150,12 +153,15 @@ fi
 echo "Installing to $INSTALL_DIR..."
 tar xzf "$TMPDIR/$FILENAME" -C "$TMPDIR"
 
-if [[ -w "$INSTALL_DIR" ]]; then
-    mv "$TMPDIR/pki" "$INSTALL_DIR/pki"
+if mv "$TMPDIR/pki" "$INSTALL_DIR/pki" 2>/dev/null; then
+    true
+elif sudo mv "$TMPDIR/pki" "$INSTALL_DIR/pki" 2>/dev/null; then
+    true
 else
-    sudo mv "$TMPDIR/pki" "$INSTALL_DIR/pki"
+    echo "ERROR: Cannot install to $INSTALL_DIR — try: sudo bash"
+    exit 1
 fi
-chmod +x "$INSTALL_DIR/pki"
+chmod +x "$INSTALL_DIR/pki" 2>/dev/null || sudo chmod +x "$INSTALL_DIR/pki"
 
 echo ""
 if [[ -n "$CURRENT_VERSION" ]]; then
