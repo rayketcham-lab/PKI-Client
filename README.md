@@ -4,7 +4,7 @@
 
 Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero dependencies.
 
-[![Demo](https://img.shields.io/badge/▶_Watch_Demo-asciinema-d40000?style=for-the-badge&logo=asciinema)](https://rayketcham-lab.github.io/PKI-Client/pki-demo.cast)
+[![Watch Demo](https://img.shields.io/badge/▶_Watch_Demo-in_browser-d40000?style=for-the-badge&logo=asciinema)](https://rayketcham-lab.github.io/PKI-Client/demo.html)
 
 ---
 

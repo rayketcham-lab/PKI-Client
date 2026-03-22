@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PKI Client Demo</title>
+<link rel="stylesheet" type="text/css" href="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.css" />
+<style>
+  body { background: #1a1a2e; margin: 0; padding: 2rem; font-family: system-ui; color: #e0e0e0; }
+  h1 { text-align: center; color: #00d4ff; margin-bottom: 0.5rem; }
+  p { text-align: center; color: #888; margin-bottom: 2rem; }
+  #player { max-width: 960px; margin: 0 auto; }
+  a { color: #00d4ff; }
+  .footer { text-align: center; margin-top: 2rem; font-size: 0.9rem; color: #666; }
+</style>
+</head>
+<body>
+<h1>PKI Client — Live Demo</h1>
+<p>Install to inspection in 30 seconds. Pure Rust. Zero dependencies.</p>
+<div id="player"></div>
+<div class="footer">
+  <p><a href="https://github.com/rayketcham-lab/PKI-Client">GitHub</a> |
+  Install: <code>curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash</code></p>
+</div>
+<script src="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.min.js"></script>
+<script>
+  AsciinemaPlayer.create('pki-demo.cast', document.getElementById('player'), {
+    theme: 'monokai',
+    speed: 1.5,
+    idleTimeLimit: 2,
+    fit: 'width',
+    cols: 120,
+    rows: 35,
+    autoPlay: true
+  });
+</script>
+</body>
+</html>
