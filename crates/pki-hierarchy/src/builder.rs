@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use chrono::DateTime;
 use spork_core::algo::AlgorithmId;
 use spork_core::ca::{CaCeremony, CaConfig, InitializedCa};
 use spork_core::cert::extensions::{CertificatePolicies, ExtendedKeyUsage};
@@ -78,8 +79,24 @@ pub fn build_hierarchy(config: &HierarchyConfig) -> Result<BuildResult> {
         }
         let subject = name_builder.build();
 
-        // Build CaConfig
-        let validity = Validity::years_from_now(entry.validity_years);
+        // Build CaConfig — use explicit dates if provided, otherwise validity_years
+        let validity = if let (Some(nb), Some(na)) = (&entry.not_before, &entry.not_after) {
+            let not_before = DateTime::parse_from_rfc3339(nb)
+                .map_err(|e| {
+                    HierarchyError::Build(format!("CA '{}': invalid not_before: {}", entry.id, e))
+                })?
+                .to_utc();
+            let not_after = DateTime::parse_from_rfc3339(na)
+                .map_err(|e| {
+                    HierarchyError::Build(format!("CA '{}': invalid not_after: {}", entry.id, e))
+                })?
+                .to_utc();
+            Validity::new(not_before, not_after).map_err(|e| {
+                HierarchyError::Build(format!("CA '{}': invalid validity: {}", entry.id, e))
+            })?
+        } else {
+            Validity::years_from_now(entry.validity_years)
+        };
 
         let ca_config = if entry.ca_type == "root" {
             CaConfig::root(&entry.common_name, algorithm)
@@ -273,6 +290,66 @@ mod tests {
     fn test_parse_algorithm_rsa_4096() {
         let algo = parse_algorithm("rsa-4096").unwrap();
         assert_eq!(algo, AlgorithmId::Rsa4096);
+    }
+
+    #[test]
+    fn test_build_with_explicit_dates_produces_cert() {
+        let toml = r#"
+[hierarchy]
+name = "expired-test"
+output_dir = "/tmp/pki-hierarchy-test-expired"
+
+[hierarchy.defaults]
+organization = "Test Org"
+country = "US"
+
+[[ca]]
+id = "expired-root"
+type = "root"
+algorithm = "ecdsa-p256"
+common_name = "Expired Test CA"
+validity_years = 1
+not_before = "2024-01-15T00:00:00Z"
+not_after = "2025-01-15T00:00:00Z"
+path_length = 0
+"#;
+        let config: crate::config::HierarchyConfig = toml::from_str(toml).unwrap();
+        let result = build_hierarchy(&config).unwrap();
+        let ca = result.cas.get("expired-root").unwrap();
+        // The cert PEM should contain data and be valid PEM
+        assert!(ca
+            .certificate_pem
+            .starts_with("-----BEGIN CERTIFICATE-----"));
+        assert!(!ca.certificate_der.is_empty());
+    }
+
+    #[test]
+    fn test_build_with_future_explicit_dates() {
+        let toml = r#"
+[hierarchy]
+name = "future-test"
+output_dir = "/tmp/pki-hierarchy-test-future"
+
+[hierarchy.defaults]
+organization = "Test Org"
+country = "US"
+
+[[ca]]
+id = "future-root"
+type = "root"
+algorithm = "ecdsa-p256"
+common_name = "Future Test CA"
+validity_years = 1
+not_before = "2030-06-01T00:00:00Z"
+not_after = "2040-06-01T00:00:00Z"
+path_length = 0
+"#;
+        let config: crate::config::HierarchyConfig = toml::from_str(toml).unwrap();
+        let result = build_hierarchy(&config).unwrap();
+        let ca = result.cas.get("future-root").unwrap();
+        assert!(ca
+            .certificate_pem
+            .starts_with("-----BEGIN CERTIFICATE-----"));
     }
 
     #[test]

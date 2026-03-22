@@ -77,6 +77,12 @@ pub struct CaEntry {
     pub policies: Option<Vec<String>>,
     /// Extended Key Usage OIDs
     pub eku: Option<Vec<String>>,
+    /// Explicit not_before date (RFC 3339 format, e.g. "2024-01-15T00:00:00Z")
+    /// When set with not_after, overrides validity_years
+    pub not_before: Option<String>,
+    /// Explicit not_after date (RFC 3339 format, e.g. "2025-01-15T00:00:00Z")
+    /// When set with not_before, overrides validity_years
+    pub not_after: Option<String>,
 }
 
 /// CRL Distribution Point configuration
@@ -259,6 +265,46 @@ validity_years = 10
 "#;
         let config: HierarchyConfig = toml::from_str(toml).unwrap();
         assert_eq!(config.ca[0].ou.as_deref(), Some("PKI Operations"));
+    }
+
+    #[test]
+    fn test_parse_explicit_validity_dates() {
+        let toml = r#"
+[hierarchy]
+name = "date-test"
+
+[[ca]]
+id = "root"
+type = "root"
+algorithm = "rsa-4096"
+common_name = "Expired Root CA"
+validity_years = 1
+not_before = "2024-01-15T00:00:00Z"
+not_after = "2025-01-15T00:00:00Z"
+"#;
+        let config: HierarchyConfig = toml::from_str(toml).unwrap();
+        let ca = &config.ca[0];
+        assert_eq!(ca.not_before.as_deref(), Some("2024-01-15T00:00:00Z"));
+        assert_eq!(ca.not_after.as_deref(), Some("2025-01-15T00:00:00Z"));
+    }
+
+    #[test]
+    fn test_parse_no_explicit_dates_defaults_none() {
+        let toml = r#"
+[hierarchy]
+name = "no-dates"
+
+[[ca]]
+id = "root"
+type = "root"
+algorithm = "ecdsa-p256"
+common_name = "Root"
+validity_years = 10
+"#;
+        let config: HierarchyConfig = toml::from_str(toml).unwrap();
+        let ca = &config.ca[0];
+        assert!(ca.not_before.is_none());
+        assert!(ca.not_after.is_none());
     }
 
     #[test]

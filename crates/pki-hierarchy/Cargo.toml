@@ -15,6 +15,7 @@ thiserror = { workspace = true }
 zeroize = { version = "1.8", features = ["derive"] }
 hex = { workspace = true }
 const-oid = "0.9"
+chrono = { workspace = true }
 
 [features]
 pqc = ["spork-core/pqc"]

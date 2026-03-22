@@ -46,6 +46,37 @@ pub fn validate_hierarchy(config: &HierarchyConfig) -> Result<ValidationResult> 
         let node = &tree.nodes[id];
         let entry = &node.entry;
 
+        // Validate explicit date fields
+        match (&entry.not_before, &entry.not_after) {
+            (Some(nb), Some(na)) => {
+                let nb_dt = chrono::DateTime::parse_from_rfc3339(nb).map_err(|e| {
+                    HierarchyError::Validation(format!(
+                        "CA '{}': invalid not_before date '{}': {}",
+                        id, nb, e
+                    ))
+                })?;
+                let na_dt = chrono::DateTime::parse_from_rfc3339(na).map_err(|e| {
+                    HierarchyError::Validation(format!(
+                        "CA '{}': invalid not_after date '{}': {}",
+                        id, na, e
+                    ))
+                })?;
+                if na_dt <= nb_dt {
+                    return Err(HierarchyError::Validation(format!(
+                        "CA '{}': not_after ({}) must be after not_before ({})",
+                        id, na, nb
+                    )));
+                }
+            }
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(HierarchyError::Validation(format!(
+                    "CA '{}': not_before and not_after must both be set or both omitted",
+                    id
+                )));
+            }
+            (None, None) => {} // Use validity_years
+        }
+
         // Check algorithm is recognized
         if !KNOWN_ALGORITHMS.contains(&entry.algorithm.as_str()) {
             return Err(HierarchyError::Validation(format!(
@@ -178,6 +209,8 @@ mod tests {
             aia: None,
             policies: None,
             eku: None,
+            not_before: None,
+            not_after: None,
         }
     }
 
@@ -195,6 +228,8 @@ mod tests {
             aia: None,
             policies: None,
             eku: None,
+            not_before: None,
+            not_after: None,
         }
     }
 
@@ -385,6 +420,48 @@ mod tests {
             int_entry("L3", "L2", 15, Some(0)),
         ]);
         assert!(validate_hierarchy(&config).is_err());
+    }
+
+    #[test]
+    fn test_explicit_dates_valid() {
+        let mut entry = root_entry("root", 1, Some(0));
+        entry.not_before = Some("2024-01-15T00:00:00Z".to_string());
+        entry.not_after = Some("2025-01-15T00:00:00Z".to_string());
+        let config = make_config(vec![entry]);
+        assert!(validate_hierarchy(&config).is_ok());
+    }
+
+    #[test]
+    fn test_explicit_dates_not_after_before_not_before() {
+        let mut entry = root_entry("root", 1, Some(0));
+        entry.not_before = Some("2025-01-15T00:00:00Z".to_string());
+        entry.not_after = Some("2024-01-15T00:00:00Z".to_string());
+        let config = make_config(vec![entry]);
+        assert!(validate_hierarchy(&config).is_err());
+    }
+
+    #[test]
+    fn test_explicit_dates_invalid_format() {
+        let mut entry = root_entry("root", 1, Some(0));
+        entry.not_before = Some("not-a-date".to_string());
+        entry.not_after = Some("2025-01-15T00:00:00Z".to_string());
+        let config = make_config(vec![entry]);
+        assert!(validate_hierarchy(&config).is_err());
+    }
+
+    #[test]
+    fn test_explicit_dates_only_one_set_is_error() {
+        // not_before without not_after
+        let mut entry = root_entry("root", 1, Some(0));
+        entry.not_before = Some("2024-01-15T00:00:00Z".to_string());
+        let config = make_config(vec![entry]);
+        assert!(validate_hierarchy(&config).is_err());
+
+        // not_after without not_before
+        let mut entry2 = root_entry("root", 1, Some(0));
+        entry2.not_after = Some("2025-01-15T00:00:00Z".to_string());
+        let config2 = make_config(vec![entry2]);
+        assert!(validate_hierarchy(&config2).is_err());
     }
 
     #[test]

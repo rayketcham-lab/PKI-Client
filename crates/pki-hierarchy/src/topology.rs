@@ -175,6 +175,8 @@ mod tests {
             aia: None,
             policies: None,
             eku: None,
+            not_before: None,
+            not_after: None,
         }
     }
 
@@ -192,6 +194,8 @@ mod tests {
             aia: None,
             policies: None,
             eku: None,
+            not_before: None,
+            not_after: None,
         }
     }
 
