@@ -419,6 +419,8 @@ footer a:hover { color: var(--text); }
   display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;
 }
 </style>
+<link rel="stylesheet" type="text/css" href="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.css" />
+<script src="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.min.js"></script>
 </head>
 <body>
 
@@ -556,10 +558,38 @@ footer a:hover { color: var(--text); }
 
 <hr class="divider">
 
+<!-- Live Demo Recording -->
+<section class="section fade-up" id="video">
+  <div class="section-label">Live Demo</div>
+  <h2>Watch it in action</h2>
+  <p>Install to inspection in 30 seconds. No editing, no tricks — real terminal, real output.</p>
+  <div style="max-width:900px;margin:2rem auto;">
+    <script src="https://asciinema.org/a/pki-demo.js" id="asciicast-pki-demo" async></script>
+    <div id="demo-player"></div>
+    <script>
+      // Fallback: load from local cast file
+      if (typeof AsciinemaPlayer !== 'undefined') {
+        AsciinemaPlayer.create('pki-demo.cast', document.getElementById('demo-player'), {
+          theme: 'monokai',
+          speed: 1.5,
+          idleTimeLimit: 2,
+          cols: 120,
+          rows: 35
+        });
+      }
+    </script>
+    <noscript>
+      <p><a href="pki-demo.cast">Download the terminal recording</a> and play with <code>asciinema play pki-demo.cast</code></p>
+    </noscript>
+  </div>
+</section>
+
+<hr class="divider">
+
 <!-- Demo -->
 <section class="section fade-up" id="demo">
-  <div class="section-label">In Action</div>
-  <h2>See it work</h2>
+  <div class="section-label">Examples</div>
+  <h2>See the output</h2>
   <p>Human-readable output with security grades, or pipe to JSON for automation.</p>
 
   <div class="demo-columns">
