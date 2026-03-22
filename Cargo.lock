@@ -1951,7 +1951,7 @@ dependencies = [
 
 [[package]]
 name = "pki-client"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "aes",
  "anyhow",
@@ -1995,7 +1995,7 @@ dependencies = [
 
 [[package]]
 name = "pki-client-output"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "base64",
  "chrono",
@@ -2013,7 +2013,7 @@ dependencies = [
 
 [[package]]
 name = "pki-hierarchy"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "chrono",
  "const-oid 0.9.6",
@@ -2027,7 +2027,7 @@ dependencies = [
 
 [[package]]
 name = "pki-probe"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "base64",
  "chrono",
