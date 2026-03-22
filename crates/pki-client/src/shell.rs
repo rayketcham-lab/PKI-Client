@@ -85,8 +85,29 @@ const FILE_COMMANDS: &[&str] = &[
 
 /// Top-level commands for completion
 const TOP_COMMANDS: &[&str] = &[
-    "show", "cert", "csr", "key", "chain", "convert", "diff", "probe", "scep", "acme", "est",
-    "help", "clear", "exit", "quit", "history", "version",
+    "show",
+    "cert",
+    "csr",
+    "key",
+    "chain",
+    "convert",
+    "diff",
+    "probe",
+    "scep",
+    "acme",
+    "est",
+    "pki",
+    "dane",
+    "crl",
+    "revoke",
+    "compliance",
+    "batch",
+    "help",
+    "clear",
+    "exit",
+    "quit",
+    "history",
+    "version",
 ];
 
 /// Subcommands for each top-level command
@@ -100,6 +121,11 @@ fn get_subcommands(cmd: &str) -> &'static [&'static str] {
         "scep" => &["cacaps", "cacert", "enroll", "pkiop"],
         "acme" => &["certonly", "directory", "register"],
         "est" => &["cacerts", "enroll", "reenroll"],
+        "pki" => &["build", "preview", "validate", "export"],
+        "dane" => &["generate", "verify"],
+        "compliance" => &["check", "levels", "bridge"],
+        "crl" => &["show", "check"],
+        "revoke" => &["check"],
         _ => &[],
     }
 }
@@ -478,9 +504,22 @@ fn handle_shell_command(line: &str, _config: &GlobalConfig) -> ShellAction {
         return ShellAction::Continue;
     }
 
-    // Strip "pki" prefix — users often type "pki key gen" inside the shell
+    // Strip "pki" prefix — users often type "pki key gen" inside the shell.
+    // BUT: don't strip if the second word is a subcommand of the `pki` hierarchy command
+    // (build, preview, validate, export), since "pki build" IS the hierarchy command.
+    let pki_hierarchy_subs = ["build", "preview", "validate", "export"];
     let parts: Vec<&str> = if parts.first().map(|s| s.eq_ignore_ascii_case("pki")) == Some(true) {
-        parts[1..].to_vec()
+        let next = parts.get(1).map(|s| s.to_lowercase());
+        if next
+            .as_deref()
+            .is_some_and(|n| pki_hierarchy_subs.contains(&n))
+        {
+            // "pki build ..." → keep as-is, it's the hierarchy command
+            parts
+        } else {
+            // "pki show ..." → strip redundant prefix
+            parts[1..].to_vec()
+        }
     } else {
         parts
     };
@@ -917,10 +956,27 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
         }
         // Passthrough: run any other command via the full CLI parser
         other => {
-            passthrough_to_cli(args, config).unwrap_or_else(|_| {
-                println!("Unknown command: {other}");
-                println!("Type 'help' for available commands");
-            });
+            // Known passthrough commands — CLI already printed its own error
+            const KNOWN_PASSTHROUGH: &[&str] = &[
+                "probe",
+                "diff",
+                "convert",
+                "scep",
+                "acme",
+                "est",
+                "pki",
+                "dane",
+                "crl",
+                "revoke",
+                "compliance",
+                "batch",
+            ];
+            if let Err(_e) = passthrough_to_cli(args, config) {
+                if !KNOWN_PASSTHROUGH.contains(&other) {
+                    println!("Unknown command: {other}");
+                    println!("Type 'help' for available commands");
+                }
+            }
         }
     }
 

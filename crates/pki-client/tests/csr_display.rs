@@ -1339,3 +1339,34 @@ fn issue_29_batch_handles_quoted_cn() {
         "CSR CN should be 'My Server' but got:\n{csr_show}"
     );
 }
+
+// ============================================================================
+// Shell: `pki build` / `pki preview` must route to hierarchy builder
+// ============================================================================
+
+#[test]
+fn shell_pki_build_routes_to_hierarchy() {
+    if skip_if_missing() {
+        return;
+    }
+    // "pki build" with no args should produce a usage error mentioning "FILE", not "Unknown command"
+    let (stdout, stderr, _) = shell_input("pki build");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell 'pki build' should route to hierarchy builder, not produce Unknown command.\nGot: {combined}"
+    );
+}
+
+#[test]
+fn shell_pki_preview_routes_to_hierarchy() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("pki preview");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell 'pki preview' should route to hierarchy builder, not produce Unknown command.\nGot: {combined}"
+    );
+}
