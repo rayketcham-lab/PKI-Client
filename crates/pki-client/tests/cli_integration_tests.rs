@@ -549,6 +549,120 @@ fn test_scep_help() {
 }
 
 // ============================================================================
+// Bug #32: RSA key gen size validation
+// ============================================================================
+
+/// Regression test for issue #32: `pki key gen rsa --bits 512` should fail
+/// with a clear error rather than attempting to generate a dangerously small key.
+#[test]
+fn issue_32_rejects_rsa_512() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("tiny.key");
+
+    let output = Command::new(pki_binary())
+        .args(["key", "gen", "rsa", "--bits", "512", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("failed to run pki key gen");
+
+    assert!(
+        !output.status.success(),
+        "pki key gen rsa --bits 512 should have failed but exited 0"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.to_lowercase().contains("too small")
+            || stderr.to_lowercase().contains("minimum")
+            || stderr.to_lowercase().contains("2048"),
+        "Expected a 'too small' / 'minimum' / '2048' error message, got: {stderr}"
+    );
+}
+
+/// Regression test for issue #32: `pki key gen rsa --bits 99999` should fail
+/// with a clear error rather than attempting an absurdly large key generation.
+#[test]
+fn issue_32_rejects_rsa_99999() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("huge.key");
+
+    let output = Command::new(pki_binary())
+        .args(["key", "gen", "rsa", "--bits", "99999", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("failed to run pki key gen");
+
+    assert!(
+        !output.status.success(),
+        "pki key gen rsa --bits 99999 should have failed but exited 0"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.to_lowercase().contains("too large")
+            || stderr.to_lowercase().contains("maximum")
+            || stderr.to_lowercase().contains("16384"),
+        "Expected a 'too large' / 'maximum' / '16384' error message, got: {stderr}"
+    );
+}
+
+// ============================================================================
+// Bug #33: CSR create requires --cn
+// ============================================================================
+
+/// Regression test for issue #33: `pki csr create` without `--cn` must exit
+/// non-zero and print a helpful error rather than silently creating a malformed
+/// CSR or panicking.
+#[test]
+fn issue_33_csr_create_requires_cn() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("nocn.key");
+    let csr_path = temp_dir.path().join("nocn.csr");
+
+    // Generate a key to use
+    let _ = Command::new(pki_binary())
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("failed to generate key");
+
+    // Attempt CSR creation without --cn
+    let output = Command::new(pki_binary())
+        .args(["csr", "create", "--key", key_path.to_str().unwrap(), "-o"])
+        .arg(&csr_path)
+        .output()
+        .expect("failed to run pki csr create");
+
+    assert!(
+        !output.status.success(),
+        "pki csr create without --cn should exit non-zero"
+    );
+
+    // The error message should mention cn or required argument
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{stderr}{stdout}").to_lowercase();
+    assert!(
+        combined.contains("cn")
+            || combined.contains("required")
+            || combined.contains("common name"),
+        "Expected error mentioning '--cn' or 'required', got stderr: {stderr}\nstdout: {stdout}"
+    );
+}
+
+// ============================================================================
 // Version Test
 // ============================================================================
 

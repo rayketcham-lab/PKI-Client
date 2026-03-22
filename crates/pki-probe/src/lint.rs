@@ -221,7 +221,12 @@ impl CertLinter {
 
         // Check validity period length (leaf certs should be max 398 days per CA/B Forum)
         let validity_days = (not_after - not_before).num_days();
-        if index == 0 && validity_days > 398 {
+        let is_ca_cert = cert
+            .basic_constraints()
+            .ok()
+            .and_then(|bc| bc.map(|e| e.value.ca))
+            .unwrap_or(false);
+        if index == 0 && !is_ca_cert && validity_days > 398 {
             results.push(LintResult {
                 rule_id: "VALIDITY_TOO_LONG".to_string(),
                 severity: LintSeverity::Warning,
@@ -364,8 +369,8 @@ impl CertLinter {
             });
         }
 
-        // Check leaf cert has SAN
-        if index == 0 && cert.subject_alternative_name().ok().flatten().is_none() {
+        // Check leaf cert has SAN (skip CA certs — they don't need SANs)
+        if index == 0 && !is_ca && cert.subject_alternative_name().ok().flatten().is_none() {
             results.push(LintResult {
                 rule_id: "MISSING_SAN".to_string(),
                 severity: LintSeverity::Warning,

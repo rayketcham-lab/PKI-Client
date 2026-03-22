@@ -122,6 +122,19 @@ fn gen(args: GenArgs, config: &GlobalConfig) -> Result<CmdResult> {
             generate_ed25519()?
         }
         "rsa" => {
+            if args.bits < 2048 {
+                anyhow::bail!(
+                    "RSA key size {} is too small. Minimum is 2048 bits.\n\
+                     Recommended: 3072 or 4096 bits.",
+                    args.bits
+                );
+            }
+            if args.bits > 16384 {
+                anyhow::bail!(
+                    "RSA key size {} is too large. Maximum is 16384 bits.",
+                    args.bits
+                );
+            }
             if args.bits < 3072 && !config.quiet {
                 eprintln!(
                     "{} RSA-{} is below recommended minimum of 3072 bits",

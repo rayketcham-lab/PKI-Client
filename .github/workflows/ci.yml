@@ -272,8 +272,8 @@ jobs:
           set -euo pipefail
           VERSION_OUT=$(target/release/pki --version)
           echo "Version output: $VERSION_OUT"
-          if ! echo "$VERSION_OUT" | grep -qF "0.5.0-beta.5"; then
-            echo "ERROR: version output did not contain expected '0.5.0-beta.5'"
+          if ! echo "$VERSION_OUT" | grep -qF "0.5.0-beta.6"; then
+            echo "ERROR: version output did not contain expected '0.5.0-beta.6'"
             echo "Got: $VERSION_OUT"
             exit 1
           fi
@@ -390,6 +390,40 @@ jobs:
             echo "OK: key match gives clear error for CSR files"
           else
             echo "OK: key match handled CSR input"
+          fi
+
+      - name: "Regression: RSA-4096 shows correct key size (#31)"
+        run: |
+          set -euo pipefail
+          SHOW_OUT=$(target/release/pki show /tmp/ci-test.key)
+          echo "$SHOW_OUT"
+          if echo "$SHOW_OUT" | grep -q "4096"; then
+            echo "OK: RSA key shows 4096 bits"
+          else
+            echo "FAIL: RSA key does not show 4096 bits"
+            exit 1
+          fi
+
+      - name: "Regression: RSA-512 rejected (#32)"
+        run: |
+          set -euo pipefail
+          if target/release/pki key gen rsa --bits 512 -o /tmp/ci-weak.key 2>&1; then
+            echo "FAIL: RSA-512 should be rejected"
+            rm -f /tmp/ci-weak.key
+            exit 1
+          else
+            echo "OK: RSA-512 correctly rejected"
+          fi
+
+      - name: "Regression: RSA-99999 rejected (#32)"
+        run: |
+          set -euo pipefail
+          if target/release/pki key gen rsa --bits 99999 -o /tmp/ci-huge.key 2>&1; then
+            echo "FAIL: RSA-99999 should be rejected"
+            rm -f /tmp/ci-huge.key
+            exit 1
+          else
+            echo "OK: RSA-99999 correctly rejected"
           fi
 
       - name: Cleanup temp files

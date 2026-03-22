@@ -1019,7 +1019,9 @@ fn shell_input(input: &str) -> (String, String, bool) {
         let _ = stdin.write_all(input.as_bytes());
         let _ = stdin.write_all(b"\nexit\n");
     }
-    let out = child.wait_with_output().expect("failed to read shell output");
+    let out = child
+        .wait_with_output()
+        .expect("failed to read shell output");
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
     (stdout, stderr, out.status.success())
@@ -1242,5 +1244,97 @@ fn issue_28_batch_skips_comments_and_blanks() {
     assert!(
         key_path.exists(),
         "batch: command after comments was not executed. stdout: {stdout}"
+    );
+}
+
+// ============================================================================
+// Bug #31: RSA-4096 key size accuracy
+// ============================================================================
+
+/// Regression test for issue #31: `pki show` reported RSA-4096 as 4208 bits
+/// because it multiplied raw DER bytes (including overhead) by 8.
+///
+/// The fix parses the actual RSA modulus from the SubjectPublicKeyInfo
+/// BIT STRING rather than using the encoded length.
+#[test]
+fn issue_31_rsa_4096_shows_correct_key_size() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key = gen_key(&dir, "rsa4096-issue31.key", "rsa", &["--bits", "4096"]);
+    let csr = gen_csr(&dir, "rsa4096-issue31.csr", &key);
+
+    // pki show must report exactly 4096, not 4208 or any other inflated value
+    assert_show_key_bits(&csr, 4096);
+    // pki csr show must also report exactly 4096
+    assert_csr_show_key_bits(&csr, 4096);
+}
+
+// ============================================================================
+// Bug #29: Batch mode quoted argument handling
+// ============================================================================
+
+/// Regression test for issue #29: batch mode split on whitespace, so a CN
+/// like "My Server" was parsed as two tokens "My and Server".
+///
+/// The fix introduces a shell-aware splitter that respects double and single
+/// quoted strings.
+#[test]
+fn issue_29_batch_handles_quoted_cn() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+
+    // Generate a key to use in the batch
+    let key_path = dir.path().join("quoted-cn.key");
+    let gen_out = pki_cmd()
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("failed to run pki key gen");
+    assert!(
+        gen_out.status.success(),
+        "key gen failed: {}",
+        String::from_utf8_lossy(&gen_out.stderr)
+    );
+
+    let csr_path = dir.path().join("quoted-cn.csr");
+
+    // Write a batch script that uses a quoted CN containing a space
+    let script_path = dir.path().join("quoted.txt");
+    fs::write(
+        &script_path,
+        format!(
+            "csr create --key {} --cn \"My Server\" -o {}\n",
+            key_path.display(),
+            csr_path.display()
+        ),
+    )
+    .unwrap();
+
+    let batch_out = pki_cmd()
+        .args(["batch", script_path.to_str().unwrap()])
+        .output()
+        .expect("failed to run pki batch");
+
+    assert!(
+        csr_path.exists(),
+        "batch: CSR was not created.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&batch_out.stdout),
+        String::from_utf8_lossy(&batch_out.stderr),
+    );
+
+    // Verify the CSR actually contains "My Server" as the CN, not just "My"
+    let show_out = pki_cmd()
+        .args(["csr", "show", "--color", "never"])
+        .arg(&csr_path)
+        .output()
+        .expect("failed to run pki csr show");
+    let csr_show = String::from_utf8_lossy(&show_out.stdout);
+    assert!(
+        csr_show.contains("My Server"),
+        "CSR CN should be 'My Server' but got:\n{csr_show}"
     );
 }

@@ -379,11 +379,7 @@ pub fn run_batch(path: &std::path::Path, config: &GlobalConfig) -> Result<CmdRes
         }
 
         if !config.quiet {
-            println!(
-                "{} {}",
-                format!("[{}]", line_num + 1).dimmed(),
-                line.cyan()
-            );
+            println!("{} {}", format!("[{}]", line_num + 1).dimmed(), line.cyan());
         }
 
         match handle_shell_command(line, config) {
@@ -436,7 +432,8 @@ fn handle_shell_command(line: &str, _config: &GlobalConfig) -> ShellAction {
         (line, None)
     };
 
-    let parts: Vec<&str> = command_part.split_whitespace().collect();
+    let split = shell_split(command_part);
+    let parts: Vec<&str> = split.iter().map(|s| s.as_str()).collect();
     if parts.is_empty() && pem_content.is_none() {
         return ShellAction::Continue;
     }
@@ -831,6 +828,31 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
 
 /// Passthrough commands to the full CLI dispatcher for commands not
 /// explicitly handled in the shell (probe, diff, convert, scep, acme, est, etc.)
+/// Split a command line respecting double and single quotes.
+fn shell_split(input: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_double = false;
+    let mut in_single = false;
+
+    for c in input.chars() {
+        match c {
+            '"' if !in_single => in_double = !in_double,
+            '\'' if !in_double => in_single = !in_single,
+            ' ' | '\t' if !in_double && !in_single => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    args
+}
+
 fn passthrough_to_cli(args: &[String], config: &GlobalConfig) -> Result<()> {
     // Reconstruct CLI args as "pki <command> [args...]" and dispatch
     let cli_args: Vec<String> = std::iter::once("pki".to_string())

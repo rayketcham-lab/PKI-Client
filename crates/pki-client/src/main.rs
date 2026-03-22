@@ -460,26 +460,24 @@ pub fn run_from_args(args: &[String], config: &GlobalConfig) -> Result<()> {
             interactive,
             all,
             no_chain,
-        }) => {
-            match show::auto_show(&file, config)? {
-                Some(result) => Ok(result),
-                None => cert::run(
-                    cert::CertCommands::Show(cert::ShowArgs {
-                        file,
-                        subject: false,
-                        san: false,
-                        issuer: false,
-                        check,
-                        issuer_cert,
-                        lint,
-                        interactive,
-                        all,
-                        no_chain,
-                    }),
-                    config,
-                ),
-            }
-        }
+        }) => match show::auto_show(&file, config)? {
+            Some(result) => Ok(result),
+            None => cert::run(
+                cert::CertCommands::Show(cert::ShowArgs {
+                    file,
+                    subject: false,
+                    san: false,
+                    issuer: false,
+                    check,
+                    issuer_cert,
+                    lint,
+                    interactive,
+                    all,
+                    no_chain,
+                }),
+                config,
+            ),
+        },
         Some(Commands::Cert(cmd)) => cert::run(cmd, config),
         Some(Commands::Key(cmd)) => key::run(cmd, config),
         Some(Commands::Chain(cmd)) => chain::run(cmd, config),

@@ -223,3 +223,51 @@ fn test_lint_severity_ordering() {
     assert_ne!(LintSeverity::Warning, LintSeverity::Error);
     assert_ne!(LintSeverity::Error, LintSeverity::Critical);
 }
+
+// ============================================================================
+// Bug #34: Lint incorrectly flags CA certificates
+// ============================================================================
+
+/// Regression test for issue #34: the linter applied leaf-cert rules
+/// (VALIDITY_TOO_LONG, MISSING_SAN) to CA certificates at index 0 when
+/// the CA was the only cert in the chain.
+///
+/// CA certs are permitted long validity periods and are not required to carry
+/// a Subject Alternative Name.
+#[test]
+fn issue_34_lint_does_not_flag_ca_cert_validity_too_long() {
+    let linter = CertLinter::new();
+    let ca_cert = generate_ca_cert();
+
+    let results = linter.lint_chain(&[ca_cert]);
+
+    let offending: Vec<_> = results
+        .iter()
+        .filter(|r| r.rule_id == "VALIDITY_TOO_LONG")
+        .collect();
+
+    assert!(
+        offending.is_empty(),
+        "CA certificate should not trigger VALIDITY_TOO_LONG, but got: {:?}",
+        offending
+    );
+}
+
+#[test]
+fn issue_34_lint_does_not_flag_ca_cert_missing_san() {
+    let linter = CertLinter::new();
+    let ca_cert = generate_ca_cert();
+
+    let results = linter.lint_chain(&[ca_cert]);
+
+    let offending: Vec<_> = results
+        .iter()
+        .filter(|r| r.rule_id == "MISSING_SAN")
+        .collect();
+
+    assert!(
+        offending.is_empty(),
+        "CA certificate should not trigger MISSING_SAN, but got: {:?}",
+        offending
+    );
+}

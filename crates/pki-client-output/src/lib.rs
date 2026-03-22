@@ -476,7 +476,7 @@ fn get_key_info(
     match algo_oid.as_str() {
         // RSA
         "1.2.840.113549.1.1.1" => {
-            let bits = cert.public_key().subject_public_key.data.len() * 8;
+            let bits = parse_rsa_modulus_bits(&cert.public_key().subject_public_key.data);
             (algo_oid, "RSA".to_string(), bits as u32, None)
         }
         // EC
@@ -493,6 +493,72 @@ fn get_key_info(
         "2.16.840.1.101.3.4.3.18" => (algo_oid, "ML-DSA-65".to_string(), 0, None),
         "2.16.840.1.101.3.4.3.19" => (algo_oid, "ML-DSA-87".to_string(), 0, None),
         _ => (algo_oid.clone(), algo_oid, 0, None),
+    }
+}
+
+/// Parse RSA public key BIT STRING to extract modulus bit length.
+///
+/// The BIT STRING content is: SEQUENCE { INTEGER (modulus), INTEGER (exponent) }
+/// We parse past the DER encoding to get the actual modulus byte count.
+fn parse_rsa_modulus_bits(data: &[u8]) -> usize {
+    // Skip SEQUENCE tag + length
+    if data.len() < 4 || data[0] != 0x30 {
+        return data.len() * 8; // fallback
+    }
+    let (seq_hdr, ok) = skip_der_tag_length(data);
+    if !ok {
+        return data.len() * 8;
+    }
+    let inner = &data[seq_hdr..];
+
+    // First element is INTEGER (modulus)
+    if inner.is_empty() || inner[0] != 0x02 {
+        return data.len() * 8;
+    }
+    let (int_hdr, ok) = skip_der_tag_length(inner);
+    if !ok {
+        return data.len() * 8;
+    }
+    let mut modulus_len = inner.len() - int_hdr;
+    // Parse actual length from the DER length field
+    if inner.len() > 1 {
+        let len_byte = inner[1];
+        if len_byte < 0x80 {
+            modulus_len = len_byte as usize;
+        } else {
+            let num_bytes = (len_byte & 0x7f) as usize;
+            if inner.len() >= 2 + num_bytes {
+                let mut len = 0usize;
+                for i in 0..num_bytes {
+                    len = (len << 8) | inner[2 + i] as usize;
+                }
+                modulus_len = len;
+            }
+        }
+    }
+    let modulus_start = int_hdr;
+    // Skip leading zero byte (DER sign padding for positive integers)
+    if modulus_len > 0 && modulus_start < inner.len() && inner[modulus_start] == 0x00 {
+        modulus_len -= 1;
+    }
+    modulus_len * 8
+}
+
+/// Skip a DER tag + length, returning (header_size, success).
+fn skip_der_tag_length(data: &[u8]) -> (usize, bool) {
+    if data.len() < 2 {
+        return (0, false);
+    }
+    let len_byte = data[1];
+    if len_byte < 0x80 {
+        (2, true)
+    } else {
+        let num = (len_byte & 0x7f) as usize;
+        if data.len() < 2 + num {
+            (0, false)
+        } else {
+            (2 + num, true)
+        }
     }
 }
 
