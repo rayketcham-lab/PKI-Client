@@ -534,9 +534,23 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                         // Fall through to process current line as new command
                     }
 
-                    // Buffer this line as pending — next readline will
-                    // either join a continuation or flush-then-execute
-                    pending_command = Some(single_line.to_string());
+                    // Check if this is a shell builtin (version, help, clear, exit)
+                    // that should execute immediately without buffering.
+                    // Only buffer CLI commands (RunCommand) for potential continuation.
+                    match handle_shell_command(single_line, config) {
+                        ShellAction::Continue => {
+                            // Builtin already handled (printed version, help, etc.)
+                            let _ = rl.add_history_entry(single_line);
+                        }
+                        ShellAction::Exit => {
+                            should_exit = true;
+                            break;
+                        }
+                        ShellAction::RunCommand(_) => {
+                            // CLI command — buffer for potential line continuation
+                            pending_command = Some(single_line.to_string());
+                        }
+                    }
                 }
 
                 if should_exit {

@@ -2,7 +2,7 @@
 
 Modern PKI CLI tool -- certificate inspection, key management, TLS probing, and enrollment protocols.
 
-**Version:** 0.6.6 | **Binary:** `pki` | **License:** Apache-2.0
+**Version:** 0.6.7 | **Binary:** `pki` | **License:** Apache-2.0
 
 ---
 
