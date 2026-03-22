@@ -66,6 +66,47 @@ jobs:
             echo "OK: release is current"
           fi
 
+      - name: Check version consistency across docs
+        run: |
+          set -euo pipefail
+
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+          ERRORS=0
+
+          # Check README badge
+          README_VER=$(grep -oP 'version-\K[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9.-]*' README.md | head -1 || true)
+          if [ -n "$README_VER" ] && [ "$README_VER" != "$CARGO_VERSION" ]; then
+            echo "::error::README.md badge shows v${README_VER} but Cargo.toml is v${CARGO_VERSION}"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check docs/index.html hero badge
+          if [ -f docs/index.html ]; then
+            DOCS_VER=$(grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9.-]*' docs/index.html | head -1 || true)
+            DOCS_VER_CLEAN="${DOCS_VER#v}"
+            if [ -n "$DOCS_VER_CLEAN" ] && [ "$DOCS_VER_CLEAN" != "$CARGO_VERSION" ]; then
+              echo "::error::docs/index.html shows ${DOCS_VER} but Cargo.toml is v${CARGO_VERSION}"
+              ERRORS=$((ERRORS + 1))
+            fi
+          fi
+
+          # Check CLAUDE.md
+          if [ -f CLAUDE.md ]; then
+            CLAUDE_VER=$(grep -oP 'Version:\*\* \K[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9.-]*' CLAUDE.md || true)
+            if [ -n "$CLAUDE_VER" ] && [ "$CLAUDE_VER" != "$CARGO_VERSION" ]; then
+              echo "::error::CLAUDE.md shows v${CLAUDE_VER} but Cargo.toml is v${CARGO_VERSION}"
+              ERRORS=$((ERRORS + 1))
+            fi
+          fi
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::warning::${ERRORS} version inconsistencies found — update docs to match Cargo.toml v${CARGO_VERSION}"
+          else
+            echo "OK: all version references are consistent (v${CARGO_VERSION})"
+          fi
+
       - name: Close resolved issues
         if: success()
         env:
