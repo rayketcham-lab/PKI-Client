@@ -83,6 +83,44 @@ const FILE_COMMANDS: &[&str] = &[
     "chain verify",
 ];
 
+/// Check if a line looks like the start of a new command (not a continuation of a previous one).
+/// Returns true if the first word matches a known command or pki prefix.
+fn looks_like_new_command(line: &str) -> bool {
+    let first_word = line.split_whitespace().next().unwrap_or("");
+    let lower = first_word.to_lowercase();
+    // Known command names (subset — anything that could start a command)
+    const CMD_STARTS: &[&str] = &[
+        "show",
+        "cert",
+        "csr",
+        "key",
+        "chain",
+        "convert",
+        "diff",
+        "probe",
+        "scep",
+        "acme",
+        "est",
+        "pki",
+        "dane",
+        "crl",
+        "revoke",
+        "compliance",
+        "batch",
+        "build",
+        "preview",
+        "validate",
+        "export",
+        "help",
+        "clear",
+        "exit",
+        "quit",
+        "history",
+        "version",
+    ];
+    CMD_STARTS.contains(&lower.as_str())
+}
+
 /// Top-level commands for completion
 const TOP_COMMANDS: &[&str] = &[
     "show",
@@ -279,9 +317,10 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
     }
 
     let mut multiline_buffer: Option<String> = None;
+    let mut pending_command: Option<String> = None;
 
     loop {
-        let prompt = if multiline_buffer.is_some() {
+        let prompt = if multiline_buffer.is_some() || pending_command.is_some() {
             format!("{} ", "....>".dimmed())
         } else {
             format!("{} ", "pki>".cyan().bold())
@@ -290,6 +329,73 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
 
         match readline {
             Ok(line) => {
+                // --- Line continuation across readline calls ---
+                // If there's a pending command and this line arrives:
+                //   - Explicit `\` continuation: keep buffering
+                //   - Line doesn't look like a new command: join and execute
+                //   - Line IS a new command: flush pending, then process new line
+                if pending_command.is_some() {
+                    let trimmed = line.trim();
+
+                    if trimmed.is_empty() {
+                        // Empty line → flush pending command
+                        let cmd = pending_command.take().unwrap();
+                        let _ = rl.add_history_entry(&cmd);
+                        match handle_shell_command(&cmd, config) {
+                            ShellAction::Continue => continue,
+                            ShellAction::Exit => break,
+                            ShellAction::RunCommand(args) => {
+                                if let Err(e) = run_cli_command(&args, config) {
+                                    eprintln!("{}: {}", "error".red().bold(), e);
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    // Explicit continuation: line ends with `\`
+                    if let Some(without_slash) = trimmed.strip_suffix('\\') {
+                        if let Some(ref mut buf) = pending_command {
+                            buf.push(' ');
+                            buf.push_str(without_slash.trim_end());
+                        }
+                        continue;
+                    }
+
+                    // Auto-join: line doesn't look like a new command
+                    if !looks_like_new_command(trimmed) {
+                        let mut cmd = pending_command.take().unwrap();
+                        cmd.push(' ');
+                        cmd.push_str(trimmed);
+                        // Execute the joined command now
+                        let _ = rl.add_history_entry(&cmd);
+                        match handle_shell_command(&cmd, config) {
+                            ShellAction::Continue => continue,
+                            ShellAction::Exit => break,
+                            ShellAction::RunCommand(args) => {
+                                if let Err(e) = run_cli_command(&args, config) {
+                                    eprintln!("{}: {}", "error".red().bold(), e);
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    // It IS a new command — flush pending first, then fall through
+                    let prev = pending_command.take().unwrap();
+                    let _ = rl.add_history_entry(&prev);
+                    match handle_shell_command(&prev, config) {
+                        ShellAction::Continue => {}
+                        ShellAction::Exit => break,
+                        ShellAction::RunCommand(args) => {
+                            if let Err(e) = run_cli_command(&args, config) {
+                                eprintln!("{}: {}", "error".red().bold(), e);
+                            }
+                        }
+                    }
+                    // Fall through to process current line as new command
+                }
+
                 // Handle multi-line PEM paste
                 if let Some(ref mut buffer) = multiline_buffer {
                     buffer.push('\n');
@@ -371,20 +477,66 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                         continue;
                     }
 
-                    let _ = rl.add_history_entry(single_line);
-
-                    match handle_shell_command(single_line, config) {
-                        ShellAction::Continue => continue,
-                        ShellAction::Exit => {
-                            should_exit = true;
-                            break;
+                    // --- Line continuation support ---
+                    // 1. Explicit: line ends with `\` → buffer and wait for more
+                    if let Some(without_slash) = single_line.strip_suffix('\\') {
+                        let stripped = without_slash.trim_end();
+                        if let Some(ref mut buf) = pending_command {
+                            buf.push(' ');
+                            buf.push_str(stripped);
+                        } else {
+                            pending_command = Some(stripped.to_string());
                         }
-                        ShellAction::RunCommand(args) => {
-                            if let Err(e) = run_cli_command(&args, config) {
-                                eprintln!("{}: {}", "error".red().bold(), e);
+                        continue;
+                    }
+
+                    // 2. Auto-join: if there's a pending command and this line
+                    //    doesn't look like a new command, join it
+                    if let Some(ref mut buf) = pending_command {
+                        if !looks_like_new_command(single_line) {
+                            buf.push(' ');
+                            buf.push_str(single_line);
+                            // Check if THIS line also ends with \
+                            // (already handled above, so this line is complete)
+                            let full_cmd = buf.clone();
+                            pending_command = None;
+                            let _ = rl.add_history_entry(&full_cmd);
+                            match handle_shell_command(&full_cmd, config) {
+                                ShellAction::Continue => continue,
+                                ShellAction::Exit => {
+                                    should_exit = true;
+                                    break;
+                                }
+                                ShellAction::RunCommand(args) => {
+                                    if let Err(e) = run_cli_command(&args, config) {
+                                        eprintln!("{}: {}", "error".red().bold(), e);
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                        // This IS a new command — flush the pending one first
+                        let prev_cmd = buf.clone();
+                        pending_command = None;
+                        let _ = rl.add_history_entry(&prev_cmd);
+                        match handle_shell_command(&prev_cmd, config) {
+                            ShellAction::Continue => {}
+                            ShellAction::Exit => {
+                                should_exit = true;
+                                break;
+                            }
+                            ShellAction::RunCommand(args) => {
+                                if let Err(e) = run_cli_command(&args, config) {
+                                    eprintln!("{}: {}", "error".red().bold(), e);
+                                }
                             }
                         }
+                        // Fall through to process current line as new command
                     }
+
+                    // Buffer this line as pending — next readline will
+                    // either join a continuation or flush-then-execute
+                    pending_command = Some(single_line.to_string());
                 }
 
                 if should_exit {
@@ -392,15 +544,28 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                 }
             }
             Err(ReadlineError::Interrupted) => {
-                if multiline_buffer.is_some() {
+                if multiline_buffer.is_some() || pending_command.is_some() {
                     println!("^C (cancelled multi-line input)");
                     multiline_buffer = None;
+                    pending_command = None;
                 } else {
                     println!("^C");
                 }
                 continue;
             }
             Err(ReadlineError::Eof) => {
+                // Flush pending command before exit
+                if let Some(cmd) = pending_command.take() {
+                    let _ = rl.add_history_entry(&cmd);
+                    match handle_shell_command(&cmd, config) {
+                        ShellAction::Continue | ShellAction::Exit => {}
+                        ShellAction::RunCommand(args) => {
+                            if let Err(e) = run_cli_command(&args, config) {
+                                eprintln!("{}: {}", "error".red().bold(), e);
+                            }
+                        }
+                    }
+                }
                 println!("^D");
                 break;
             }
