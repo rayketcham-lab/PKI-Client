@@ -297,6 +297,20 @@ Examples:
 
     /// Enter interactive shell mode
     Shell,
+
+    /// Run commands from a script file (batch mode)
+    ///
+    /// Reads commands line-by-line from a file and executes each one.
+    /// Errors don't halt execution — all commands run. Comments (#) and
+    /// blank lines are skipped.
+    #[command(after_help = "Examples:
+  pki batch commands.txt              Run all commands from file
+  pki batch deploy-certs.txt          Automate certificate deployment")]
+    Batch {
+        /// Script file containing pki commands (one per line)
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -393,6 +407,7 @@ fn main() -> Result<()> {
         Some(Commands::Convert(args)) => convert::run(args, &config),
         Some(Commands::Completions { shell }) => completions::run(shell),
         Some(Commands::Manpages { output }) => completions::generate_manpages(&output),
+        Some(Commands::Batch { file }) => shell::run_batch(&file, &config),
         Some(Commands::Shell) | None => shell::run(&config),
     };
 
@@ -486,6 +501,7 @@ pub fn run_from_args(args: &[String], config: &GlobalConfig) -> Result<()> {
         Some(Commands::Completions { .. }) | Some(Commands::Manpages { .. }) => {
             Ok(CmdResult::Success)
         }
+        Some(Commands::Batch { file }) => shell::run_batch(&file, config),
         Some(Commands::Shell) | None => Ok(CmdResult::Success),
     };
 

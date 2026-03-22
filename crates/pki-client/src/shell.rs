@@ -289,27 +289,40 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                     continue;
                 }
 
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
+                // Split on newlines to handle multi-line paste
+                let lines: Vec<&str> = line.split('\n').collect();
+                let mut should_exit = false;
 
-                // Check if this line starts a multi-line PEM input
-                if line.contains("-----BEGIN") && !line.contains("-----END") {
-                    multiline_buffer = Some(line.to_string());
-                    continue;
-                }
+                for single_line in lines {
+                    let single_line = single_line.trim();
+                    if single_line.is_empty() {
+                        continue;
+                    }
 
-                let _ = rl.add_history_entry(line);
+                    // Check if this line starts a multi-line PEM input
+                    if single_line.contains("-----BEGIN") && !single_line.contains("-----END") {
+                        multiline_buffer = Some(single_line.to_string());
+                        continue;
+                    }
 
-                match handle_shell_command(line, config) {
-                    ShellAction::Continue => continue,
-                    ShellAction::Exit => break,
-                    ShellAction::RunCommand(args) => {
-                        if let Err(e) = run_cli_command(&args, config) {
-                            eprintln!("{}: {}", "error".red().bold(), e);
+                    let _ = rl.add_history_entry(single_line);
+
+                    match handle_shell_command(single_line, config) {
+                        ShellAction::Continue => continue,
+                        ShellAction::Exit => {
+                            should_exit = true;
+                            break;
+                        }
+                        ShellAction::RunCommand(args) => {
+                            if let Err(e) = run_cli_command(&args, config) {
+                                eprintln!("{}: {}", "error".red().bold(), e);
+                            }
                         }
                     }
+                }
+
+                if should_exit {
+                    break;
                 }
             }
             Err(ReadlineError::Interrupted) => {
@@ -343,6 +356,68 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
     }
 
     Ok(CmdResult::Success)
+}
+
+/// Run commands from a script file (batch mode).
+///
+/// Reads the file line-by-line, skips comments and blanks, and executes
+/// each line as a shell command. Errors don't halt execution.
+pub fn run_batch(path: &std::path::Path, config: &GlobalConfig) -> Result<CmdResult> {
+    use anyhow::Context;
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read batch file: {}", path.display()))?;
+
+    let mut succeeded = 0u32;
+    let mut failed = 0u32;
+
+    for (line_num, line) in content.lines().enumerate() {
+        let line = line.trim();
+
+        // Skip blanks and comments
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        if !config.quiet {
+            println!(
+                "{} {}",
+                format!("[{}]", line_num + 1).dimmed(),
+                line.cyan()
+            );
+        }
+
+        match handle_shell_command(line, config) {
+            ShellAction::Continue => {}
+            ShellAction::Exit => break,
+            ShellAction::RunCommand(args) => {
+                if let Err(e) = run_cli_command(&args, config) {
+                    eprintln!("{}: {}", "error".red().bold(), e);
+                    failed += 1;
+                    continue;
+                }
+                succeeded += 1;
+            }
+        }
+    }
+
+    if !config.quiet {
+        println!(
+            "\n{}: {} succeeded, {} failed",
+            "Batch complete".bold(),
+            succeeded.to_string().green(),
+            if failed > 0 {
+                failed.to_string().red().to_string()
+            } else {
+                "0".to_string()
+            }
+        );
+    }
+
+    if failed > 0 {
+        Ok(CmdResult::ExitCode(1))
+    } else {
+        Ok(CmdResult::Success)
+    }
 }
 
 enum ShellAction {

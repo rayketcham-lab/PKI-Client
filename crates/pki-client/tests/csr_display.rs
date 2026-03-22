@@ -1109,3 +1109,138 @@ fn issue_26_shell_dash_h() {
         "shell '-h' returned Unknown command"
     );
 }
+
+// ============================================================================
+// Issue #28: Batch mode — multi-line paste and script file input
+// ============================================================================
+
+#[test]
+fn issue_28_shell_multiline_paste_runs_all_commands() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key1 = dir.path().join("a.key");
+    let key2 = dir.path().join("b.key");
+
+    // Paste two key gen commands at once
+    let input = format!(
+        "key gen ec --curve p256 -o {}\nkey gen rsa --bits 2048 -o {}",
+        key1.display(),
+        key2.display()
+    );
+    let (stdout, _stderr, _) = shell_input(&input);
+
+    // Both keys should have been generated
+    assert!(
+        key1.exists(),
+        "First command in multi-line paste was not executed. stdout: {stdout}"
+    );
+    assert!(
+        key2.exists(),
+        "Second command in multi-line paste was not executed. stdout: {stdout}"
+    );
+}
+
+#[test]
+fn issue_28_batch_file_runs_all_commands() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key_path = dir.path().join("batch.key");
+    let csr_path = dir.path().join("batch.csr");
+
+    // Create a batch script
+    let script = dir.path().join("commands.txt");
+    fs::write(
+        &script,
+        format!(
+            "# Generate key and CSR\nkey gen ec --curve p256 -o {}\ncsr create --key {} --cn batch-test -o {}\n",
+            key_path.display(),
+            key_path.display(),
+            csr_path.display()
+        ),
+    )
+    .unwrap();
+
+    let out = pki_cmd()
+        .args(["batch", script.to_str().unwrap()])
+        .output()
+        .expect("failed to run pki batch");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(
+        key_path.exists(),
+        "batch: key was not generated. stdout: {stdout}"
+    );
+    assert!(
+        csr_path.exists(),
+        "batch: CSR was not generated. stdout: {stdout}"
+    );
+}
+
+#[test]
+fn issue_28_batch_continues_on_error() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key_path = dir.path().join("after-error.key");
+
+    // First command will fail (nonexistent file), second should still run
+    let script = dir.path().join("errors.txt");
+    fs::write(
+        &script,
+        format!(
+            "show /nonexistent/file.pem\nkey gen ec --curve p256 -o {}\n",
+            key_path.display()
+        ),
+    )
+    .unwrap();
+
+    let out = pki_cmd()
+        .args(["batch", script.to_str().unwrap()])
+        .output()
+        .expect("failed to run pki batch");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    // The key should exist even though the first command failed
+    assert!(
+        key_path.exists(),
+        "batch: second command did not run after first failed. stdout: {stdout}"
+    );
+}
+
+#[test]
+fn issue_28_batch_skips_comments_and_blanks() {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key_path = dir.path().join("comment-test.key");
+
+    let script = dir.path().join("comments.txt");
+    fs::write(
+        &script,
+        format!(
+            "# This is a comment\n\n  # Another comment\n\nkey gen ec --curve p256 -o {}\n\n",
+            key_path.display()
+        ),
+    )
+    .unwrap();
+
+    let out = pki_cmd()
+        .args(["batch", script.to_str().unwrap()])
+        .output()
+        .expect("failed to run pki batch");
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(
+        key_path.exists(),
+        "batch: command after comments was not executed. stdout: {stdout}"
+    );
+}
