@@ -318,6 +318,7 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
 
     let mut multiline_buffer: Option<String> = None;
     let mut pending_command: Option<String> = None;
+    let mut explicit_continuation = false; // true when pending is from `\`
 
     loop {
         // Show ....> only for PEM multi-line paste, not for command buffering
@@ -360,10 +361,12 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                             buf.push(' ');
                             buf.push_str(without_slash.trim_end());
                         }
+                        explicit_continuation = true;
                         continue;
                     }
 
                     // Auto-join: line doesn't look like a new command
+                    explicit_continuation = false;
                     if !looks_like_new_command(trimmed) {
                         let mut cmd = pending_command.take().unwrap();
                         cmd.push(' ');
@@ -488,6 +491,7 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                         } else {
                             pending_command = Some(stripped.to_string());
                         }
+                        explicit_continuation = true;
                         continue;
                     }
 
@@ -549,6 +553,24 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                         ShellAction::RunCommand(_) => {
                             // Buffer for potential line continuation
                             pending_command = Some(single_line.to_string());
+                        }
+                    }
+                }
+
+                // Flush pending command at end of each readline —
+                // don't let stale commands persist across inputs.
+                // BUT: keep the buffer if it was set by explicit `\` continuation.
+                if !explicit_continuation {
+                    if let Some(cmd) = pending_command.take() {
+                        let _ = rl.add_history_entry(&cmd);
+                        match handle_shell_command(&cmd, config) {
+                            ShellAction::Continue => {}
+                            ShellAction::Exit => should_exit = true,
+                            ShellAction::RunCommand(args) => {
+                                if let Err(e) = run_cli_command(&args, config) {
+                                    eprintln!("{}: {}", "error".red().bold(), e);
+                                }
+                            }
                         }
                     }
                 }

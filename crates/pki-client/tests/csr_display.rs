@@ -1404,31 +1404,28 @@ fn shell_bare_preview_routes_to_hierarchy() {
 
 #[test]
 fn shell_continuation_lint_on_next_line() {
-    // Simulates: "show /tmp/cert.pem\n--lint" where --lint wrapped to next line
+    // Use explicit \ continuation: "show /tmp/cert.pem \\\n--lint"
     if skip_if_missing() {
         return;
     }
     let dir = TempDir::new().unwrap();
     let key = dir.path().join("cont.key");
-    // Generate a key to have something to show
     let _ = pki_cmd()
         .args(["key", "gen", "ec", "--curve", "p256", "-o"])
         .arg(&key)
         .output();
-    // Paste two lines: "show <key>" then "--lint" should NOT be "Unknown command"
-    let input = format!("show {}\n--lint", key.display());
+    let input = format!("show {} \\\n--lint", key.display());
     let (stdout, stderr, _) = shell_input(&input);
     let combined = format!("{stdout}{stderr}");
-    // --lint should have been joined to the show command, not treated as its own command
     assert!(
         !combined.contains("Unknown command: --lint"),
-        "shell should auto-join '--lint' to previous 'show' command.\nGot: {combined}"
+        "shell should join backslash-continued '--lint' to 'show' command.\nGot: {combined}"
     );
 }
 
 #[test]
 fn shell_continuation_second_file_arg() {
-    // Simulates: "diff a.key\nb.key" where second file wrapped
+    // Use explicit \ continuation: "diff a.key \\\nb.key"
     if skip_if_missing() {
         return;
     }
@@ -1443,13 +1440,12 @@ fn shell_continuation_second_file_arg() {
         .args(["key", "gen", "rsa", "--bits", "2048", "-o"])
         .arg(&k2)
         .output();
-    // Paste: "diff <k1>\n<k2>" — second path is NOT a command, should join
-    let input = format!("diff {}\n{}", k1.display(), k2.display());
+    let input = format!("diff {} \\\n{}", k1.display(), k2.display());
     let (stdout, stderr, _) = shell_input(&input);
     let combined = format!("{stdout}{stderr}");
     assert!(
         !combined.contains("Unknown command"),
-        "shell should auto-join second file path to 'diff' command.\nGot: {combined}"
+        "shell should join backslash-continued file path to 'diff'.\nGot: {combined}"
     );
 }
 
@@ -1477,17 +1473,16 @@ fn shell_continuation_explicit_backslash() {
 
 #[test]
 fn shell_continuation_hostname_on_next_line() {
-    // Simulates: "dane generate --cert /tmp/c.pem -p 443 -H\nquantumnexum.com"
+    // Use explicit \ continuation: "dane generate -p 443 -H \\\nquantumnexum.com"
     if skip_if_missing() {
         return;
     }
-    // We don't need a real cert for this — just check it doesn't say "Unknown command: quantumnexum.com"
-    let input = "dane generate -p 443 -H\nquantumnexum.com";
+    let input = "dane generate -p 443 -H \\\nquantumnexum.com";
     let (stdout, stderr, _) = shell_input(input);
     let combined = format!("{stdout}{stderr}");
     assert!(
         !combined.contains("Unknown command: quantumnexum.com"),
-        "shell should auto-join hostname to previous dane command.\nGot: {combined}"
+        "shell should join backslash-continued hostname.\nGot: {combined}"
     );
 }
 
@@ -1521,18 +1516,18 @@ fn shell_continuation_does_not_eat_real_commands() {
 
 #[test]
 fn shell_continuation_flag_value_on_next_line() {
-    // "key gen rsa\n--bits 4096 -o <path>" — "--bits" starts with -- so not a command
+    // Use explicit \ continuation: "key gen rsa \\\n--bits 4096 -o <path>"
     if skip_if_missing() {
         return;
     }
     let dir = TempDir::new().unwrap();
     let key = dir.path().join("fv.key");
-    let input = format!("key gen rsa\n--bits 4096 -o {}", key.display());
+    let input = format!("key gen rsa \\\n--bits 4096 -o {}", key.display());
     let (stdout, stderr, _) = shell_input(&input);
     let combined = format!("{stdout}{stderr}");
     assert!(
         !combined.contains("Unknown command"),
-        "shell should auto-join '--bits 4096' to previous command.\nGot: {combined}"
+        "shell should join backslash-continued '--bits 4096'.\nGot: {combined}"
     );
     assert!(
         key.exists(),
