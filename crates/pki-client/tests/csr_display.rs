@@ -1539,3 +1539,82 @@ fn shell_continuation_flag_value_on_next_line() {
         "RSA key should have been generated via continued command"
     );
 }
+
+// ============================================================================
+// Issue #48: probe should default to server subcommand
+// ============================================================================
+
+#[test]
+fn shell_probe_defaults_to_server() {
+    // "probe example.com:443" should route to "probe server example.com:443"
+    // not "unrecognized subcommand"
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("probe localhost:1");
+    let combined = format!("{stdout}{stderr}");
+    // Should NOT say "unrecognized subcommand" — it should try to connect
+    // (and fail with a connection error, which is fine)
+    assert!(
+        !combined.contains("unrecognized subcommand"),
+        "shell 'probe localhost:1' should default to 'probe server'.\nGot: {combined}"
+    );
+}
+
+#[test]
+fn shell_probe_server_still_works() {
+    // Explicit "probe server" should still work
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("probe server localhost:1");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        !combined.contains("unrecognized subcommand"),
+        "shell 'probe server localhost:1' should work.\nGot: {combined}"
+    );
+}
+
+#[test]
+fn shell_probe_check_still_works() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("probe check localhost:1");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        !combined.contains("unrecognized subcommand"),
+        "shell 'probe check' should still work as explicit subcommand.\nGot: {combined}"
+    );
+}
+
+// ============================================================================
+// Issue #49: no ....> delay for non-continuation commands
+// ============================================================================
+
+#[test]
+fn shell_no_buffering_delay_for_simple_commands() {
+    // Two show commands should both execute without delay
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key = dir.path().join("nodelay.key");
+    let _ = pki_cmd()
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key)
+        .output();
+    // "show <key>\nversion" — show should execute immediately, not buffer
+    let input = format!("show {}\nversion", key.display());
+    let (stdout, stderr, _) = shell_input(&input);
+    let combined = format!("{stdout}{stderr}");
+    // Both should produce output
+    assert!(
+        combined.contains("EC") || combined.contains("ECDSA"),
+        "show command should execute immediately.\nGot: {combined}"
+    );
+    assert!(
+        combined.contains("0.6."),
+        "version should also execute.\nGot: {combined}"
+    );
+}

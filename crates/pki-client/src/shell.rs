@@ -320,7 +320,8 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
     let mut pending_command: Option<String> = None;
 
     loop {
-        let prompt = if multiline_buffer.is_some() || pending_command.is_some() {
+        // Show ....> only for PEM multi-line paste, not for command buffering
+        let prompt = if multiline_buffer.is_some() {
             format!("{} ", "....>".dimmed())
         } else {
             format!("{} ", "pki>".cyan().bold())
@@ -536,7 +537,6 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
 
                     // Check if this is a shell builtin (version, help, clear, exit)
                     // that should execute immediately without buffering.
-                    // Only buffer CLI commands (RunCommand) for potential continuation.
                     match handle_shell_command(single_line, config) {
                         ShellAction::Continue => {
                             // Builtin already handled (printed version, help, etc.)
@@ -547,7 +547,7 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                             break;
                         }
                         ShellAction::RunCommand(_) => {
-                            // CLI command — buffer for potential line continuation
+                            // Buffer for potential line continuation
                             pending_command = Some(single_line.to_string());
                         }
                     }
@@ -1132,6 +1132,16 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                     println!("Available: create, show");
                 }
             }
+        }
+        // Smart probe: "probe example.com" → "probe server example.com"
+        "probe" => {
+            const PROBE_SUBS: &[&str] = &["server", "check", "lint", "fetch"];
+            let mut probe_args = args.to_vec();
+            // If second arg exists and isn't a known subcommand, insert "server"
+            if probe_args.len() >= 2 && !PROBE_SUBS.contains(&probe_args[1].as_str()) {
+                probe_args.insert(1, "server".to_string());
+            }
+            passthrough_to_cli(&probe_args, config)?;
         }
         // Bare hierarchy commands → route to "pki build", "pki preview", etc.
         "build" | "preview" | "validate" | "export" => {
