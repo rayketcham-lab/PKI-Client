@@ -482,7 +482,7 @@ footer a:hover { color: var(--text); }
 <div class="stats fade-up">
   <div class="stats-inner">
     <div class="stat">
-      <div class="stat-value">17</div>
+      <div class="stat-value">19</div>
       <div class="stat-label">Subcommands</div>
     </div>
     <div class="stat">
@@ -575,20 +575,24 @@ footer a:hover { color: var(--text); }
 <span class="t-comment"># Inspect any PKI file (auto-detects type)</span>
 <span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">show</span> <span class="t-string">server.pem</span>
 
-<span class="t-comment"># Deep forensic analysis with grades</span>
-<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">cert show</span> <span class="t-string">server.pem</span> <span class="t-flag">--format forensic</span>
-
-<span class="t-comment"># Certs expiring within 30 days</span>
-<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">cert expires</span> <span class="t-string">*.pem</span> <span class="t-flag">--within 30d</span>
-
 <span class="t-comment"># Probe a live TLS server</span>
-<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">probe</span> <span class="t-string">example.com:443</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">probe server</span> <span class="t-string">github.com:443</span>
 
-<span class="t-comment"># Generate an EC key pair</span>
-<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">key gen ec</span> <span class="t-flag">--curve</span> <span class="t-string">P-256</span>
+<span class="t-comment"># Generate key + CSR in one flow</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">key gen ec</span> <span class="t-flag">--curve</span> <span class="t-string">p256</span> <span class="t-flag">-o</span> <span class="t-string">server.key</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">csr create</span> <span class="t-flag">--key</span> <span class="t-string">server.key</span> <span class="t-flag">--cn</span> <span class="t-string">"My Server"</span> <span class="t-flag">-o</span> <span class="t-string">server.csr</span>
 
-<span class="t-comment"># Enter interactive shell</span>
-<span class="t-prompt">$</span> <span class="t-cmd">pki</span>
+<span class="t-comment"># Build a 3-tier CA hierarchy from TOML</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">pki build</span> <span class="t-string">hierarchy.toml</span>
+
+<span class="t-comment"># Compare two certs side-by-side</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">diff</span> <span class="t-string">old.pem</span> <span class="t-string">new.pem</span> <span class="t-flag">--side-by-side</span>
+
+<span class="t-comment"># Run a batch of commands from file</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">batch</span> <span class="t-string">commands.txt</span>
+
+<span class="t-comment"># SCEP automated enrollment</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">scep enroll</span> <span class="t-string">https://scep.corp/scep</span> <span class="t-flag">-s</span> <span class="t-string">device01</span>
       </div>
     </div>
 
@@ -632,7 +636,7 @@ footer a:hover { color: var(--text); }
 <!-- Commands -->
 <section class="section fade-up" id="commands">
   <div class="section-label">Commands</div>
-  <h2>17 subcommands</h2>
+  <h2>19 subcommands</h2>
   <p>From inspection to enrollment, every PKI operation in one tool.</p>
 
   <table class="command-table">
@@ -648,7 +652,8 @@ footer a:hover { color: var(--text); }
       <tr><td>probe</td><td>TLS server inspection with security linting</td></tr>
       <tr><td>acme</td><td>ACME / Let's Encrypt certificate enrollment</td></tr>
       <tr><td>est</td><td>EST protocol enrollment (RFC 7030)</td></tr>
-      <tr><td>scep</td><td>SCEP protocol (RFC 8894) &mdash; CA discovery and capabilities</td></tr>
+      <tr><td>scep</td><td>SCEP enrollment (RFC 8894) &mdash; automated certificate issuance</td></tr>
+      <tr><td>batch</td><td>Run commands from a script file (skip errors, comments)</td></tr>
       <tr><td>compliance</td><td>FIPS 140-3, NIST, and Federal Bridge validation</td></tr>
       <tr><td>dane</td><td>TLSA record generation (RFC 6698)</td></tr>
       <tr><td>diff</td><td>Side-by-side certificate comparison</td></tr>
