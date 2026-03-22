@@ -192,7 +192,19 @@ fn run_generate(args: GenerateArgs, config: &GlobalConfig) -> Result<CmdResult> 
         h.clone()
     } else {
         // Try to extract from certificate CN or SAN
-        extract_hostname_from_cert(&cert_der).unwrap_or_else(|| "example.com".to_string())
+        match extract_hostname_from_cert(&cert_der) {
+            Some(h) => h,
+            None => {
+                if !config.quiet {
+                    eprintln!(
+                        "{} No valid DNS hostname in certificate CN/SAN; using 'example.com'",
+                        "Warning:".yellow().bold()
+                    );
+                    eprintln!("  Use --hostname to specify the correct DNS name");
+                }
+                "example.com".to_string()
+            }
+        }
     };
 
     let dns_name = dane::tlsa_domain_name(&hostname, args.port, &args.protocol);
@@ -281,23 +293,50 @@ fn run_verify(args: VerifyArgs, config: &GlobalConfig) -> Result<CmdResult> {
     }
 }
 
-/// Try to extract a hostname from certificate CN or SAN.
+/// Check if a string is a valid DNS hostname (RFC 952/1123).
+///
+/// Rejects names with spaces, underscores, or other characters invalid in DNS labels.
+fn is_valid_dns_hostname(name: &str) -> bool {
+    if name.is_empty() || name.len() > 253 {
+        return false;
+    }
+
+    let name = name.strip_suffix('.').unwrap_or(name);
+
+    name.split('.').all(|label| {
+        !label.is_empty()
+            && label.len() <= 63
+            && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+    })
+}
+
+/// Try to extract a valid DNS hostname from certificate CN or SAN.
+///
+/// Returns `None` if no valid DNS hostname can be extracted (e.g., the CN
+/// contains spaces or other characters invalid in DNS names).
 fn extract_hostname_from_cert(cert_der: &[u8]) -> Option<String> {
-    // Try SANs first
+    // Try SANs first — only accept valid DNS names
     if let Ok((dns_names, _, _)) = spork_core::cert::extract_sans_from_der(cert_der) {
-        if let Some(name) = dns_names.into_iter().find(|n| !n.starts_with('*')) {
+        if let Some(name) = dns_names
+            .into_iter()
+            .find(|n| !n.starts_with('*') && is_valid_dns_hostname(n))
+        {
             return Some(name);
         }
     }
 
-    // Fall back to CN extraction
+    // Fall back to CN extraction — only if it looks like a DNS name
     if let Ok(cert) = spork_core::cert::parse_certificate_der(cert_der) {
         for rdn in cert.tbs_certificate.subject.0.iter() {
             for atv in rdn.0.iter() {
                 // CN OID = 2.5.4.3
                 if atv.oid.to_string() == "2.5.4.3" {
                     if let Ok(cn) = std::str::from_utf8(atv.value.value()) {
-                        return Some(cn.to_string());
+                        if is_valid_dns_hostname(cn) {
+                            return Some(cn.to_string());
+                        }
                     }
                 }
             }
@@ -305,4 +344,100 @@ fn extract_hostname_from_cert(cert_der: &[u8]) -> Option<String> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a self-signed cert with the given CN and no SANs.
+    fn cert_with_cn(cn: &str) -> Vec<u8> {
+        use spork_core::algo::{AlgorithmId, KeyPair};
+        use spork_core::cert::{encode_certificate_der, Validity};
+        use spork_core::cert::{CertificateBuilder, DistinguishedName};
+
+        let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+        let pub_key = kp.public_key_der().unwrap();
+        let subject = DistinguishedName::simple(cn);
+        let cert = CertificateBuilder::new(subject, pub_key, AlgorithmId::EcdsaP256)
+            .validity(Validity::days_from_now(90))
+            .build_and_sign(&kp)
+            .unwrap();
+        encode_certificate_der(&cert).unwrap()
+    }
+
+    /// Build a self-signed cert with a SAN dNSName.
+    fn cert_with_san(cn: &str, dns_san: &str) -> Vec<u8> {
+        use spork_core::algo::{AlgorithmId, KeyPair};
+        use spork_core::cert::{encode_certificate_der, Validity};
+        use spork_core::cert::{CertificateBuilder, DistinguishedName, SubjectAltName};
+
+        let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+        let pub_key = kp.public_key_der().unwrap();
+        let subject = DistinguishedName::simple(cn);
+        let san = SubjectAltName::new().dns(dns_san);
+        let cert = CertificateBuilder::new(subject, pub_key, AlgorithmId::EcdsaP256)
+            .validity(Validity::days_from_now(90))
+            .subject_alt_name(san)
+            .build_and_sign(&kp)
+            .unwrap();
+        encode_certificate_der(&cert).unwrap()
+    }
+
+    // ---- extract_hostname_from_cert ----
+
+    #[test]
+    fn extract_hostname_valid_cn() {
+        let der = cert_with_cn("server.example.com");
+        let hostname = extract_hostname_from_cert(&der);
+        assert_eq!(hostname, Some("server.example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_hostname_san_preferred_over_cn() {
+        let der = cert_with_san("Old CN", "san.example.com");
+        let hostname = extract_hostname_from_cert(&der);
+        assert_eq!(hostname, Some("san.example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_hostname_rejects_cn_with_spaces() {
+        // CN like "Ketcham Labs TLS Issuing CA" is NOT a valid DNS hostname
+        let der = cert_with_cn("Ketcham Labs TLS Issuing CA");
+        let hostname = extract_hostname_from_cert(&der);
+        assert_eq!(
+            hostname, None,
+            "CN with spaces must not be used as DNS hostname"
+        );
+    }
+
+    #[test]
+    fn extract_hostname_rejects_cn_organizational_name() {
+        let der = cert_with_cn("My Company Root CA");
+        let hostname = extract_hostname_from_cert(&der);
+        assert_eq!(
+            hostname, None,
+            "organizational CN must not be used as DNS hostname"
+        );
+    }
+
+    // ---- is_valid_dns_hostname ----
+
+    #[test]
+    fn valid_hostnames() {
+        assert!(is_valid_dns_hostname("example.com"));
+        assert!(is_valid_dns_hostname("sub.example.com"));
+        assert!(is_valid_dns_hostname("my-host.example.com"));
+        assert!(is_valid_dns_hostname("a.b.c.d.example.com"));
+    }
+
+    #[test]
+    fn invalid_hostnames() {
+        assert!(!is_valid_dns_hostname(""));
+        assert!(!is_valid_dns_hostname("has spaces.com"));
+        assert!(!is_valid_dns_hostname("Ketcham Labs TLS Issuing CA"));
+        assert!(!is_valid_dns_hostname("-leading-dash.com"));
+        assert!(!is_valid_dns_hostname("trailing-dash-.com"));
+        assert!(!is_valid_dns_hostname("under_score.com"));
+    }
 }
