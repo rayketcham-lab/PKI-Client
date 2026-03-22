@@ -17,12 +17,12 @@
 use anyhow::{anyhow, Context, Result};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
+#[cfg(not(feature = "fips"))]
+use spork_core::algo::rsa_oaep;
 use spork_core::{
     algo::{AlgorithmId, KeyPair},
     cert::{CsrBuilder, NameBuilder},
 };
-#[cfg(not(feature = "fips"))]
-use spork_core::algo::rsa_oaep;
 
 use super::types::MessageType;
 

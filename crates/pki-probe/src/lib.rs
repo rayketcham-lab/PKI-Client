@@ -429,6 +429,48 @@ fn parse_cert_info(cert_der: &[u8], position: usize) -> Result<CertInfo> {
     })
 }
 
+/// Parse RSA public key BIT STRING to extract modulus bit length.
+pub(crate) fn parse_rsa_modulus_bits(data: &[u8]) -> usize {
+    // BIT STRING content: SEQUENCE { INTEGER (modulus), INTEGER (exponent) }
+    if data.len() < 4 || data[0] != 0x30 {
+        return data.len() * 8;
+    }
+    // Skip SEQUENCE tag + length
+    let hdr = if data[1] < 0x80 {
+        2
+    } else {
+        2 + (data[1] & 0x7f) as usize
+    };
+    if hdr >= data.len() {
+        return data.len() * 8;
+    }
+    let inner = &data[hdr..];
+    // First element: INTEGER (modulus)
+    if inner.is_empty() || inner[0] != 0x02 {
+        return data.len() * 8;
+    }
+    // Parse INTEGER length
+    let (mod_len, mod_start) = if inner.len() > 1 && inner[1] < 0x80 {
+        (inner[1] as usize, 2usize)
+    } else if inner.len() > 2 {
+        let n = (inner[1] & 0x7f) as usize;
+        let mut len = 0usize;
+        for i in 0..n.min(inner.len() - 2) {
+            len = (len << 8) | inner[2 + i] as usize;
+        }
+        (len, 2 + n)
+    } else {
+        return data.len() * 8;
+    };
+    // Skip leading zero (DER sign padding)
+    let adj = if mod_start < inner.len() && inner[mod_start] == 0x00 {
+        1
+    } else {
+        0
+    };
+    (mod_len - adj) * 8
+}
+
 /// Get key algorithm and size from certificate.
 fn get_key_info(cert: &x509_parser::certificate::X509Certificate) -> (String, Option<u32>) {
     let algo = cert.public_key().algorithm.algorithm.to_string();
@@ -438,8 +480,7 @@ fn get_key_info(cert: &x509_parser::certificate::X509Certificate) -> (String, Op
     let key_size = match algo.as_str() {
         // RSA OID: 1.2.840.113549.1.1.1
         "1.2.840.113549.1.1.1" => {
-            // Approximate from subject public key length
-            let bits = cert.public_key().subject_public_key.data.len() * 8;
+            let bits = parse_rsa_modulus_bits(&cert.public_key().subject_public_key.data);
             Some(bits as u32)
         }
         // EC P-256: 1.2.840.10045.3.1.7

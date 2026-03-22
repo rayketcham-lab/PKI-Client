@@ -253,7 +253,7 @@ impl CertLinter {
         let mut results = Vec::new();
 
         let algo = cert.public_key().algorithm.algorithm.to_string();
-        let key_bits = cert.public_key().subject_public_key.data.len() * 8;
+        let key_bits = crate::parse_rsa_modulus_bits(&cert.public_key().subject_public_key.data);
 
         // RSA key checks
         if algo == "1.2.840.113549.1.1.1" {
