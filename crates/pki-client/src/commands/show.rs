@@ -20,14 +20,51 @@ use crate::config::GlobalConfig;
 /// - `Ok(None)` if file type is Certificate (caller should handle with full options)
 /// - `Err(...)` on error
 pub fn auto_show(path: &Path, config: &GlobalConfig) -> Result<Option<CmdResult>> {
-    let data =
-        std::fs::read(path).with_context(|| format!("Failed to read file: {}", path.display()))?;
+    // Support reading from stdin with "-"
+    let data = if path == Path::new("-") {
+        use std::io::Read;
+        let mut buf = Vec::new();
+        std::io::stdin()
+            .read_to_end(&mut buf)
+            .context("Failed to read from stdin")?;
+        buf
+    } else {
+        std::fs::read(path)
+            .with_context(|| format!("Failed to read file: {}", path.display()))?
+    };
 
     // Smart detection - analyzes content, tries parsing
     let detection = DetectedFileType::detect_with_confidence(&data, path);
     let file_type = detection.file_type;
 
-    show_by_type(path, &data, file_type, config)
+    let result = show_by_type(path, &data, file_type, config);
+
+    // For stdin ("-"), never return None — write to temp file and show as cert
+    if path == Path::new("-") {
+        if let Ok(None) = result {
+            let tmp = std::env::temp_dir().join(format!("pki-stdin-{}.pem", std::process::id()));
+            std::fs::write(&tmp, &data)?;
+            let show_result = super::cert::run(
+                super::cert::CertCommands::Show(super::cert::ShowArgs {
+                    file: tmp.clone(),
+                    subject: false,
+                    san: false,
+                    issuer: false,
+                    check: false,
+                    issuer_cert: None,
+                    lint: false,
+                    interactive: false,
+                    all: false,
+                    no_chain: false,
+                }),
+                config,
+            );
+            let _ = std::fs::remove_file(&tmp);
+            return show_result.map(Some);
+        }
+    }
+
+    result
 }
 
 /// Get human-readable name for file type.

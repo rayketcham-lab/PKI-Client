@@ -299,9 +299,44 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                         continue;
                     }
 
+                    // If we're buffering PEM, keep adding lines
+                    if let Some(ref mut buffer) = multiline_buffer {
+                        buffer.push('\n');
+                        buffer.push_str(single_line);
+                        if single_line.contains("-----END") {
+                            let full_pem = buffer.clone();
+                            multiline_buffer = None;
+                            // Auto-show the pasted PEM
+                            if let Err(e) = show_inline_pem(&full_pem, config) {
+                                eprintln!("{}: {}", "error".red().bold(), e);
+                            }
+                        }
+                        continue;
+                    }
+
                     // Check if this line starts a multi-line PEM input
-                    if single_line.contains("-----BEGIN") && !single_line.contains("-----END") {
-                        multiline_buffer = Some(single_line.to_string());
+                    if single_line.contains("-----BEGIN") {
+                        if single_line.contains("-----END") {
+                            // Single-line PEM (unlikely but handle it)
+                            if let Err(e) = show_inline_pem(single_line, config) {
+                                eprintln!("{}: {}", "error".red().bold(), e);
+                            }
+                        } else {
+                            multiline_buffer = Some(single_line.to_string());
+                        }
+                        continue;
+                    }
+
+                    // Detect raw base64 DER paste (e.g. "MIIFqj..." without PEM headers)
+                    if single_line.len() > 40
+                        && single_line.starts_with("MII")
+                        && single_line.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+                    {
+                        // Wrap in PEM and show
+                        let pem = format!("-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----", single_line);
+                        if let Err(e) = show_inline_pem(&pem, config) {
+                            eprintln!("{}: {}", "error".red().bold(), e);
+                        }
                         continue;
                     }
 
@@ -889,6 +924,24 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
 
 /// Passthrough commands to the full CLI dispatcher for commands not
 /// explicitly handled in the shell (probe, diff, convert, scep, acme, est, etc.)
+/// Show inline PEM content — auto-detects type (cert, CSR, key, CRL, PKCS#7).
+fn show_inline_pem(pem_text: &str, config: &GlobalConfig) -> Result<()> {
+    use std::io::Write;
+
+    // Write PEM to a temp file, show it, clean up
+    let tmp_path = std::env::temp_dir().join(format!("pki-paste-{}.pem", std::process::id()));
+    let mut f = std::fs::File::create(&tmp_path)?;
+    f.write_all(pem_text.as_bytes())?;
+    f.flush()?;
+    drop(f);
+
+    let args = vec!["show".to_string(), tmp_path.display().to_string()];
+    let result = run_cli_command(&args, config);
+
+    let _ = std::fs::remove_file(&tmp_path);
+    result
+}
+
 /// Split a command line respecting double and single quotes.
 fn shell_split(input: &str) -> Vec<String> {
     let mut args = Vec::new();
