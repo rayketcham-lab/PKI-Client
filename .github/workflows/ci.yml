@@ -270,14 +270,15 @@ jobs:
       - name: Check version output
         run: |
           set -euo pipefail
+          EXPECTED=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           VERSION_OUT=$(target/release/pki --version)
           echo "Version output: $VERSION_OUT"
-          if ! echo "$VERSION_OUT" | grep -qF "0.6.2"; then
-            echo "ERROR: version output did not contain expected '0.6.2'"
+          if ! echo "$VERSION_OUT" | grep -qF "$EXPECTED"; then
+            echo "ERROR: version output did not contain expected '$EXPECTED'"
             echo "Got: $VERSION_OUT"
             exit 1
           fi
-          echo "OK: version check passed"
+          echo "OK: version check passed (v$EXPECTED)"
 
       - name: Generate RSA-4096 key
         run: |
