@@ -954,6 +954,12 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                 }
             }
         }
+        // Bare hierarchy commands → route to "pki build", "pki preview", etc.
+        "build" | "preview" | "validate" | "export" => {
+            let mut pki_args = vec!["pki".to_string()];
+            pki_args.extend(args.iter().cloned());
+            passthrough_to_cli(&pki_args, config)?;
+        }
         // Passthrough: run any other command via the full CLI parser
         other => {
             // Known passthrough commands — CLI already printed its own error

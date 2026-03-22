@@ -1370,3 +1370,30 @@ fn shell_pki_preview_routes_to_hierarchy() {
         "shell 'pki preview' should route to hierarchy builder, not produce Unknown command.\nGot: {combined}"
     );
 }
+
+#[test]
+fn shell_bare_build_routes_to_hierarchy() {
+    if skip_if_missing() {
+        return;
+    }
+    // Bare "build" (no pki prefix) should also route to hierarchy builder
+    let (stdout, stderr, _) = shell_input("build");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell bare 'build' should route to hierarchy builder.\nGot: {combined}"
+    );
+}
+
+#[test]
+fn shell_bare_preview_routes_to_hierarchy() {
+    if skip_if_missing() {
+        return;
+    }
+    let (stdout, stderr, _) = shell_input("preview");
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        !combined.contains("Unknown command"),
+        "shell bare 'preview' should route to hierarchy builder.\nGot: {combined}"
+    );
+}
