@@ -123,7 +123,7 @@ fn extract_authenticated_attrs_from_signer_infos(signer_infos: &[u8]) -> ScepAtt
     attrs
 }
 
-/// Walk a SignerInfo SEQUENCE to find [0] authenticatedAttributes.
+/// Walk a SignerInfo SEQUENCE to find \[0\] authenticatedAttributes.
 fn parse_signer_info_for_attrs(si: &[u8], attrs: &mut ScepAttrs) {
     let mut pos = 0;
 
@@ -288,7 +288,7 @@ fn parse_transaction_id(attrs: &ScepAttrs) -> Option<String> {
 
 // ── DER parsing helpers ───────────────────────────────────────────────────────
 
-/// Parse ContentInfo and extract the content (stripping id-signedData OID and [0] wrapper).
+/// Parse ContentInfo and extract the content (stripping id-signedData OID and \[0\] wrapper).
 fn extract_content_info_content(der: &[u8]) -> Result<&[u8]> {
     // ContentInfo ::= SEQUENCE { contentType OID, content [0] EXPLICIT ANY }
     let ci_content = parse_sequence_content(der).context("ContentInfo is not a SEQUENCE")?;

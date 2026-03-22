@@ -18,9 +18,11 @@ use anyhow::{anyhow, Context, Result};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 use spork_core::{
-    algo::{rsa_oaep, AlgorithmId, KeyPair},
+    algo::{AlgorithmId, KeyPair},
     cert::{CsrBuilder, NameBuilder},
 };
+#[cfg(not(feature = "fips"))]
+use spork_core::algo::rsa_oaep;
 
 use super::types::MessageType;
 
@@ -285,7 +287,7 @@ fn der_printable_string(s: &str) -> Vec<u8> {
     out
 }
 
-/// Encode a context-tagged implicit value (e.g. [0] IMPLICIT).
+/// Encode a context-tagged implicit value (e.g. \[0\] IMPLICIT).
 fn der_context_implicit(tag_num: u8, data: &[u8]) -> Vec<u8> {
     let mut out = vec![0x80 | tag_num]; // primitive context tag
     encode_length(&mut out, data.len());
@@ -293,7 +295,7 @@ fn der_context_implicit(tag_num: u8, data: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Encode a context-tagged explicit value (e.g. [0] EXPLICIT).
+/// Encode a context-tagged explicit value (e.g. \[0\] EXPLICIT).
 fn der_context_explicit(tag_num: u8, data: &[u8]) -> Vec<u8> {
     let mut out = vec![0xa0 | tag_num]; // constructed context tag
     encode_length(&mut out, data.len());
@@ -323,7 +325,11 @@ fn algorithm_identifier_no_params(oid_value: &[u8]) -> Vec<u8> {
 ///
 /// Encrypts `plaintext` (the CSR DER) with AES-256-CBC.
 /// The AES key is encrypted to `ca_pub_key_der` (RSA SPKI) using RSAES-OAEP.
+#[allow(unreachable_code, unused_variables)]
 pub fn build_enveloped_data(plaintext: &[u8], ca_pub_key_der: &[u8]) -> Result<Vec<u8>> {
+    #[cfg(feature = "fips")]
+    anyhow::bail!("SCEP enrollment is not available in FIPS mode");
+
     // Generate AES-256 key and IV
     let mut aes_key = [0u8; 32];
     let mut iv = [0u8; 16];
@@ -333,10 +339,13 @@ pub fn build_enveloped_data(plaintext: &[u8], ca_pub_key_der: &[u8]) -> Result<V
     // Encrypt plaintext with AES-256-CBC
     let ciphertext = aes256_cbc_encrypt(&aes_key, &iv, plaintext)?;
 
-    // Encrypt AES key with RSA-OAEP (SHA-256)
+    // Encrypt AES key with RSA-OAEP
+    #[cfg(not(feature = "fips"))]
     let encrypted_key =
         rsa_oaep::oaep_encrypt(ca_pub_key_der, &aes_key, rsa_oaep::OaepHash::Sha1, None)
             .context("RSA-OAEP encryption of content-encryption key failed")?;
+    #[cfg(feature = "fips")]
+    let encrypted_key: Vec<u8> = unreachable!();
 
     // Extract IssuerAndSerialNumber from CA cert for RecipientIdentifier
     // For simplicity we use SubjectKeyIdentifier [0] with the CA pub key hash
@@ -678,7 +687,7 @@ fn build_signed_data_inner(
     Ok(der_sequence(&inner))
 }
 
-/// Build EncapsulatedContentInfo SEQUENCE { id-data, [0] OCTET STRING(payload) }.
+/// Build EncapsulatedContentInfo SEQUENCE { id-data, \[0\] OCTET STRING(payload) }.
 fn build_encap_content_info(payload: &[u8]) -> Vec<u8> {
     let oid = der_oid(OID_DATA);
     let payload_oct = der_octet_string(payload);
@@ -687,7 +696,7 @@ fn build_encap_content_info(payload: &[u8]) -> Vec<u8> {
     der_sequence(&inner)
 }
 
-/// Build the [0] IMPLICIT certificates field in SignedData.
+/// Build the \[0\] IMPLICIT certificates field in SignedData.
 fn build_certificates_field(cert_der: &[u8]) -> Vec<u8> {
     let mut out = vec![0xa0]; // [0] CONSTRUCTED
     encode_length(&mut out, cert_der.len());
