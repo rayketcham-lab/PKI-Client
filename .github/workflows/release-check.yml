@@ -1,0 +1,111 @@
+name: Release Freshness Check
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 12 * * *'  # Noon UTC daily
+  workflow_dispatch:
+
+concurrency:
+  group: release-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-release-freshness:
+    name: Release Freshness
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # full history for tag comparison
+
+      - name: Check for unreleased features
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # Get latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          echo "Latest tag: $LATEST_TAG"
+
+          if [ "$LATEST_TAG" = "none" ]; then
+            echo "No tags found — skipping freshness check"
+            exit 0
+          fi
+
+          # Get Cargo.toml version
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          TAG_VERSION="${LATEST_TAG#v}"
+          echo "Cargo.toml version: $CARGO_VERSION"
+          echo "Tag version: $TAG_VERSION"
+
+          # Count feat/fix commits since last tag
+          FEAT_FIX_COUNT=$(git log "${LATEST_TAG}..HEAD" --oneline --grep="^feat" --grep="^fix" --extended-regexp 2>/dev/null | wc -l)
+          TOTAL_COMMITS=$(git log "${LATEST_TAG}..HEAD" --oneline 2>/dev/null | wc -l)
+          echo "Commits since $LATEST_TAG: $TOTAL_COMMITS (feat/fix: $FEAT_FIX_COUNT)"
+
+          # Check: version matches tag but there are new feat/fix commits
+          if [ "$CARGO_VERSION" = "$TAG_VERSION" ] && [ "$FEAT_FIX_COUNT" -gt 0 ]; then
+            echo ""
+            echo "WARNING: Cargo.toml version ($CARGO_VERSION) matches latest tag ($LATEST_TAG)"
+            echo "         but there are $FEAT_FIX_COUNT unreleased feat/fix commits."
+            echo "         Bump the version and tag a new release!"
+            echo ""
+            git log "${LATEST_TAG}..HEAD" --oneline
+            echo ""
+
+            # On schedule: create issue
+            if [ "$EVENT_NAME" = "schedule" ]; then
+              title="ci: unreleased features detected — ${FEAT_FIX_COUNT} feat/fix commits since ${LATEST_TAG}"
+              existing=$(gh issue list --label release-pending --state open --json number --jq '.[0].number // empty')
+              if [ -z "$existing" ]; then
+                commits=$(git log "${LATEST_TAG}..HEAD" --oneline --grep="^feat" --grep="^fix" --extended-regexp)
+                body="## Unreleased Features
+
+The following feat/fix commits have been on main since ${LATEST_TAG} without a release:
+
+\`\`\`
+${commits}
+\`\`\`
+
+**Action:** Bump version in Cargo.toml, push a new tag, and cut a release.
+
+This issue was auto-created by the release freshness check."
+                gh issue create --title "$title" --label release-pending --body "$body"
+              fi
+            fi
+
+            # On push: warn (visible in CI summary)
+            echo "::warning::${FEAT_FIX_COUNT} feat/fix commits are unreleased. Bump version and tag!"
+          else
+            echo "OK: release is current"
+          fi
+
+      - name: Close resolved issues
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          TAG_VERSION="${LATEST_TAG#v}"
+          TOTAL_COMMITS=$(git log "${LATEST_TAG}..HEAD" --oneline 2>/dev/null | wc -l)
+
+          # If version is fresh, close pending issues
+          if [ "$TOTAL_COMMITS" -eq 0 ] || [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+            issues=$(gh issue list --label release-pending --state open --json number --jq '.[].number')
+            for num in $issues; do
+              gh issue close "$num" --comment "Release $LATEST_TAG is current. Auto-closing."
+            done
+          fi
