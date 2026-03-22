@@ -196,16 +196,30 @@ pki
 
 Download a static binary — no Rust, no build tools, no dependencies:
 
-**Linux (x86_64):**
+**Install:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash
+```
+
+**Upgrade:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- upgrade
+```
+
+**Uninstall:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- uninstall
+```
+
+**Pin to a specific version:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- v0.5.0-beta.4
 ```
 
 Or download manually from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases):
 
 ```bash
-# Download and install
-curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.5.0-beta.1-x86_64-linux.tar.gz
+curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.5.0-beta.4-x86_64-linux.tar.gz
 tar xzf pki.tar.gz
 sudo mv pki /usr/local/bin/
 ```
@@ -224,17 +238,17 @@ sha256sum -c SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-v0.5.0-beta.1-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-v0.5.0-beta.4-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore):**
 ```bash
-curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.5.0-beta.1-x86_64-linux.tar.gz.bundle
+curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.5.0-beta.4-x86_64-linux.tar.gz.bundle
 cosign verify-blob \
-  --bundle pki-v0.5.0-beta.1-x86_64-linux.tar.gz.bundle \
+  --bundle pki-v0.5.0-beta.4-x86_64-linux.tar.gz.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-v0.5.0-beta.1-x86_64-linux.tar.gz
+  pki-v0.5.0-beta.4-x86_64-linux.tar.gz
 ```
 
 ### Shell completions

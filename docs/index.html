@@ -705,10 +705,15 @@ footer a:hover { color: var(--text); }
   </div>
 
   <div class="install-block">
-    <h3>Pre-built binaries</h3>
-    <pre><span class="comment"># Download static Linux binary (no dependencies)</span>
-<span class="cmd">curl</span> -sL https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-x86_64-unknown-linux-musl.tar.gz | <span class="cmd">tar</span> xz
-<span class="cmd">sudo mv</span> pki /usr/local/bin/</pre>
+    <h3>Pre-built binary (recommended)</h3>
+    <pre><span class="comment"># Install (or upgrade if outdated)</span>
+<span class="cmd">curl</span> -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | <span class="cmd">bash</span>
+
+<span class="comment"># Upgrade</span>
+<span class="cmd">curl</span> -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | <span class="cmd">bash</span> <span class="flag">-s -- upgrade</span>
+
+<span class="comment"># Uninstall</span>
+<span class="cmd">curl</span> -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | <span class="cmd">bash</span> <span class="flag">-s -- uninstall</span></pre>
   </div>
 
   <div class="install-block">
