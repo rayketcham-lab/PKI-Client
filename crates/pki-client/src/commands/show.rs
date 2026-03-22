@@ -29,8 +29,7 @@ pub fn auto_show(path: &Path, config: &GlobalConfig) -> Result<Option<CmdResult>
             .context("Failed to read from stdin")?;
         buf
     } else {
-        std::fs::read(path)
-            .with_context(|| format!("Failed to read file: {}", path.display()))?
+        std::fs::read(path).with_context(|| format!("Failed to read file: {}", path.display()))?
     };
 
     // Smart detection - analyzes content, tries parsing

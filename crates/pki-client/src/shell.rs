@@ -330,10 +330,15 @@ pub fn run(config: &GlobalConfig) -> Result<CmdResult> {
                     // Detect raw base64 DER paste (e.g. "MIIFqj..." without PEM headers)
                     if single_line.len() > 40
                         && single_line.starts_with("MII")
-                        && single_line.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+                        && single_line
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
                     {
                         // Wrap in PEM and show
-                        let pem = format!("-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----", single_line);
+                        let pem = format!(
+                            "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----",
+                            single_line
+                        );
                         if let Err(e) = show_inline_pem(&pem, config) {
                             eprintln!("{}: {}", "error".red().bold(), e);
                         }
