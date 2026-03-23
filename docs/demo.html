@@ -260,14 +260,14 @@ function loadDemo(key) {
   var isShort = currentMode === 'short';
   var suffix = isShort ? ' (TL;DR)' : '';
   document.getElementById('demo-title').textContent = demo.label + suffix;
-  document.getElementById('demo-desc').textContent = isShort ? demo.shortDesc : demo.desc;
+  document.getElementById('demo-desc').textContent = demo.desc;
   var castFile = isShort ? demo.short : demo.file;
   var rows = isShort ? 24 : 40;
   var container = document.getElementById('player');
   while (container.firstChild) { container.removeChild(container.firstChild); }
   AsciinemaPlayer.create(castFile, container, {
     theme: 'monokai', speed: 1.0, idleTimeLimit: isShort ? 1 : 3,
-    fit: 'width', cols: 120, rows: rows, autoPlay: true, loop: isShort
+    fit: 'width', cols: 120, rows: rows, autoPlay: true
   });
 }
 
