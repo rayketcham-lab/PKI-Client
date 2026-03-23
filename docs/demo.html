@@ -69,26 +69,22 @@
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 212, 255, 0.05);
   }
   #player { width: 100%; }
-  .shorts { max-width: 1100px; margin: 3rem auto; padding: 0 1rem; }
-  .shorts-header { text-align: center; margin-bottom: 0.5rem; }
-  .shorts-header h2 { font-size: 1.8rem; font-weight: 800; color: #fff; letter-spacing: 0.15em; text-transform: uppercase; }
-  .shorts-header h2 span { color: #ff4da6; }
-  .shorts-subtitle { text-align: center; color: #667; font-size: 0.9rem; margin-bottom: 2rem; font-style: italic; }
-  .shorts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; }
-  .short-card {
-    background: #111827; border: 1px solid #1f2937; border-radius: 12px; overflow: hidden;
-    transition: border-color 0.3s, box-shadow 0.3s;
+  .mode-toggle { display: flex; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
+  .mode-btn {
+    padding: 0.5rem 1.4rem;
+    background: #111827;
+    border: 1px solid #1f2937;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    transition: all 0.2s;
+    font-weight: 500;
   }
-  .short-card:hover { border-color: #ff4da6; box-shadow: 0 0 20px rgba(255, 77, 166, 0.15); }
-  .short-player { width: 100%; border-bottom: 1px solid #1f2937; }
-  .short-meta { padding: 1rem 1.2rem; }
-  .short-meta h3 { color: #ff4da6; font-size: 0.95rem; margin-bottom: 0.3rem; }
-  .short-meta p { color: #9ca3af; font-size: 0.82rem; line-height: 1.4; }
-  .short-meta .short-duration { display: inline-block; margin-top: 0.4rem; padding: 0.15rem 0.5rem; background: rgba(255, 77, 166, 0.1); border-radius: 4px; font-size: 0.7rem; color: #ff4da6; font-weight: 600; }
-  .shorts-divider {
-    max-width: 1100px; margin: 3rem auto 0; padding: 0 1rem;
-    border-top: 1px solid #1a2a3a;
-  }
+  .mode-btn:first-child { border-radius: 6px 0 0 6px; }
+  .mode-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+  .mode-btn.active-full { background: rgba(0, 212, 255, 0.15); border-color: #00d4ff; color: #00d4ff; font-weight: 600; }
+  .mode-btn.active-short { background: rgba(255, 77, 166, 0.15); border-color: #ff4da6; color: #ff4da6; font-weight: 600; }
   .suite { max-width: 1100px; margin: 3rem auto; padding: 0 1rem; }
   .suite-header { text-align: center; margin-bottom: 2rem; }
   .suite-header h2 { font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem; }
@@ -135,6 +131,10 @@
 
 <div class="demo-section">
   <div class="section-title">Choose a Scenario</div>
+  <div class="mode-toggle">
+    <button class="mode-btn active-full" id="mode-full" onclick="setMode('full')">Full Demo</button>
+    <button class="mode-btn" id="mode-short" onclick="setMode('short')">TL;DR (15s)</button>
+  </div>
   <div class="demo-tabs" id="tabs"></div>
   <div class="demo-info">
     <h2 id="demo-title">The Audit</h2>
@@ -143,16 +143,6 @@
   <div class="player-wrapper">
     <div id="player"></div>
   </div>
-</div>
-
-<div class="shorts-divider"></div>
-
-<div class="shorts">
-  <div class="shorts-header">
-    <h2><span>SHORTS</span></h2>
-  </div>
-  <div class="shorts-subtitle">The TL;DR version. 10 seconds. Honest IT humor. No time wasted.</div>
-  <div class="shorts-grid" id="shorts-grid"></div>
 </div>
 
 <div class="suite">
@@ -239,6 +229,7 @@ var demos = [
 ];
 
 var currentKey = 'audit';
+var currentMode = 'full';
 
 var tabsEl = document.getElementById('tabs');
 demos.forEach(function(d, i) {
@@ -250,6 +241,15 @@ demos.forEach(function(d, i) {
   tabsEl.appendChild(btn);
 });
 
+function setMode(mode) {
+  currentMode = mode;
+  var fullBtn = document.getElementById('mode-full');
+  var shortBtn = document.getElementById('mode-short');
+  fullBtn.className = 'mode-btn' + (mode === 'full' ? ' active-full' : '');
+  shortBtn.className = 'mode-btn' + (mode === 'short' ? ' active-short' : '');
+  loadDemo(currentKey);
+}
+
 function loadDemo(key) {
   currentKey = key;
   var demo = demos.filter(function(d) { return d.key === key; })[0];
@@ -257,58 +257,27 @@ function loadDemo(key) {
   for (var i = 0; i < buttons.length; i++) {
     buttons[i].className = buttons[i].getAttribute('data-key') === key ? 'demo-tab active' : 'demo-tab';
   }
-  document.getElementById('demo-title').textContent = demo.label;
-  document.getElementById('demo-desc').textContent = demo.desc;
+  var isShort = currentMode === 'short';
+  var suffix = isShort ? ' (TL;DR)' : '';
+  document.getElementById('demo-title').textContent = demo.label + suffix;
+  document.getElementById('demo-desc').textContent = isShort ? demo.shortDesc : demo.desc;
+  var castFile = isShort ? demo.short : demo.file;
+  var rows = isShort ? 24 : 40;
   var container = document.getElementById('player');
   while (container.firstChild) { container.removeChild(container.firstChild); }
-  AsciinemaPlayer.create(demo.file, container, {
-    theme: 'monokai', speed: 1.0, idleTimeLimit: 3,
-    fit: 'width', cols: 120, rows: 40, autoPlay: true
-  });
-}
-
-function initShorts() {
-  var grid = document.getElementById('shorts-grid');
-  demos.forEach(function(d) {
-    var card = document.createElement('div');
-    card.className = 'short-card';
-
-    var playerDiv = document.createElement('div');
-    playerDiv.className = 'short-player';
-    card.appendChild(playerDiv);
-
-    var meta = document.createElement('div');
-    meta.className = 'short-meta';
-
-    var h3 = document.createElement('h3');
-    h3.textContent = d.icon + ' ' + d.label;
-    meta.appendChild(h3);
-
-    var p = document.createElement('p');
-    p.textContent = d.shortDesc;
-    meta.appendChild(p);
-
-    var dur = document.createElement('span');
-    dur.className = 'short-duration';
-    dur.textContent = '\u25B6 ~10s \u00B7 loops';
-    meta.appendChild(dur);
-
-    card.appendChild(meta);
-    grid.appendChild(card);
-
-    AsciinemaPlayer.create(d.short, playerDiv, {
-      theme: 'monokai', speed: 1.0, idleTimeLimit: 1,
-      fit: 'width', cols: 120, rows: 24, autoPlay: false, loop: true
-    });
+  AsciinemaPlayer.create(castFile, container, {
+    theme: 'monokai', speed: 1.0, idleTimeLimit: isShort ? 1 : 3,
+    fit: 'width', cols: 120, rows: rows, autoPlay: true, loop: isShort
   });
 }
 
 window.addEventListener('DOMContentLoaded', function() {
   var params = new URLSearchParams(window.location.search);
   var requested = params.get('demo');
+  var mode = params.get('mode');
+  if (mode === 'short') { setMode('short'); }
   var valid = demos.some(function(d) { return d.key === requested; });
   loadDemo(valid ? requested : 'audit');
-  initShorts();
 });
 </script>
 </body>

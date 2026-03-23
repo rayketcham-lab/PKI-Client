@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate 10-second TL;DR 'shorts' versions of the PKI demo stories.
+"""Generate 15-second TL;DR 'shorts' versions of the PKI demo stories.
 
 Each short is a punchy, honest, reel-style asciinema cast:
-  - Fast typing, no pauses
+  - Fast typing, dramatic pauses
   - One command, one punchline
   - IT humor that anyone who's managed certs will feel in their soul
 
@@ -113,42 +113,42 @@ def gen_short_a() -> None:
     t = 0.0
 
     ev.append([t, "o", clear()])
-    t = 0.3
+    t = 0.5
 
     # Title card
-    ev.append([t, "o", move(2, 1) + center(dim("TL;DR"))])
-    t += 0.2
-    ev.append([t, "o", move(3, 1) + center(bold("The Audit"))])
-    t += 0.8
+    ev.append([t, "o", move(10, 1) + center(dim("TL;DR"))])
+    t += 0.3
+    ev.append([t, "o", move(11, 1) + center(bold("The Audit"))])
+    t += 1.2
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
 
     # The command
-    t = type_cmd(ev, t, "pki cert expires --within 30d /etc/ssl/certs/", speed=0.02)
-    t += 0.3
+    t = type_cmd(ev, t, "pki cert expires --within 30d /etc/ssl/certs/", speed=0.025)
+    t += 0.5
 
     # Output — the horror
     t = output_line(ev, t, "")
     t = output_line(ev, t, f"  {red('EXPIRED')}   api.prod.internal        " + red("died 47 days ago"))
-    t += 0.15
+    t += 0.4
     t = output_line(ev, t, f"  {yellow('WARNING')}   mail.corp.example.com    " + yellow("23 days left"))
-    t += 0.15
+    t += 0.4
     t = output_line(ev, t, f"  {green('OK')}        payments.example.com     " + green("312 days left"))
-    t += 0.5
+    t += 0.8
 
     # The punchline
     t = output_line(ev, t, "")
     t = output_line(ev, t, dim("  1 dead. 1 dying. 1 fine."))
-    t += 0.2
+    t += 0.6
     t = output_line(ev, t, bold("  guess which one had the monitoring."))
-    t += 1.5
+    t += 3.0
 
     # Smash cut to logo
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
     ev.append([t, "o", move(11, 1) + center(cyan("pki") + dim(" — because openssl deserved it"))])
-    t += 1.5
+    t += 2.5
     ev.append([t, "o", ""])
 
     write_cast("short-a-audit.cast", "TL;DR: The Audit", ev)
@@ -160,15 +160,15 @@ def gen_short_b() -> None:
     t = 0.0
 
     ev.append([t, "o", clear()])
-    t = 0.3
+    t = 0.5
 
-    ev.append([t, "o", move(2, 1) + center(dim("TL;DR"))])
-    t += 0.2
-    ev.append([t, "o", move(3, 1) + center(bold("The Renewal"))])
-    t += 0.8
+    ev.append([t, "o", move(10, 1) + center(dim("TL;DR"))])
+    t += 0.3
+    ev.append([t, "o", move(11, 1) + center(bold("The Renewal"))])
+    t += 1.2
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
 
     # Speed-run style with step counter
     steps = [
@@ -182,19 +182,19 @@ def gen_short_b() -> None:
     for i, (cmd, result) in enumerate(steps):
         step_label = dim(f"[{i+1}/5]") + " "
         ev.append([round(t, 3), "o", step_label + green("$ ") + cmd + "\r\n"])
-        t += 0.25
+        t += 0.4
         ev.append([round(t, 3), "o", "      " + result + "\r\n"])
-        t += 0.35
+        t += 0.5
 
-    t += 0.3
+    t += 0.5
     t = output_line(ev, t, "")
     t = output_line(ev, t, bold("  cert renewed. no yaml. no tickets. no drama."))
-    t += 1.5
+    t += 3.0
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
     ev.append([t, "o", move(11, 1) + center(cyan("pki") + dim(" — renewal speedrun any%"))])
-    t += 1.5
+    t += 2.5
     ev.append([t, "o", ""])
 
     write_cast("short-b-renewal.cast", "TL;DR: The Renewal", ev)
@@ -206,43 +206,44 @@ def gen_short_c() -> None:
     t = 0.0
 
     ev.append([t, "o", clear()])
-    t = 0.3
+    t = 0.5
 
-    ev.append([t, "o", move(2, 1) + center(dim("TL;DR"))])
-    t += 0.2
-    ev.append([t, "o", move(3, 1) + center(bold("The Migration"))])
-    t += 0.8
+    ev.append([t, "o", move(10, 1) + center(dim("TL;DR"))])
+    t += 0.3
+    ev.append([t, "o", move(11, 1) + center(bold("The Migration"))])
+    t += 1.2
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
 
     # Before
     ev.append([round(t, 3), "o", dim("  before:") + "\r\n"])
-    t += 0.2
-    t = type_cmd(ev, t, "pki lint *.pem", speed=0.025)
-    t += 0.2
-    t = output_line(ev, t, f"  {red('ERROR')}   RSA-2048 — " + red("deprecated, migrate to PQC"))
-    t = output_line(ev, t, f"  {yellow('WARN')}    SHA-256 + RSA — " + yellow("upgrade path available"))
+    t += 0.3
+    t = type_cmd(ev, t, "pki lint *.pem", speed=0.03)
+    t += 0.3
+    t = output_line(ev, t, f"  {red('ERROR')}   RSA-2048 — " + red("deprecated, migrate to PQC"), delay=0.2)
+    t = output_line(ev, t, f"  {yellow('WARN')}    SHA-256 + RSA — " + yellow("upgrade path available"), delay=0.2)
     t = output_line(ev, t, f"  {green('OK')}      P-384 — " + green("classical approved"))
-    t += 0.5
+    t += 0.8
 
     # After (one command later)
     ev.append([round(t, 3), "o", "\r\n" + dim("  after: dual-algorithm certs") + "\r\n"])
-    t += 0.2
-    t = type_cmd(ev, t, "pki lint *.pem", speed=0.025)
-    t += 0.2
+    t += 0.3
+    t = type_cmd(ev, t, "pki lint *.pem", speed=0.03)
+    t += 0.3
     t = output_line(ev, t, f"  {green('OK')}  {green('OK')}  {green('OK')}  {green('OK')}  {green('OK')}")
-    t += 0.4
+    t += 0.8
 
     t = output_line(ev, t, "")
     t = output_line(ev, t, bold("  RSA? in 2026?"))
+    t += 0.5
     t = output_line(ev, t, bold("  sir this is a quantum neighborhood."))
-    t += 1.5
+    t += 3.0
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
     ev.append([t, "o", move(11, 1) + center(cyan("pki") + dim(" — quantum-safe migration path"))])
-    t += 1.5
+    t += 2.5
     ev.append([t, "o", ""])
 
     write_cast("short-c-migration.cast", "TL;DR: The Migration", ev)
@@ -254,19 +255,19 @@ def gen_short_d() -> None:
     t = 0.0
 
     ev.append([t, "o", clear()])
-    t = 0.3
+    t = 0.5
 
-    ev.append([t, "o", move(2, 1) + center(dim("TL;DR"))])
-    t += 0.2
-    ev.append([t, "o", move(3, 1) + center(bold("The Build"))])
-    t += 0.8
+    ev.append([t, "o", move(10, 1) + center(dim("TL;DR"))])
+    t += 0.3
+    ev.append([t, "o", move(11, 1) + center(bold("The Build"))])
+    t += 1.2
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
 
     # Show the TOML (abbreviated)
     ev.append([round(t, 3), "o", dim("  hierarchy.toml:") + "\r\n"])
-    t += 0.15
+    t += 0.25
     toml_lines = [
         cyan("  [root]"),
         f"  subject = {dim('\"CN=Root CA\"')}",
@@ -278,30 +279,32 @@ def gen_short_d() -> None:
         f"  parent = {dim('\"root\"')}",
     ]
     for line in toml_lines:
-        t = output_line(ev, t, line, delay=0.06)
+        t = output_line(ev, t, line, delay=0.12)
 
-    t += 0.3
-    t = type_cmd(ev, t, "pki hierarchy build hierarchy.toml", speed=0.02)
-    t += 0.2
+    t += 0.5
+    t = type_cmd(ev, t, "pki hierarchy build hierarchy.toml", speed=0.025)
+    t += 0.4
 
     # Build output
     t = output_line(ev, t, f"  {green('\u2713')} Root CA .......... {green('ML-DSA-87')}")
-    t += 0.15
+    t += 0.3
     t = output_line(ev, t, f"  {green('\u2713')} Issuing CA ....... {green('ML-DSA-65')}")
-    t += 0.15
+    t += 0.3
     t = output_line(ev, t, f"  {green('\u2713')} Chain verified ... {green('2/2 valid')}")
-    t += 0.4
+    t += 0.6
 
     t = output_line(ev, t, "")
     t = output_line(ev, t, bold("  entire PKI hierarchy."))
+    t += 0.3
     t = output_line(ev, t, bold("  8 lines of TOML."))
+    t += 0.3
     t = output_line(ev, t, bold("  that's it. that's the post."))
-    t += 1.5
+    t += 3.0
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
     ev.append([t, "o", move(11, 1) + center(cyan("pki") + dim(" — PKI as code, literally"))])
-    t += 1.5
+    t += 2.5
     ev.append([t, "o", ""])
 
     write_cast("short-d-build.cast", "TL;DR: The Build", ev)
@@ -313,43 +316,44 @@ def gen_short_e() -> None:
     t = 0.0
 
     ev.append([t, "o", clear()])
-    t = 0.3
+    t = 0.5
 
-    ev.append([t, "o", move(2, 1) + center(dim("TL;DR"))])
-    t += 0.2
-    ev.append([t, "o", move(3, 1) + center(bold("The Handoff"))])
-    t += 0.8
+    ev.append([t, "o", move(10, 1) + center(dim("TL;DR"))])
+    t += 0.3
+    ev.append([t, "o", move(11, 1) + center(bold("The Handoff"))])
+    t += 1.2
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
 
     # Chat format — the handoff conversation
     t = output_line(ev, t, dim("  new dev:") + "  how do i check if the cert is good?")
-    t += 0.4
+    t += 0.6
     t = output_line(ev, t, dim("  senior:"))
-    t = type_cmd(ev, t, "pki show --lint prod.pem", speed=0.025)
-    t += 0.15
+    t = type_cmd(ev, t, "pki show --lint prod.pem", speed=0.03)
+    t += 0.3
     t = output_line(ev, t, f"  {green('A+')}  TLS server cert, P-384, 312 days, SANs valid")
-    t += 0.4
+    t += 0.6
 
     t = output_line(ev, t, "")
     t = output_line(ev, t, dim("  new dev:") + "  what about DNS pinning?")
-    t += 0.3
+    t += 0.5
     t = output_line(ev, t, dim("  senior:"))
-    t = type_cmd(ev, t, "pki dane prod.pem", speed=0.025)
-    t += 0.15
+    t = type_cmd(ev, t, "pki dane prod.pem", speed=0.03)
+    t += 0.3
     t = output_line(ev, t, f"  {cyan('TLSA')}  3 1 1 a4b9c8d7e6... " + dim("(ready to paste)"))
-    t += 0.4
+    t += 0.6
 
     t = output_line(ev, t, "")
     t = output_line(ev, t, dim("  new dev:") + "  ...that's it?")
+    t += 0.5
     t = output_line(ev, t, dim("  senior:") + bold("  that's it."))
-    t += 1.5
+    t += 3.0
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
     ev.append([t, "o", move(11, 1) + center(cyan("pki") + dim(" — onboarding in 60 seconds"))])
-    t += 1.5
+    t += 2.5
     ev.append([t, "o", ""])
 
     write_cast("short-e-handoff.cast", "TL;DR: The Handoff", ev)
@@ -361,15 +365,15 @@ def gen_short_f() -> None:
     t = 0.0
 
     ev.append([t, "o", clear()])
-    t = 0.3
+    t = 0.5
 
-    ev.append([t, "o", move(2, 1) + center(dim("TL;DR"))])
-    t += 0.2
-    ev.append([t, "o", move(3, 1) + center(bold("The Vision"))])
-    t += 0.8
+    ev.append([t, "o", move(10, 1) + center(dim("TL;DR"))])
+    t += 0.3
+    ev.append([t, "o", move(11, 1) + center(bold("The Vision"))])
+    t += 1.2
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
 
     # Timeline
     timeline = [
@@ -384,19 +388,19 @@ def gen_short_f() -> None:
     for year, clr, algo, note in timeline:
         ev.append([round(t, 3), "o",
                     f"  {c(clr, year)}  {c(clr, algo):<42}  {dim(note)}\r\n"])
-        t += 0.35
+        t += 0.6
 
-    t += 0.3
+    t += 0.5
     t = output_line(ev, t, "")
     t = output_line(ev, t, bold("  every era said \"this is fine.\""))
-    t += 0.3
+    t += 0.6
     t = output_line(ev, t, bold("  we're the first ones building the exit."))
-    t += 1.8
+    t += 3.0
 
     ev.append([t, "o", clear()])
-    t += 0.2
+    t += 0.3
     ev.append([t, "o", move(11, 1) + center(cyan("pki") + dim(" — from MD5 to ML-DSA and beyond"))])
-    t += 1.5
+    t += 2.5
     ev.append([t, "o", ""])
 
     write_cast("short-f-vision.cast", "TL;DR: The Vision", ev)
