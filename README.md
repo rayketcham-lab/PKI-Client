@@ -13,7 +13,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 | [The Audit](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=audit) | Security auditor reviews expired RSA, hybrid, and PQC certificates |
 | [The Renewal](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=renewal) | Cron catches an expiring cert — full renewal workflow |
 | [The Migration](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=migration) | PKI architect presents the RSA → Hybrid → PQC roadmap |
-| [The Pipeline](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=pipeline) | CI/CD cert validation — automated checks before deploy |
+| [The Build](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=build) | 20 lines of TOML. One command. Full PQC hierarchy from scratch |
 | [The Handoff](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=handoff) | Senior engineer onboards a new team member |
 | [The Vision](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=vision) | From MD5 to 2050 — the past, present, and future of PKI |
 
