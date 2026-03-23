@@ -45,20 +45,6 @@
   .stat-label { font-size: 0.75rem; color: #667; text-transform: uppercase; letter-spacing: 0.05em; }
   .demo-section { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
   .section-title { text-align: center; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.15em; color: #556; margin-bottom: 1.5rem; }
-  .mode-toggle { display: flex; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
-  .mode-btn {
-    padding: 0.5rem 1.2rem;
-    background: #111827;
-    border: 1px solid #1f2937;
-    color: #9ca3af;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-family: inherit;
-    transition: all 0.2s;
-  }
-  .mode-btn:first-child { border-radius: 6px 0 0 6px; }
-  .mode-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
-  .mode-btn.active { background: rgba(0, 212, 255, 0.15); border-color: #00d4ff; color: #00d4ff; font-weight: 600; }
   .demo-tabs { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
   .demo-tab {
     padding: 0.6rem 1.2rem;
@@ -83,6 +69,26 @@
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 212, 255, 0.05);
   }
   #player { width: 100%; }
+  .shorts { max-width: 1100px; margin: 3rem auto; padding: 0 1rem; }
+  .shorts-header { text-align: center; margin-bottom: 0.5rem; }
+  .shorts-header h2 { font-size: 1.8rem; font-weight: 800; color: #fff; letter-spacing: 0.15em; text-transform: uppercase; }
+  .shorts-header h2 span { color: #ff4da6; }
+  .shorts-subtitle { text-align: center; color: #667; font-size: 0.9rem; margin-bottom: 2rem; font-style: italic; }
+  .shorts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; }
+  .short-card {
+    background: #111827; border: 1px solid #1f2937; border-radius: 12px; overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .short-card:hover { border-color: #ff4da6; box-shadow: 0 0 20px rgba(255, 77, 166, 0.15); }
+  .short-player { width: 100%; border-bottom: 1px solid #1f2937; }
+  .short-meta { padding: 1rem 1.2rem; }
+  .short-meta h3 { color: #ff4da6; font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .short-meta p { color: #9ca3af; font-size: 0.82rem; line-height: 1.4; }
+  .short-meta .short-duration { display: inline-block; margin-top: 0.4rem; padding: 0.15rem 0.5rem; background: rgba(255, 77, 166, 0.1); border-radius: 4px; font-size: 0.7rem; color: #ff4da6; font-weight: 600; }
+  .shorts-divider {
+    max-width: 1100px; margin: 3rem auto 0; padding: 0 1rem;
+    border-top: 1px solid #1a2a3a;
+  }
   .suite { max-width: 1100px; margin: 3rem auto; padding: 0 1rem; }
   .suite-header { text-align: center; margin-bottom: 2rem; }
   .suite-header h2 { font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem; }
@@ -129,10 +135,6 @@
 
 <div class="demo-section">
   <div class="section-title">Choose a Scenario</div>
-  <div class="mode-toggle">
-    <button class="mode-btn active" id="mode-full" onclick="setMode('full')">Full Demo</button>
-    <button class="mode-btn" id="mode-short" onclick="setMode('short')">TL;DR (10s)</button>
-  </div>
   <div class="demo-tabs" id="tabs"></div>
   <div class="demo-info">
     <h2 id="demo-title">The Audit</h2>
@@ -141,6 +143,16 @@
   <div class="player-wrapper">
     <div id="player"></div>
   </div>
+</div>
+
+<div class="shorts-divider"></div>
+
+<div class="shorts">
+  <div class="shorts-header">
+    <h2><span>SHORTS</span></h2>
+  </div>
+  <div class="shorts-subtitle">The TL;DR version. 10 seconds. Honest IT humor. No time wasted.</div>
+  <div class="shorts-grid" id="shorts-grid"></div>
 </div>
 
 <div class="suite">
@@ -219,14 +231,13 @@ var demos = [
   { key: 'handoff', icon: '\uD83C\uDF93', label: 'The Handoff',
     file: 'demos/story-e-handoff.cast', short: 'demos/short-e-handoff.cast',
     desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.',
-    shortDesc: '"How do I check if the cert is good?" One command. "...that\'s it?" That\'s it.' },
+    shortDesc: '"How do I check the cert?" One command. "...that\'s it?" That\'s it.' },
   { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision',
     file: 'demos/story-f-vision.cast', short: 'demos/short-f-vision.cast',
     desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.',
-    shortDesc: 'Every era said "this is fine." We\'re the first ones building the exit.' }
+    shortDesc: 'Every era said "this is fine." We\'re building the exit.' }
 ];
 
-var currentMode = 'full';
 var currentKey = 'audit';
 
 var tabsEl = document.getElementById('tabs');
@@ -239,13 +250,6 @@ demos.forEach(function(d, i) {
   tabsEl.appendChild(btn);
 });
 
-function setMode(mode) {
-  currentMode = mode;
-  document.getElementById('mode-full').className = 'mode-btn' + (mode === 'full' ? ' active' : '');
-  document.getElementById('mode-short').className = 'mode-btn' + (mode === 'short' ? ' active' : '');
-  loadDemo(currentKey);
-}
-
 function loadDemo(key) {
   currentKey = key;
   var demo = demos.filter(function(d) { return d.key === key; })[0];
@@ -253,27 +257,58 @@ function loadDemo(key) {
   for (var i = 0; i < buttons.length; i++) {
     buttons[i].className = buttons[i].getAttribute('data-key') === key ? 'demo-tab active' : 'demo-tab';
   }
-  var isShort = currentMode === 'short';
-  var titleSuffix = isShort ? ' (TL;DR)' : '';
-  document.getElementById('demo-title').textContent = demo.label + titleSuffix;
-  document.getElementById('demo-desc').textContent = isShort ? demo.shortDesc : demo.desc;
-  var castFile = isShort ? demo.short : demo.file;
-  var rows = isShort ? 24 : 40;
+  document.getElementById('demo-title').textContent = demo.label;
+  document.getElementById('demo-desc').textContent = demo.desc;
   var container = document.getElementById('player');
   while (container.firstChild) { container.removeChild(container.firstChild); }
-  AsciinemaPlayer.create(castFile, container, {
+  AsciinemaPlayer.create(demo.file, container, {
     theme: 'monokai', speed: 1.0, idleTimeLimit: 3,
-    fit: 'width', cols: 120, rows: rows, autoPlay: true, loop: isShort
+    fit: 'width', cols: 120, rows: 40, autoPlay: true
+  });
+}
+
+function initShorts() {
+  var grid = document.getElementById('shorts-grid');
+  demos.forEach(function(d) {
+    var card = document.createElement('div');
+    card.className = 'short-card';
+
+    var playerDiv = document.createElement('div');
+    playerDiv.className = 'short-player';
+    card.appendChild(playerDiv);
+
+    var meta = document.createElement('div');
+    meta.className = 'short-meta';
+
+    var h3 = document.createElement('h3');
+    h3.textContent = d.icon + ' ' + d.label;
+    meta.appendChild(h3);
+
+    var p = document.createElement('p');
+    p.textContent = d.shortDesc;
+    meta.appendChild(p);
+
+    var dur = document.createElement('span');
+    dur.className = 'short-duration';
+    dur.textContent = '\u25B6 ~10s \u00B7 loops';
+    meta.appendChild(dur);
+
+    card.appendChild(meta);
+    grid.appendChild(card);
+
+    AsciinemaPlayer.create(d.short, playerDiv, {
+      theme: 'monokai', speed: 1.0, idleTimeLimit: 1,
+      fit: 'width', cols: 120, rows: 24, autoPlay: false, loop: true
+    });
   });
 }
 
 window.addEventListener('DOMContentLoaded', function() {
   var params = new URLSearchParams(window.location.search);
   var requested = params.get('demo');
-  var mode = params.get('mode');
-  if (mode === 'short') { setMode('short'); }
   var valid = demos.some(function(d) { return d.key === requested; });
   loadDemo(valid ? requested : 'audit');
+  initShorts();
 });
 </script>
 </body>
