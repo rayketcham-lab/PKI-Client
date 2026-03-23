@@ -323,7 +323,7 @@ def phase_training(t: float) -> float:
     t += 0.3
 
     # ── Section 1: Batch Signing Limits ──────────────────────────────────────
-    add(t, section_box(2, 8, 52, "1  BATCH SIGNING LIMITS"))
+    add(t, section_box(2, 4, 112, "1  BATCH SIGNING LIMITS"))
     t += 0.6
 
     bullets_1 = [
@@ -335,12 +335,12 @@ def phase_training(t: float) -> float:
     ]
 
     for i, b in enumerate(bullets_1):
-        add(t, mv(6 + i * 2, 10) + b)
+        add(t, mv(6 + i * 2, 8) + b)
         t += 1.2
 
     # API example
     t += 0.5
-    add(t, mv(17, 10) + dim("Example request:"))
+    add(t, mv(17, 8) + dim("Example request:"))
     t += 0.3
     api_lines = [
         cyan("POST") + " /api/v1/sign/batch",
@@ -352,20 +352,20 @@ def phase_training(t: float) -> float:
         "  }",
     ]
     for i, line in enumerate(api_lines):
-        add(t, mv(18 + i, 12) + line)
+        add(t, mv(18 + i, 10) + line)
         t += 0.25
 
     t += 0.3
-    add(t, mv(26, 12) + yellow("⚠") + dim("  Server rejects if files.len() > 10"))
+    add(t, mv(26, 8) + yellow("⚠") + dim("  Server rejects if files.len() > 10"))
     t += 3.0
     add(t, clr())
     t += 0.3
 
     # ── Section 2: Signing Types ─────────────────────────────────────────────
-    add(t, section_box(2, 8, 52, "2  SIGNING TYPES"))
+    add(t, section_box(2, 4, 112, "2  SIGNING TYPES"))
     t += 0.6
 
-    add(t, mv(6, 10) + bold("Arbitrary File Signing") + dim("  (hash-based, any file)"))
+    add(t, mv(6, 8) + bold("Arbitrary File Signing") + dim("  (hash-based, any file)"))
     t += 0.5
     arb = [
         green("✓") + "  Configs, firmware, containers, scripts, images",
@@ -373,11 +373,11 @@ def phase_training(t: float) -> float:
         green("✓") + "  Detached signature: " + dim("file.bin") + " + " + cyan("file.bin.sig"),
     ]
     for i, b in enumerate(arb):
-        add(t, mv(8 + i * 2, 12) + b)
+        add(t, mv(8 + i * 2, 10) + b)
         t += 1.0
 
     t += 1.2
-    add(t, mv(15, 10) + bold("PE / Authenticode") + dim("  (Windows executables)"))
+    add(t, mv(15, 8) + bold("PE / Authenticode") + dim("  (Windows executables)"))
     t += 0.5
     pe = [
         green("✓") + "  .exe  .dll  .sys  .msi  .cab  .appx  .ps1",
@@ -386,17 +386,17 @@ def phase_training(t: float) -> float:
         yellow("⚠") + "  " + bold("Timestamping required") + " — certs expire, timestamps don't",
     ]
     for i, b in enumerate(pe):
-        add(t, mv(17 + i * 2, 12) + b)
+        add(t, mv(17 + i * 2, 10) + b)
         t += 1.0
 
     t += 0.8
-    add(t, mv(26, 12) + dim("Verify offline:  ") + green("$ ") + cyan("pki verify") + " app.exe --authenticode")
+    add(t, mv(26, 8) + dim("Verify offline:  ") + green("$ ") + cyan("pki verify") + " app.exe --authenticode")
     t += 3.0
     add(t, clr())
     t += 0.3
 
     # ── Section 3: Service Responsibility ─────────────────────────────────────
-    add(t, section_box(2, 8, 52, "3  SERVICE RESPONSIBILITY"))
+    add(t, section_box(2, 4, 112, "3  SERVICE RESPONSIBILITY"))
     t += 0.6
 
     responsibilities = [
@@ -419,11 +419,11 @@ def phase_training(t: float) -> float:
 
     row = 6
     for title, line1, line2 in responsibilities:
-        add(t, mv(row, 10) + cyan("▸ ") + bold(title))
+        add(t, mv(row, 8) + cyan("▸ ") + bold(title))
         t += 0.5
-        add(t, mv(row + 1, 14) + c("0;37", line1))
+        add(t, mv(row + 1, 12) + c("0;37", line1))
         t += 0.4
-        add(t, mv(row + 2, 14) + dim(line2))
+        add(t, mv(row + 2, 12) + dim(line2))
         t += 1.0
         row += 4
 
@@ -432,7 +432,7 @@ def phase_training(t: float) -> float:
     t += 0.3
 
     # ── Section 4: Preflight Checklist ────────────────────────────────────────
-    add(t, section_box(2, 8, 52, "4  BEFORE YOU SHIP — CHECKLIST"))
+    add(t, section_box(2, 4, 112, "4  BEFORE YOU SHIP — CHECKLIST"))
     t += 0.6
 
     checks = [
@@ -447,11 +447,11 @@ def phase_training(t: float) -> float:
     ]
 
     for i, text in enumerate(checks):
-        add(t, mv(6 + i * 2, 10) + green("☑") + "  " + text)
+        add(t, mv(6 + i * 2, 8) + green("☑") + "  " + text)
         t += 0.8
 
     t += 1.0
-    add(t, mv(24, 10) + bold("All green?  ") + green("Ship it."))
+    add(t, mv(24, 8) + bold("All green?  ") + green("Ship it."))
     t += 3.5
     add(t, clr())
     t += 0.5
@@ -492,9 +492,9 @@ def phase_pitch(t: float) -> float:
 
     row = 9
     for cmd, desc in cmds:
-        add(t, mv(row, 10) + cmd)
+        add(t, mv(row, 8) + cmd)
         t += 0.5
-        add(t, mv(row + 1, 12) + dim(desc))
+        add(t, mv(row + 1, 10) + dim(desc))
         t += 1.0
         row += 3
 
@@ -515,7 +515,7 @@ def phase_pitch(t: float) -> float:
     ]
 
     for i, (name, desc) in enumerate(suite):
-        add(t, mv(17 + i * 2, 16) + cyan(f"{name:<24}") + dim(desc))
+        add(t, mv(17 + i * 2, 10) + cyan(f"{name:<24}") + dim(desc))
         t += 0.6
 
     t += 1.0
