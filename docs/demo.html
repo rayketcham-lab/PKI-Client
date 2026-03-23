@@ -3,36 +3,224 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PKI Client v0.6.9 — The Quantum Migration</title>
+<title>PKI Client — Live Demos</title>
 <link rel="stylesheet" type="text/css" href="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.css" />
 <style>
-  body { background: #1a1a2e; margin: 0; padding: 2rem; font-family: system-ui; color: #e0e0e0; }
-  h1 { text-align: center; color: #00d4ff; margin-bottom: 0.5rem; }
-  p { text-align: center; color: #888; margin-bottom: 2rem; }
-  #player { max-width: 960px; margin: 0 auto; }
-  a { color: #00d4ff; }
-  .footer { text-align: center; margin-top: 2rem; font-size: 0.9rem; color: #666; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a1a;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+  .hero {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+    background: linear-gradient(180deg, #0d1b2a 0%, #0a0a1a 100%);
+    border-bottom: 1px solid #1a2a3a;
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: #00d4ff;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+  }
+  .hero h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+  .hero h1 span { color: #00d4ff; }
+  .hero p { color: #8899aa; font-size: 1.1rem; max-width: 600px; margin: 0 auto 1.5rem; }
+  .hero-stats { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1rem; }
+  .stat { text-align: center; }
+  .stat-value { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+  .stat-label { font-size: 0.75rem; color: #667; text-transform: uppercase; letter-spacing: 0.05em; }
+  .demo-section { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+  .section-title { text-align: center; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.15em; color: #556; margin-bottom: 1.5rem; }
+  .demo-tabs { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
+  .demo-tab {
+    padding: 0.6rem 1.2rem;
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+  .demo-tab:hover { border-color: #00d4ff; color: #e0e0e0; background: #1a2332; }
+  .demo-tab.active { background: rgba(0, 212, 255, 0.1); border-color: #00d4ff; color: #00d4ff; font-weight: 600; }
+  .demo-info { text-align: center; margin-bottom: 1.5rem; min-height: 3.5rem; }
+  .demo-info h2 { font-size: 1.3rem; color: #fff; margin-bottom: 0.3rem; }
+  .demo-info p { color: #667; font-size: 0.9rem; }
+  .player-wrapper {
+    max-width: 1000px; margin: 0 auto;
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid #1f2937;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 212, 255, 0.05);
+  }
+  #player { width: 100%; }
+  .suite { max-width: 1100px; margin: 3rem auto; padding: 0 1rem; }
+  .suite-header { text-align: center; margin-bottom: 2rem; }
+  .suite-header h2 { font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem; }
+  .suite-header p { color: #667; }
+  .suite-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+  .suite-card {
+    background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 1.5rem; transition: border-color 0.2s;
+  }
+  .suite-card:hover { border-color: #00d4ff; }
+  .suite-card h3 { color: #00d4ff; font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .suite-card .desc { color: #9ca3af; font-size: 0.9rem; margin-bottom: 0.8rem; line-height: 1.5; }
+  .suite-card .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .tag { padding: 0.2rem 0.5rem; background: rgba(0, 212, 255, 0.08); border-radius: 4px; font-size: 0.72rem; color: #00d4ff; }
+  .install { max-width: 700px; margin: 2rem auto 3rem; text-align: center; padding: 0 1rem; }
+  .install-box {
+    background: #111827; border: 1px solid #1f2937; border-radius: 8px;
+    padding: 1rem 1.5rem; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem; color: #00d4ff; text-align: left;
+  }
+  .install-box .prompt { color: #22c55e; }
+  .install-box .cmd { color: #e0e0e0; }
+  .footer { text-align: center; padding: 2rem 1rem; border-top: 1px solid #1a2a3a; color: #445; font-size: 0.8rem; }
+  .footer a { color: #00d4ff; text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 1.8rem; }
+    .demo-tab { padding: 0.5rem 0.8rem; font-size: 0.78rem; }
+  }
 </style>
 </head>
 <body>
-<h1>PKI Client v0.6.9 — The Quantum Migration</h1>
-<p>From RSA to Post-Quantum: A QuantumNexum Story</p>
-<div id="player"></div>
-<div class="footer">
-  <p><a href="https://github.com/rayketcham-lab/PKI-Client">GitHub</a> |
-  Install: <code>curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash</code></p>
+
+<div class="hero">
+  <div class="hero-badge">Post-Quantum Ready</div>
+  <h1><span>PKI</span> Client</h1>
+  <p>Modern certificate operations in one binary. Inspect, lint, diff, probe, enroll &mdash; from RSA to ML-DSA-87.</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-value">19</div><div class="stat-label">Commands</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Dependencies</div></div>
+    <div class="stat"><div class="stat-value">6</div><div class="stat-label">PQC Algorithms</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Protocols</div></div>
+  </div>
 </div>
+
+<div class="demo-section">
+  <div class="section-title">Choose a Scenario</div>
+  <div class="demo-tabs" id="tabs"></div>
+  <div class="demo-info">
+    <h2 id="demo-title">The Audit</h2>
+    <p id="demo-desc"></p>
+  </div>
+  <div class="player-wrapper">
+    <div id="player"></div>
+  </div>
+</div>
+
+<div class="suite">
+  <div class="suite-header">
+    <h2>The QuantumNexum PKI Suite</h2>
+    <p>Three tools. One mission. Quantum-safe infrastructure.</p>
+  </div>
+  <div class="suite-grid">
+    <div class="suite-card">
+      <h3>PKI-Client</h3>
+      <div class="desc">Certificate inspection, TLS probing, key management, and enrollment protocols in a single static binary.</div>
+      <div class="tags">
+        <span class="tag">19 Commands</span>
+        <span class="tag">Pure Rust</span>
+        <span class="tag">ACME / EST / SCEP</span>
+        <span class="tag">ML-DSA</span>
+        <span class="tag">SLH-DSA</span>
+      </div>
+    </div>
+    <div class="suite-card">
+      <h3>PKI-Signing-Service</h3>
+      <div class="desc">Code signing, document signing, and timestamping across classical and post-quantum algorithms.</div>
+      <div class="tags">
+        <span class="tag">Multi-Algorithm</span>
+        <span class="tag">Audit Logging</span>
+        <span class="tag">REST API</span>
+        <span class="tag">FIPS 140-3</span>
+      </div>
+    </div>
+    <div class="suite-card">
+      <h3>PKI-CA-Engine</h3>
+      <div class="desc">Certificate Authority as code. Declarative hierarchy, automated issuance, policy enforcement.</div>
+      <div class="tags">
+        <span class="tag">Declarative TOML</span>
+        <span class="tag">Automated Lifecycle</span>
+        <span class="tag">Post-Quantum</span>
+        <span class="tag">FIPS Ready</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="install">
+  <div class="install-box">
+    <span class="prompt">$</span> <span class="cmd">curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash</span>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="https://github.com/rayketcham-lab/PKI-Client">GitHub</a> &middot;
+  <a href="https://github.com/rayketcham-lab/PKI-Client/releases">Releases</a> &middot;
+  <a href="https://github.com/rayketcham-lab/PKI-Client/issues">Issues</a>
+  <br><br>
+  Built by <a href="https://github.com/rayketcham-lab">QuantumNexum</a>
+</div>
+
 <script src="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.min.js"></script>
 <script>
-  AsciinemaPlayer.create('pki-demo.cast', document.getElementById('player'), {
-    theme: 'monokai',
-    speed: 1.0,
-    idleTimeLimit: 2,
-    fit: 'width',
-    cols: 120,
-    rows: 35,
-    autoPlay: true
+var demos = [
+  { key: 'audit', icon: '\uD83D\uDD0D', label: 'The Audit', file: 'demos/story-a-audit.cast',
+    desc: 'Security auditor reviews expired RSA, hybrid transition, and post-quantum certificates.' },
+  { key: 'incident', icon: '\uD83D\uDEA8', label: 'The Incident', file: 'demos/story-b-incident.cast',
+    desc: '3AM alert \u2014 on-call engineer triages an expired cert and confirms the PQC replacement.' },
+  { key: 'migration', icon: '\uD83D\uDDFA\uFE0F', label: 'The Migration', file: 'demos/story-c-migration.cast',
+    desc: 'PKI architect presents the quantum migration roadmap: RSA \u2192 Hybrid \u2192 ML-DSA-87.' },
+  { key: 'pipeline', icon: '\u2699\uFE0F', label: 'The Pipeline', file: 'demos/story-d-pipeline.cast',
+    desc: 'CI/CD certificate validation \u2014 every cert checked and linted before deployment.' },
+  { key: 'handoff', icon: '\uD83C\uDF93', label: 'The Handoff', file: 'demos/story-e-handoff.cast',
+    desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.' }
+];
+
+var tabsEl = document.getElementById('tabs');
+demos.forEach(function(d, i) {
+  var btn = document.createElement('button');
+  btn.className = 'demo-tab' + (i === 0 ? ' active' : '');
+  btn.textContent = d.icon + ' ' + d.label;
+  btn.setAttribute('data-key', d.key);
+  btn.addEventListener('click', function() { loadDemo(d.key); });
+  tabsEl.appendChild(btn);
+});
+
+function loadDemo(key) {
+  var demo = demos.filter(function(d) { return d.key === key; })[0];
+  var buttons = document.querySelectorAll('.demo-tab');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].className = buttons[i].getAttribute('data-key') === key ? 'demo-tab active' : 'demo-tab';
+  }
+  document.getElementById('demo-title').textContent = demo.label;
+  document.getElementById('demo-desc').textContent = demo.desc;
+  var container = document.getElementById('player');
+  while (container.firstChild) { container.removeChild(container.firstChild); }
+  AsciinemaPlayer.create(demo.file, container, {
+    theme: 'monokai', speed: 1.0, idleTimeLimit: 3,
+    fit: 'width', cols: 120, rows: 40, autoPlay: true
   });
+}
+
+window.addEventListener('DOMContentLoaded', function() { loadDemo('audit'); });
 </script>
 </body>
 </html>
