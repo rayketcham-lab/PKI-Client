@@ -6,6 +6,16 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 
 [![Watch Demo](https://img.shields.io/badge/▶_Watch_Demo-in_browser-d40000?style=for-the-badge&logo=asciinema)](https://rayketcham-lab.github.io/PKI-Client/demo.html)
 
+### Demos
+
+| Scenario | Description |
+|----------|-------------|
+| [The Audit](docs/demos/story-a-audit.cast) | Security auditor reviews expired RSA, hybrid, and PQC certificates |
+| [The Incident](docs/demos/story-b-incident.cast) | 3AM alert — on-call engineer triages an expired cert |
+| [The Migration](docs/demos/story-c-migration.cast) | PKI architect presents the RSA → Hybrid → PQC roadmap |
+| [The Pipeline](docs/demos/story-d-pipeline.cast) | CI/CD cert validation — automated checks before deploy |
+| [The Handoff](docs/demos/story-e-handoff.cast) | Senior engineer onboards a new team member |
+
 ---
 
 ### Project Health
