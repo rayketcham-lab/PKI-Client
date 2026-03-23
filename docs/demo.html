@@ -220,7 +220,12 @@ function loadDemo(key) {
   });
 }
 
-window.addEventListener('DOMContentLoaded', function() { loadDemo('audit'); });
+window.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(window.location.search);
+  var requested = params.get('demo');
+  var valid = demos.some(function(d) { return d.key === requested; });
+  loadDemo(valid ? requested : 'audit');
+});
 </script>
 </body>
 </html>

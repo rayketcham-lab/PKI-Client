@@ -10,11 +10,11 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 
 | Scenario | Description |
 |----------|-------------|
-| [The Audit](docs/demos/story-a-audit.cast) | Security auditor reviews expired RSA, hybrid, and PQC certificates |
-| [The Incident](docs/demos/story-b-incident.cast) | 3AM alert — on-call engineer triages an expired cert |
-| [The Migration](docs/demos/story-c-migration.cast) | PKI architect presents the RSA → Hybrid → PQC roadmap |
-| [The Pipeline](docs/demos/story-d-pipeline.cast) | CI/CD cert validation — automated checks before deploy |
-| [The Handoff](docs/demos/story-e-handoff.cast) | Senior engineer onboards a new team member |
+| [The Audit](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=audit) | Security auditor reviews expired RSA, hybrid, and PQC certificates |
+| [The Incident](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=incident) | 3AM alert — on-call engineer triages an expired cert |
+| [The Migration](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=migration) | PKI architect presents the RSA → Hybrid → PQC roadmap |
+| [The Pipeline](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=pipeline) | CI/CD cert validation — automated checks before deploy |
+| [The Handoff](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=handoff) | Senior engineer onboards a new team member |
 
 ---
 
