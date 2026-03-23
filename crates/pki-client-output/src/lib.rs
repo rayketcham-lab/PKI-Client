@@ -596,18 +596,92 @@ fn get_ec_curve(cert: &x509_parser::certificate::X509Certificate) -> (String, u3
     }
 }
 
-/// Extract RSA modulus and exponent.
+/// Parse RSA modulus and exponent from the SubjectPublicKey BIT STRING content.
+///
+/// The data is DER-encoded: `SEQUENCE { INTEGER (modulus), INTEGER (exponent) }`.
+/// Returns `(modulus_hex_uppercase, exponent)` or `None` if parsing fails.
+fn parse_rsa_spk(data: &[u8]) -> (Option<String>, Option<u32>) {
+    // Need at least SEQUENCE tag+len + INTEGER tag+len
+    if data.len() < 10 || data[0] != 0x30 {
+        return (None, None);
+    }
+
+    // Skip SEQUENCE header
+    let (seq_hdr, ok) = skip_der_tag_length(data);
+    if !ok {
+        return (None, None);
+    }
+    let inner = &data[seq_hdr..];
+
+    // First INTEGER: modulus
+    if inner.is_empty() || inner[0] != 0x02 {
+        return (None, None);
+    }
+    let (mod_hdr, ok) = skip_der_tag_length(inner);
+    if !ok {
+        return (None, None);
+    }
+    let mod_len = parse_der_length(&inner[1..]);
+    if mod_len == 0 || mod_hdr + mod_len > inner.len() {
+        return (None, None);
+    }
+    let mut mod_bytes = &inner[mod_hdr..mod_hdr + mod_len];
+    // Skip leading 0x00 padding (DER sign byte for positive integers)
+    if mod_bytes.len() > 1 && mod_bytes[0] == 0x00 {
+        mod_bytes = &mod_bytes[1..];
+    }
+    let modulus_hex = hex::encode(mod_bytes).to_uppercase();
+
+    // Second INTEGER: exponent
+    let exp_start = mod_hdr + mod_len;
+    if exp_start >= inner.len() || inner[exp_start] != 0x02 {
+        return (Some(modulus_hex), None);
+    }
+    let exp_data = &inner[exp_start..];
+    let (exp_hdr, ok) = skip_der_tag_length(exp_data);
+    if !ok {
+        return (Some(modulus_hex), None);
+    }
+    let exp_len = parse_der_length(&exp_data[1..]);
+    if exp_len == 0 || exp_hdr + exp_len > exp_data.len() {
+        return (Some(modulus_hex), None);
+    }
+    let exp_bytes = &exp_data[exp_hdr..exp_hdr + exp_len];
+    let mut exponent: u32 = 0;
+    for &b in exp_bytes {
+        exponent = exponent.checked_shl(8).unwrap_or(0) | b as u32;
+    }
+
+    (Some(modulus_hex), Some(exponent))
+}
+
+/// Parse a DER length field (starting after the tag byte).
+fn parse_der_length(len_data: &[u8]) -> usize {
+    if len_data.is_empty() {
+        return 0;
+    }
+    let first = len_data[0];
+    if first < 0x80 {
+        first as usize
+    } else {
+        let num_bytes = (first & 0x7f) as usize;
+        if len_data.len() < 1 + num_bytes {
+            return 0;
+        }
+        let mut len = 0usize;
+        for i in 0..num_bytes {
+            len = (len << 8) | len_data[1 + i] as usize;
+        }
+        len
+    }
+}
+
+/// Extract RSA modulus and exponent from an X.509 certificate.
 fn extract_rsa_params(
     cert: &x509_parser::certificate::X509Certificate,
 ) -> (Option<String>, Option<u32>) {
-    // RSA public keys are encoded as SEQUENCE { modulus INTEGER, exponent INTEGER }
     let spk = &cert.public_key().subject_public_key.data;
-    if spk.len() > 10 {
-        // Simplified: just return the hex of the key data
-        (Some(hex::encode(&spk[..64.min(spk.len())])), Some(65537))
-    } else {
-        (None, None)
-    }
+    parse_rsa_spk(spk)
 }
 
 /// Parse key usage flags.
@@ -1004,5 +1078,144 @@ mod tests {
     fn test_format_ip_odd_length() {
         let result = format_ip(&[0xab, 0xcd, 0xef]);
         assert_eq!(result, "abcdef");
+    }
+
+    // ========== parse_rsa_spk ==========
+
+    /// Helper: build DER-encoded RSA SPK from raw modulus bytes and exponent.
+    fn build_rsa_spk_der(modulus: &[u8], exponent: u32) -> Vec<u8> {
+        // Encode modulus INTEGER (add leading 0x00 if high bit set)
+        let needs_pad = modulus[0] & 0x80 != 0;
+        let mod_content_len = modulus.len() + if needs_pad { 1 } else { 0 };
+        let mut mod_int = vec![0x02]; // INTEGER tag
+        encode_der_length(&mut mod_int, mod_content_len);
+        if needs_pad {
+            mod_int.push(0x00);
+        }
+        mod_int.extend_from_slice(modulus);
+
+        // Encode exponent INTEGER
+        let exp_bytes: Vec<u8> = {
+            let be = exponent.to_be_bytes();
+            let start = be.iter().position(|&b| b != 0).unwrap_or(3);
+            be[start..].to_vec()
+        };
+        let mut exp_int = vec![0x02]; // INTEGER tag
+        encode_der_length(&mut exp_int, exp_bytes.len());
+        exp_int.extend_from_slice(&exp_bytes);
+
+        // Wrap in SEQUENCE
+        let seq_content_len = mod_int.len() + exp_int.len();
+        let mut seq = vec![0x30]; // SEQUENCE tag
+        encode_der_length(&mut seq, seq_content_len);
+        seq.extend_from_slice(&mod_int);
+        seq.extend_from_slice(&exp_int);
+        seq
+    }
+
+    /// Helper: encode DER length.
+    fn encode_der_length(buf: &mut Vec<u8>, len: usize) {
+        if len < 0x80 {
+            buf.push(len as u8);
+        } else if len < 0x100 {
+            buf.push(0x81);
+            buf.push(len as u8);
+        } else if len < 0x10000 {
+            buf.push(0x82);
+            buf.push((len >> 8) as u8);
+            buf.push(len as u8);
+        } else {
+            buf.push(0x83);
+            buf.push((len >> 16) as u8);
+            buf.push((len >> 8) as u8);
+            buf.push(len as u8);
+        }
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_2048_modulus_matches_openssl() {
+        // Real RSA 2048 SPK inner SEQUENCE bytes (from openssl-generated cert)
+        let spk_hex = "3082010a0282010100bbfa2bdcd579de46b3d45a44e0b1c2574b8937897b74e4c07a81a89c4502df8d10454b8243882b6594de27f4699655fd9a466faaaaf4297542d048abd6474a9bbca29af581825079d12bdc6651e077c32e98fa0421de1d1bd5b6ec8df72c142e47ada78f9a2b45f2a95b97765b9a711195ac0abbdf11533615facb94625d5a56f2544d2377d67756298b22bbbc75a6a16178bbe2a0239283b771433d6deb13e472d747db2fc89637eaefb310cd78bc576e3629fab17c0b77a1597ab7569df34100ccdc7d5b932a9ef2390a18cfe21598f687db0cc986ba315af458e52a7e3f4988cde47aff531a35cc2be427d6958df3bae962985355a4f8c73a6fe9166ec8c30203010001";
+        let spk_bytes = hex::decode(spk_hex).unwrap();
+
+        let (modulus, exponent) = parse_rsa_spk(&spk_bytes);
+
+        let expected_modulus = "BBFA2BDCD579DE46B3D45A44E0B1C2574B8937897B74E4C07A81A89C4502DF8D10454B8243882B6594DE27F4699655FD9A466FAAAAF4297542D048ABD6474A9BBCA29AF581825079D12BDC6651E077C32E98FA0421DE1D1BD5B6EC8DF72C142E47ADA78F9A2B45F2A95B97765B9A711195AC0ABBDF11533615FACB94625D5A56F2544D2377D67756298B22BBBC75A6A16178BBE2A0239283B771433D6DEB13E472D747DB2FC89637EAEFB310CD78BC576E3629FAB17C0B77A1597AB7569DF34100CCDC7D5B932A9EF2390A18CFE21598F687DB0CC986BA315AF458E52A7E3F4988CDE47AFF531A35CC2BE427D6958DF3BAE962985355A4F8C73A6FE9166EC8C3";
+        assert_eq!(modulus.as_deref(), Some(expected_modulus));
+        assert_eq!(exponent, Some(65537));
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_4096_modulus_matches_openssl() {
+        // Real RSA 4096 SPK inner SEQUENCE bytes
+        let spk_hex = "3082020a0282020100f43f2d8c931e9542498a75b9091e4ee972761a2531c603f7a6b76bb8cff7f8a2f6725ec8006412c33c2aaab7e509c96614c1b8389cf9c40a22ead36d4f42d7c1eb022eb09f01cd9f6fd61b3bcb5cf8736b408e2b309b207c44273204e9857d3ca867cf44d0315188bda8d086efff8867a895da040b24f4ecab62279a491de4b861defe2785e9d53d97607da476c1e63d93d5119a6a91b461c7261e9bc588ac1d1b355b420af9c1a84ad008bc2d7d271d43dc12f2d17af1f0712da60b840a9013bee11225c43d4bc45726f231d734758a3375e7aed53961d45c863fcb57e6c161df35b137f8651bb919e5b65ce4b3e40a28e45f9055d19bcc0720e2274cd0fdc41652c5f8e67a66ad6f0ed2192ec62f2ba9238235c4d5ec6a76cdab64d2da7e32b263d8faa05d7a0ac28ad4ae7fd5bfff5884db18835924a61487b42e878569e31b2a2364f3c72c914bb44e62a0eb68e5a883c3c0fb3bb0e59eceba02036bb9f3cf30e7296c75a334f249b9d6028862603b6519cb380b4c4f63b96feb5dfd0a20b7a993b85c18fca3e38b2c8e89b17ec2fbcaac4f48fadeaaada40b3c5e366b24ce0af4a57e888e2f58669158a3b1bb4cb53f1b45fb6796cbe287ba9ebd16d83903045bb2302b9416d48806f4d3029bceb357f31c3b773f87b9d64aefe5be365dc07901b5d13da33f99d7a8723726419e93aee302201b5be0cb2450d4b3c24c6f0203010001";
+        let spk_bytes = hex::decode(spk_hex).unwrap();
+
+        let (modulus, exponent) = parse_rsa_spk(&spk_bytes);
+
+        let expected_modulus = "F43F2D8C931E9542498A75B9091E4EE972761A2531C603F7A6B76BB8CFF7F8A2F6725EC8006412C33C2AAAB7E509C96614C1B8389CF9C40A22EAD36D4F42D7C1EB022EB09F01CD9F6FD61B3BCB5CF8736B408E2B309B207C44273204E9857D3CA867CF44D0315188BDA8D086EFFF8867A895DA040B24F4ECAB62279A491DE4B861DEFE2785E9D53D97607DA476C1E63D93D5119A6A91B461C7261E9BC588AC1D1B355B420AF9C1A84AD008BC2D7D271D43DC12F2D17AF1F0712DA60B840A9013BEE11225C43D4BC45726F231D734758A3375E7AED53961D45C863FCB57E6C161DF35B137F8651BB919E5B65CE4B3E40A28E45F9055D19BCC0720E2274CD0FDC41652C5F8E67A66AD6F0ED2192EC62F2BA9238235C4D5EC6A76CDAB64D2DA7E32B263D8FAA05D7A0AC28AD4AE7FD5BFFF5884DB18835924A61487B42E878569E31B2A2364F3C72C914BB44E62A0EB68E5A883C3C0FB3BB0E59ECEBA02036BB9F3CF30E7296C75A334F249B9D6028862603B6519CB380B4C4F63B96FEB5DFD0A20B7A993B85C18FCA3E38B2C8E89B17EC2FBCAAC4F48FADEAAADA40B3C5E366B24CE0AF4A57E888E2F58669158A3B1BB4CB53F1B45FB6796CBE287BA9EBD16D83903045BB2302B9416D48806F4D3029BCEB357F31C3B773F87B9D64AEFE5BE365DC07901B5D13DA33F99D7A8723726419E93AEE302201B5BE0CB2450D4B3C24C6F";
+        assert_eq!(modulus.as_deref(), Some(expected_modulus));
+        assert_eq!(exponent, Some(65537));
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_exponent_3() {
+        // Construct a small synthetic RSA SPK with exponent 3
+        let mod_bytes = vec![0xAB; 128]; // fake 1024-bit modulus (high bit set)
+        let spk = build_rsa_spk_der(&mod_bytes, 3);
+
+        let (modulus, exponent) = parse_rsa_spk(&spk);
+
+        let expected_hex = "AB".repeat(128);
+        assert_eq!(modulus.as_deref(), Some(expected_hex.as_str()));
+        assert_eq!(exponent, Some(3));
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_modulus_no_padding_byte() {
+        // Modulus with high bit clear — no 0x00 padding in DER
+        let mod_bytes = vec![0x7F; 64]; // high bit clear
+        let spk = build_rsa_spk_der(&mod_bytes, 65537);
+
+        let (modulus, exponent) = parse_rsa_spk(&spk);
+
+        let expected_hex = "7F".repeat(64);
+        assert_eq!(modulus.as_deref(), Some(expected_hex.as_str()));
+        assert_eq!(exponent, Some(65537));
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_empty_input() {
+        let (modulus, exponent) = parse_rsa_spk(&[]);
+        assert_eq!(modulus, None);
+        assert_eq!(exponent, None);
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_garbage_input() {
+        let (modulus, exponent) = parse_rsa_spk(&[0xFF, 0xFF, 0xFF, 0xFF]);
+        assert_eq!(modulus, None);
+        assert_eq!(exponent, None);
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_too_short() {
+        // Valid SEQUENCE tag but truncated
+        let (modulus, exponent) = parse_rsa_spk(&[0x30, 0x03, 0x02, 0x01, 0x00]);
+        assert_eq!(modulus, None);
+        assert_eq!(exponent, None);
+    }
+
+    #[test]
+    fn test_parse_rsa_spk_uppercase_hex() {
+        // Verify output is uppercase (matching openssl -modulus format)
+        let mod_bytes = vec![0xab; 128];
+        let spk = build_rsa_spk_der(&mod_bytes, 65537);
+        let (modulus, _) = parse_rsa_spk(&spk);
+        let m = modulus.unwrap();
+        // Must be uppercase
+        assert_eq!(m, m.to_uppercase());
+        // Must not contain lowercase
+        assert!(!m.chars().any(|c| c.is_ascii_lowercase()));
     }
 }
