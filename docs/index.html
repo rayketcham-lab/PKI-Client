@@ -437,7 +437,7 @@ footer a:hover { color: var(--text); }
     </a>
     <div class="nav-links">
       <a href="#features">Features</a>
-      <a href="#demo">Demo</a>
+      <a href="demo.html">Demos</a>
       <a href="#commands">Commands</a>
       <a href="#install">Install</a>
       <a href="https://github.com/rayketcham-lab/PKI-Client" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.8rem;">
@@ -558,29 +558,39 @@ footer a:hover { color: var(--text); }
 
 <hr class="divider">
 
-<!-- Live Demo Recording -->
+<!-- Live Demos -->
 <section class="section fade-up" id="video">
-  <div class="section-label">Live Demo</div>
+  <div class="section-label">Live Demos</div>
   <h2>Watch it in action</h2>
-  <p>Install to inspection in 30 seconds. No editing, no tricks — real terminal, real output.</p>
-  <div style="max-width:900px;margin:2rem auto;">
-    <script src="https://asciinema.org/a/pki-demo.js" id="asciicast-pki-demo" async></script>
-    <div id="demo-player"></div>
-    <script>
-      // Fallback: load from local cast file
-      if (typeof AsciinemaPlayer !== 'undefined') {
-        AsciinemaPlayer.create('pki-demo.cast', document.getElementById('demo-player'), {
-          theme: 'monokai',
-          speed: 1.5,
-          idleTimeLimit: 2,
-          cols: 120,
-          rows: 35
-        });
-      }
-    </script>
-    <noscript>
-      <p><a href="pki-demo.cast">Download the terminal recording</a> and play with <code>asciinema play pki-demo.cast</code></p>
-    </noscript>
+  <p>Six real-world scenarios — from auditing expired certs to building a post-quantum PKI from scratch. Full demos or 15-second TL;DRs.</p>
+  <div style="max-width:700px;margin:2rem auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
+    <a href="demo.html?demo=audit" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Audit</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">Expired RSA, hybrid, PQC certs</div>
+    </a>
+    <a href="demo.html?demo=renewal" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Renewal</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">Full cert renewal workflow</div>
+    </a>
+    <a href="demo.html?demo=migration" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Migration</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">RSA to post-quantum roadmap</div>
+    </a>
+    <a href="demo.html?demo=build" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Build</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">PQC hierarchy from TOML</div>
+    </a>
+    <a href="demo.html?demo=handoff" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Handoff</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">Onboarding a new engineer</div>
+    </a>
+    <a href="demo.html?demo=vision" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
+      <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Vision</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">MD5 to ML-DSA to 2050</div>
+    </a>
+  </div>
+  <div style="text-align:center;margin-top:1.5rem;">
+    <a href="demo.html" style="display:inline-block;padding:0.7rem 2rem;background:var(--accent-glow);border:1px solid var(--accent);border-radius:8px;color:var(--accent);text-decoration:none;font-size:0.9rem;font-weight:600;">View All Demos</a>
   </div>
 </section>
 
