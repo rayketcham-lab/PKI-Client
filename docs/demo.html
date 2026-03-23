@@ -184,14 +184,16 @@
 var demos = [
   { key: 'audit', icon: '\uD83D\uDD0D', label: 'The Audit', file: 'demos/story-a-audit.cast',
     desc: 'Security auditor reviews expired RSA, hybrid transition, and post-quantum certificates.' },
-  { key: 'incident', icon: '\uD83D\uDEA8', label: 'The Incident', file: 'demos/story-b-incident.cast',
-    desc: '3AM alert \u2014 on-call engineer triages an expired cert and confirms the PQC replacement.' },
+  { key: 'renewal', icon: '\uD83D\uDD04', label: 'The Renewal', file: 'demos/story-b-renewal.cast',
+    desc: 'Cron job catches an expiring cert. Engineer handles the full renewal workflow.' },
   { key: 'migration', icon: '\uD83D\uDDFA\uFE0F', label: 'The Migration', file: 'demos/story-c-migration.cast',
     desc: 'PKI architect presents the quantum migration roadmap: RSA \u2192 Hybrid \u2192 ML-DSA-87.' },
   { key: 'pipeline', icon: '\u2699\uFE0F', label: 'The Pipeline', file: 'demos/story-d-pipeline.cast',
     desc: 'CI/CD certificate validation \u2014 every cert checked and linted before deployment.' },
   { key: 'handoff', icon: '\uD83C\uDF93', label: 'The Handoff', file: 'demos/story-e-handoff.cast',
-    desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.' }
+    desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.' },
+  { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision', file: 'demos/story-f-vision.cast',
+    desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.' }
 ];
 
 var tabsEl = document.getElementById('tabs');
