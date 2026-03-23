@@ -45,6 +45,20 @@
   .stat-label { font-size: 0.75rem; color: #667; text-transform: uppercase; letter-spacing: 0.05em; }
   .demo-section { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
   .section-title { text-align: center; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.15em; color: #556; margin-bottom: 1.5rem; }
+  .mode-toggle { display: flex; justify-content: center; gap: 0; margin-bottom: 1.5rem; }
+  .mode-btn {
+    padding: 0.5rem 1.2rem;
+    background: #111827;
+    border: 1px solid #1f2937;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .mode-btn:first-child { border-radius: 6px 0 0 6px; }
+  .mode-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+  .mode-btn.active { background: rgba(0, 212, 255, 0.15); border-color: #00d4ff; color: #00d4ff; font-weight: 600; }
   .demo-tabs { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
   .demo-tab {
     padding: 0.6rem 1.2rem;
@@ -115,6 +129,10 @@
 
 <div class="demo-section">
   <div class="section-title">Choose a Scenario</div>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="mode-full" onclick="setMode('full')">Full Demo</button>
+    <button class="mode-btn" id="mode-short" onclick="setMode('short')">TL;DR (10s)</button>
+  </div>
   <div class="demo-tabs" id="tabs"></div>
   <div class="demo-info">
     <h2 id="demo-title">The Audit</h2>
@@ -182,19 +200,34 @@
 <script src="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.min.js"></script>
 <script>
 var demos = [
-  { key: 'audit', icon: '\uD83D\uDD0D', label: 'The Audit', file: 'demos/story-a-audit.cast',
-    desc: 'Security auditor reviews expired RSA, hybrid transition, and post-quantum certificates.' },
-  { key: 'renewal', icon: '\uD83D\uDD04', label: 'The Renewal', file: 'demos/story-b-renewal.cast',
-    desc: 'Cron job catches an expiring cert. Engineer handles the full renewal workflow.' },
-  { key: 'migration', icon: '\uD83D\uDDFA\uFE0F', label: 'The Migration', file: 'demos/story-c-migration.cast',
-    desc: 'PKI architect presents the quantum migration roadmap: RSA \u2192 Hybrid \u2192 ML-DSA-87.' },
-  { key: 'build', icon: '\uD83D\uDD28', label: 'The Build', file: 'demos/story-d-build.cast',
-    desc: '20 lines of TOML. One command. Full post-quantum PKI hierarchy from scratch.' },
-  { key: 'handoff', icon: '\uD83C\uDF93', label: 'The Handoff', file: 'demos/story-e-handoff.cast',
-    desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.' },
-  { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision', file: 'demos/story-f-vision.cast',
-    desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.' }
+  { key: 'audit', icon: '\uD83D\uDD0D', label: 'The Audit',
+    file: 'demos/story-a-audit.cast', short: 'demos/short-a-audit.cast',
+    desc: 'Security auditor reviews expired RSA, hybrid transition, and post-quantum certificates.',
+    shortDesc: '1 dead. 1 dying. 1 fine. Guess which one had the monitoring.' },
+  { key: 'renewal', icon: '\uD83D\uDD04', label: 'The Renewal',
+    file: 'demos/story-b-renewal.cast', short: 'demos/short-b-renewal.cast',
+    desc: 'Cron job catches an expiring cert. Engineer handles the full renewal workflow.',
+    shortDesc: 'Renewal speedrun any%. No yaml. No tickets. No drama.' },
+  { key: 'migration', icon: '\uD83D\uDDFA\uFE0F', label: 'The Migration',
+    file: 'demos/story-c-migration.cast', short: 'demos/short-c-migration.cast',
+    desc: 'PKI architect presents the quantum migration roadmap: RSA \u2192 Hybrid \u2192 ML-DSA-87.',
+    shortDesc: 'RSA? In 2026? Sir, this is a quantum neighborhood.' },
+  { key: 'build', icon: '\uD83D\uDD28', label: 'The Build',
+    file: 'demos/story-d-build.cast', short: 'demos/short-d-build.cast',
+    desc: '20 lines of TOML. One command. Full post-quantum PKI hierarchy from scratch.',
+    shortDesc: '8 lines of TOML. Entire PKI. That\'s it. That\'s the post.' },
+  { key: 'handoff', icon: '\uD83C\uDF93', label: 'The Handoff',
+    file: 'demos/story-e-handoff.cast', short: 'demos/short-e-handoff.cast',
+    desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.',
+    shortDesc: '"How do I check if the cert is good?" One command. "...that\'s it?" That\'s it.' },
+  { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision',
+    file: 'demos/story-f-vision.cast', short: 'demos/short-f-vision.cast',
+    desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.',
+    shortDesc: 'Every era said "this is fine." We\'re the first ones building the exit.' }
 ];
+
+var currentMode = 'full';
+var currentKey = 'audit';
 
 var tabsEl = document.getElementById('tabs');
 demos.forEach(function(d, i) {
@@ -206,25 +239,39 @@ demos.forEach(function(d, i) {
   tabsEl.appendChild(btn);
 });
 
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-full').className = 'mode-btn' + (mode === 'full' ? ' active' : '');
+  document.getElementById('mode-short').className = 'mode-btn' + (mode === 'short' ? ' active' : '');
+  loadDemo(currentKey);
+}
+
 function loadDemo(key) {
+  currentKey = key;
   var demo = demos.filter(function(d) { return d.key === key; })[0];
   var buttons = document.querySelectorAll('.demo-tab');
   for (var i = 0; i < buttons.length; i++) {
     buttons[i].className = buttons[i].getAttribute('data-key') === key ? 'demo-tab active' : 'demo-tab';
   }
-  document.getElementById('demo-title').textContent = demo.label;
-  document.getElementById('demo-desc').textContent = demo.desc;
+  var isShort = currentMode === 'short';
+  var titleSuffix = isShort ? ' (TL;DR)' : '';
+  document.getElementById('demo-title').textContent = demo.label + titleSuffix;
+  document.getElementById('demo-desc').textContent = isShort ? demo.shortDesc : demo.desc;
+  var castFile = isShort ? demo.short : demo.file;
+  var rows = isShort ? 24 : 40;
   var container = document.getElementById('player');
   while (container.firstChild) { container.removeChild(container.firstChild); }
-  AsciinemaPlayer.create(demo.file, container, {
+  AsciinemaPlayer.create(castFile, container, {
     theme: 'monokai', speed: 1.0, idleTimeLimit: 3,
-    fit: 'width', cols: 120, rows: 40, autoPlay: true
+    fit: 'width', cols: 120, rows: rows, autoPlay: true, loop: isShort
   });
 }
 
 window.addEventListener('DOMContentLoaded', function() {
   var params = new URLSearchParams(window.location.search);
   var requested = params.get('demo');
+  var mode = params.get('mode');
+  if (mode === 'short') { setMode('short'); }
   var valid = demos.some(function(d) { return d.key === requested; });
   loadDemo(valid ? requested : 'audit');
 });
