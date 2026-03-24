@@ -51,6 +51,7 @@
     background: #111827;
     border: 1px solid #1f2937;
     border-radius: 8px;
+    text-decoration: none;
     color: #9ca3af;
     cursor: pointer;
     transition: all 0.2s;
@@ -204,20 +205,30 @@ var currentKey = 'taco-tuesday';
 
 var tabsEl = document.getElementById('tabs');
 demos.forEach(function(d, i) {
-  var btn = document.createElement('button');
-  btn.className = 'demo-tab' + (i === 0 ? ' active' : '');
-  btn.textContent = d.icon + ' ' + d.label;
-  btn.setAttribute('data-key', d.key);
-  btn.addEventListener('click', function() { loadDemo(d.key); });
-  tabsEl.appendChild(btn);
+  var link = document.createElement('a');
+  link.className = 'demo-tab' + (i === 0 ? ' active' : '');
+  link.textContent = d.icon + ' ' + d.label;
+  link.setAttribute('data-key', d.key);
+  link.href = '?demo=' + d.key;
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    loadDemo(d.key);
+  });
+  tabsEl.appendChild(link);
 });
 
 function loadDemo(key) {
   currentKey = key;
   var demo = demos.filter(function(d) { return d.key === key; })[0];
-  var buttons = document.querySelectorAll('.demo-tab');
-  for (var i = 0; i < buttons.length; i++) {
-    buttons[i].className = buttons[i].getAttribute('data-key') === key ? 'demo-tab active' : 'demo-tab';
+  if (!demo) return;
+  // Update URL without reload
+  var url = new URL(window.location);
+  url.searchParams.set('demo', key);
+  history.pushState(null, '', url);
+  // Update tabs
+  var tabs = document.querySelectorAll('.demo-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].className = tabs[i].getAttribute('data-key') === key ? 'demo-tab active' : 'demo-tab';
   }
   document.getElementById('demo-title').textContent = demo.label;
   document.getElementById('demo-desc').textContent = demo.desc;
@@ -229,11 +240,19 @@ function loadDemo(key) {
   });
 }
 
+// Handle browser back/forward
+window.addEventListener('popstate', function() {
+  var params = new URLSearchParams(window.location.search);
+  var requested = params.get('demo');
+  var valid = demos.some(function(d) { return d.key === requested; });
+  loadDemo(valid ? requested : 'taco-tuesday');
+});
+
 window.addEventListener('DOMContentLoaded', function() {
   var params = new URLSearchParams(window.location.search);
   var requested = params.get('demo');
   var valid = demos.some(function(d) { return d.key === requested; });
-  loadDemo(valid ? requested : 'audit');
+  loadDemo(valid ? requested : 'taco-tuesday');
 });
 </script>
 </body>
