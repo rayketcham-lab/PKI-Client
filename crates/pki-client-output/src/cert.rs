@@ -596,11 +596,25 @@ impl CertFormatter {
         // RSA Modulus and Exponent
         if cert.key_algorithm_name == "RSA" {
             if let Some(ref modulus) = cert.rsa_modulus {
-                output.push_str(&format!("            {}:\n", "Modulus".dimmed()));
-                // Format modulus in wrapped lines
-                for chunk in modulus.as_bytes().chunks(64) {
+                let total_bytes = modulus.len() / 2;
+                output.push_str(&format!(
+                    "            {} ({} bytes):\n",
+                    "Modulus".dimmed(),
+                    total_bytes
+                ));
+                // Show first 2 lines (128 hex chars) then truncation notice
+                let chunks: Vec<&[u8]> = modulus.as_bytes().chunks(64).collect();
+                let max_lines = 2;
+                for chunk in chunks.iter().take(max_lines) {
                     let line = std::str::from_utf8(chunk).unwrap_or("");
                     output.push_str(&format!("                {}\n", line.dimmed()));
+                }
+                if chunks.len() > max_lines {
+                    output.push_str(&format!(
+                        "                {} ({} more lines, use -f forensic for full)\n",
+                        "...".dimmed(),
+                        chunks.len() - max_lines,
+                    ));
                 }
             }
             if let Some(exponent) = cert.rsa_exponent {
@@ -2728,5 +2742,235 @@ mod tests {
         let long_title = "A".repeat(100);
         CertFormatter::forensic_section_header(&mut o, &long_title, false);
         assert!(o.contains(&long_title));
+    }
+
+    // ========== signature_bytes / format_colored tests ==========
+
+    #[test]
+    fn test_format_colored_signature_hex_present_when_bytes_set() {
+        let mut cert = make_cert();
+        cert.signature_bytes = vec![0xde, 0xad, 0xbe, 0xef];
+        let _plain = CertFormatter::format(&cert, false);
+        // format_plain does NOT include the signature hex dump; the colored path does.
+        // Verify via the colored path directly.
+        let colored_output = CertFormatter::format(&cert, true);
+        assert!(
+            colored_output.contains("Signature Value"),
+            "colored output must include Signature Value header when signature_bytes is non-empty"
+        );
+    }
+
+    #[test]
+    fn test_format_colored_signature_hex_omitted_when_bytes_empty() {
+        let cert = make_cert(); // signature_bytes is vec![] in make_cert()
+        let colored_output = CertFormatter::format(&cert, true);
+        assert!(
+            !colored_output.contains("Signature Value"),
+            "colored output must NOT include Signature Value header when signature_bytes is empty"
+        );
+    }
+
+    #[test]
+    fn test_format_colored_signature_hex_encoding_correct() {
+        // 4 bytes -> 8 hex chars -> fits in one 36-char chunk -> "de:ad:be:ef"
+        let mut cert = make_cert();
+        cert.signature_bytes = vec![0xde, 0xad, 0xbe, 0xef];
+        let colored_output = CertFormatter::format(&cert, true);
+        // Strip ANSI escape codes so we can match plain text
+        let plain = strip_ansi(&colored_output);
+        assert!(
+            plain.contains("de:ad:be:ef"),
+            "hex dump must be colon-separated byte pairs, got: {}",
+            plain
+        );
+    }
+
+    #[test]
+    fn test_format_colored_signature_hex_chunks_across_lines() {
+        // 20 bytes = 40 hex chars, which spans two 36-char chunks
+        let mut cert = make_cert();
+        cert.signature_bytes = (0u8..20).collect();
+        let colored_output = CertFormatter::format(&cert, true);
+        let plain = strip_ansi(&colored_output);
+        // Each chunk line must contain colon-separated pairs
+        let sig_section: Vec<&str> = plain
+            .lines()
+            .skip_while(|l| !l.contains("Signature Value"))
+            .skip(1) // skip the header line
+            .take_while(|l| l.starts_with("        "))
+            .collect();
+        assert!(
+            sig_section.len() >= 2,
+            "20 bytes should produce at least 2 hex dump lines, got {} lines",
+            sig_section.len()
+        );
+        for line in &sig_section {
+            assert!(
+                line.contains(':'),
+                "every hex dump line must contain colon separators, got: '{}'",
+                line
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_colored_signature_hex_single_byte() {
+        let mut cert = make_cert();
+        cert.signature_bytes = vec![0xff];
+        let colored_output = CertFormatter::format(&cert, true);
+        let plain = strip_ansi(&colored_output);
+        assert!(
+            plain.contains("ff"),
+            "single-byte signature must render as 'ff'"
+        );
+    }
+
+    // ========== PEM output in format_colored tests ==========
+
+    #[test]
+    fn test_format_colored_pem_present_when_der_set() {
+        let mut cert = make_cert();
+        // Minimal non-empty DER blob (content doesn't need to be valid ASN.1 for the formatter)
+        cert.der = vec![0x30, 0x00];
+        let colored_output = CertFormatter::format(&cert, true);
+        assert!(
+            colored_output.contains("BEGIN CERTIFICATE"),
+            "colored output must include PEM block when der is non-empty"
+        );
+        assert!(
+            colored_output.contains("END CERTIFICATE"),
+            "colored output must close PEM block"
+        );
+    }
+
+    #[test]
+    fn test_format_colored_pem_omitted_when_der_empty() {
+        let cert = make_cert(); // der is vec![] in make_cert()
+        let colored_output = CertFormatter::format(&cert, true);
+        assert!(
+            !colored_output.contains("BEGIN CERTIFICATE"),
+            "colored output must NOT include PEM block when der is empty"
+        );
+    }
+
+    #[test]
+    fn test_format_plain_no_signature_hex_dump() {
+        // format_plain intentionally omits signature bytes — this is by design
+        let mut cert = make_cert();
+        cert.signature_bytes = vec![0xde, 0xad, 0xbe, 0xef];
+        let plain_output = CertFormatter::format_plain(&cert);
+        assert!(
+            !plain_output.contains("Signature Value"),
+            "format_plain must NOT include Signature Value hex dump (no ANSI color support)"
+        );
+    }
+
+    #[test]
+    fn test_format_plain_no_pem_block() {
+        // format_plain intentionally omits PEM output — this is by design
+        let mut cert = make_cert();
+        cert.der = vec![0x30, 0x00];
+        let plain_output = CertFormatter::format_plain(&cert);
+        assert!(
+            !plain_output.contains("BEGIN CERTIFICATE"),
+            "format_plain must NOT include PEM block"
+        );
+    }
+
+    // ========== signature_bytes serde skip tests ==========
+
+    #[test]
+    fn test_signature_bytes_skipped_in_json_serialization() {
+        use crate::Formatter;
+        let mut cert = make_cert();
+        cert.signature_bytes = vec![0xde, 0xad, 0xbe, 0xef];
+        let json = cert.to_json();
+        assert!(
+            !json.contains("signature_bytes"),
+            "signature_bytes must be skipped in JSON output (#[serde(skip)])"
+        );
+    }
+
+    #[test]
+    fn test_der_skipped_in_json_serialization() {
+        use crate::Formatter;
+        let mut cert = make_cert();
+        cert.der = vec![0x30, 0x00];
+        let json = cert.to_json();
+        assert!(
+            !json.contains("\"der\""),
+            "der field must be skipped in JSON output (#[serde(skip)])"
+        );
+    }
+
+    /// Strip ANSI escape codes for plain-text assertions on colored output.
+    fn strip_ansi(s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        let mut chars = s.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '\x1b' {
+                // consume until 'm'
+                for next in chars.by_ref() {
+                    if next == 'm' {
+                        break;
+                    }
+                }
+            } else {
+                result.push(c);
+            }
+        }
+        result
+    }
+
+    // ========== RSA modulus truncation tests ==========
+
+    #[test]
+    fn test_modulus_truncated_in_text_mode() {
+        let mut cert = make_cert();
+        cert.key_algorithm_name = "RSA".to_string();
+        cert.key_size = 2048;
+        // 256 bytes = 512 hex chars (8 lines of 64)
+        cert.rsa_modulus = Some("A4".repeat(256));
+        cert.rsa_exponent = Some(65537);
+
+        let output = CertFormatter::format_colored(&cert);
+        // Should show "Modulus (256 bytes):"
+        assert!(
+            output.contains("256 bytes"),
+            "Modulus should show byte count"
+        );
+        // Should show truncation notice
+        assert!(
+            output.contains("more lines"),
+            "Modulus should show truncation notice for long moduli"
+        );
+        // Should NOT contain all 8 lines of hex
+        let hex_lines: Vec<&str> = output
+            .lines()
+            .filter(|l| l.trim().starts_with("A4A4"))
+            .collect();
+        assert_eq!(
+            hex_lines.len(),
+            2,
+            "Should show exactly 2 lines of modulus, got {}",
+            hex_lines.len()
+        );
+    }
+
+    #[test]
+    fn test_short_modulus_not_truncated() {
+        let mut cert = make_cert();
+        cert.key_algorithm_name = "RSA".to_string();
+        cert.key_size = 512;
+        // 64 bytes = 128 hex chars (2 lines of 64) — fits within limit
+        cert.rsa_modulus = Some("BB".repeat(64));
+        cert.rsa_exponent = Some(65537);
+
+        let output = CertFormatter::format_colored(&cert);
+        // Should NOT show truncation notice
+        assert!(
+            !output.contains("more lines"),
+            "Short modulus should not be truncated"
+        );
     }
 }
