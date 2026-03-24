@@ -326,6 +326,19 @@ impl CertFormatter {
             format!("RSA {}-bit {}", cert.key_size.to_string().cyan(), strength)
         } else if cert.key_algorithm_name == "Ed25519" {
             format!("Ed25519 {}", "STRONG".green())
+        } else if cert.key_algorithm_name.starts_with("ML-DSA") {
+            let nist_level = match cert.key_algorithm_name.as_str() {
+                "ML-DSA-44" => "2",
+                "ML-DSA-65" => "3",
+                "ML-DSA-87" => "5",
+                _ => "?",
+            };
+            format!(
+                "{} (NIST Level {}) {}",
+                cert.key_algorithm_name,
+                nist_level,
+                "QUANTUM-SAFE".green().bold()
+            )
         } else {
             format!("{} {}-bit", cert.key_algorithm_name, cert.key_size)
         };
@@ -577,17 +590,35 @@ impl CertFormatter {
             } else {
                 "STRONG".green()
             }
+        } else if cert.key_algorithm_name.starts_with("ML-DSA") {
+            "QUANTUM-SAFE".green().bold()
         } else {
             "".normal()
         };
 
-        output.push_str(&format!(
-            "            Algorithm: {} ({} bit) {} ({})\n",
-            cert.key_algorithm_name.cyan(),
-            cert.key_size,
-            key_strength,
-            cert.key_algorithm.dimmed()
-        ));
+        if cert.key_algorithm_name.starts_with("ML-DSA") {
+            let nist_level = match cert.key_algorithm_name.as_str() {
+                "ML-DSA-44" => "2",
+                "ML-DSA-65" => "3",
+                "ML-DSA-87" => "5",
+                _ => "?",
+            };
+            output.push_str(&format!(
+                "            Algorithm: {} (NIST Level {}) {} ({})\n",
+                cert.key_algorithm_name.cyan(),
+                nist_level,
+                key_strength,
+                cert.key_algorithm.dimmed()
+            ));
+        } else {
+            output.push_str(&format!(
+                "            Algorithm: {} ({} bit) {} ({})\n",
+                cert.key_algorithm_name.cyan(),
+                cert.key_size,
+                key_strength,
+                cert.key_algorithm.dimmed()
+            ));
+        }
 
         if let Some(ref curve) = cert.ec_curve {
             output.push_str(&format!("            Curve: {}\n", curve.green()));
@@ -2212,10 +2243,23 @@ impl CertFormatter {
 
         output.push_str(&format!("        Subject: {}\n", cert.subject));
         output.push_str("        Subject Public Key Info:\n");
-        output.push_str(&format!(
-            "            Algorithm: {} ({} bit)\n",
-            cert.key_algorithm_name, cert.key_size
-        ));
+        if cert.key_algorithm_name.starts_with("ML-DSA") {
+            let nist_level = match cert.key_algorithm_name.as_str() {
+                "ML-DSA-44" => "2",
+                "ML-DSA-65" => "3",
+                "ML-DSA-87" => "5",
+                _ => "?",
+            };
+            output.push_str(&format!(
+                "            Algorithm: {} (NIST Level {})  ({})\n",
+                cert.key_algorithm_name, nist_level, cert.key_algorithm
+            ));
+        } else {
+            output.push_str(&format!(
+                "            Algorithm: {} ({} bit)  ({})\n",
+                cert.key_algorithm_name, cert.key_size, cert.key_algorithm
+            ));
+        }
 
         if let Some(ref curve) = cert.ec_curve {
             output.push_str(&format!("            Curve: {}\n", curve));

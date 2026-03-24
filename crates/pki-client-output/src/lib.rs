@@ -496,10 +496,10 @@ fn get_key_info(
         "1.3.101.112" => (algo_oid, "Ed25519".to_string(), 256, None),
         // Ed448
         "1.3.101.113" => (algo_oid, "Ed448".to_string(), 456, None),
-        // ML-DSA
-        "2.16.840.1.101.3.4.3.17" => (algo_oid, "ML-DSA-44".to_string(), 0, None),
-        "2.16.840.1.101.3.4.3.18" => (algo_oid, "ML-DSA-65".to_string(), 0, None),
-        "2.16.840.1.101.3.4.3.19" => (algo_oid, "ML-DSA-87".to_string(), 0, None),
+        // ML-DSA (FIPS 204) — key_size = NIST security level in bits
+        "2.16.840.1.101.3.4.3.17" => (algo_oid, "ML-DSA-44".to_string(), 128, None),
+        "2.16.840.1.101.3.4.3.18" => (algo_oid, "ML-DSA-65".to_string(), 192, None),
+        "2.16.840.1.101.3.4.3.19" => (algo_oid, "ML-DSA-87".to_string(), 256, None),
         _ => (algo_oid.clone(), algo_oid, 0, None),
     }
 }
