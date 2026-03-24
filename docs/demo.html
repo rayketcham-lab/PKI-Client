@@ -234,7 +234,11 @@ var demos = [
   { key: 'quantum-ops', icon: '\u269B\uFE0F', label: 'Quantum Ops',
     file: 'demos/pki-flex-demo.cast', short: 'demos/pki-flex-demo.cast',
     desc: 'End-to-end PKI operations: enterprise cert inspection, key generation, CSR, and ML-DSA-87 post-quantum hierarchy.',
-    shortDesc: 'Classical to post-quantum — the full operational workflow.' }
+    shortDesc: 'Classical to post-quantum — the full operational workflow.' },
+  { key: 'enterprise', icon: '\uD83C\uDFE2', label: 'Enterprise PKI',
+    file: 'demos/pki-enterprise-demo.cast', short: 'demos/pki-enterprise-demo.cast',
+    desc: '3-tier corporate PKI (RSA-4096) vs QuantumNexum PQC (ML-DSA-87) — build, inspect, diff, verify.',
+    shortDesc: 'RSA-4096 meets ML-DSA-87. 20 lines of TOML. Full PKI.' }
 ];
 
 var currentKey = 'audit';
