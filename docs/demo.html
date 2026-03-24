@@ -117,7 +117,7 @@
   <div class="section-title">Choose a Scenario</div>
   <div class="demo-tabs" id="tabs"></div>
   <div class="demo-info">
-    <h2 id="demo-title">The Audit</h2>
+    <h2 id="demo-title">Tacoo Tuesday</h2>
     <p id="demo-desc"></p>
   </div>
   <div class="player-wrapper">
@@ -183,45 +183,24 @@
 <script src="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.min.js"></script>
 <script>
 var demos = [
-  { key: 'audit', icon: '\uD83D\uDD0D', label: 'The Audit',
-    file: 'demos/story-a-audit.cast', short: 'demos/short-a-audit.cast',
-    desc: 'Security auditor reviews expired RSA, hybrid transition, and post-quantum certificates.',
-    shortDesc: '1 dead. 1 dying. 1 fine. Guess which one had the monitoring.' },
-  { key: 'renewal', icon: '\uD83D\uDD04', label: 'The Renewal',
-    file: 'demos/story-b-renewal.cast', short: 'demos/short-b-renewal.cast',
-    desc: 'Cron job catches an expiring cert. Engineer handles the full renewal workflow.',
-    shortDesc: 'Renewal speedrun any%. No yaml. No tickets. No drama.' },
-  { key: 'migration', icon: '\uD83D\uDDFA\uFE0F', label: 'The Migration',
-    file: 'demos/story-c-migration.cast', short: 'demos/short-c-migration.cast',
-    desc: 'PKI architect presents the quantum migration roadmap: RSA \u2192 Hybrid \u2192 ML-DSA-87.',
-    shortDesc: 'RSA? In 2026? Sir, this is a quantum neighborhood.' },
-  { key: 'build', icon: '\uD83D\uDD28', label: 'The Build',
-    file: 'demos/story-d-build.cast', short: 'demos/short-d-build.cast',
-    desc: '20 lines of TOML. One command. Full post-quantum PKI hierarchy from scratch.',
-    shortDesc: '8 lines of TOML. Entire PKI. That\'s it. That\'s the post.' },
-  { key: 'handoff', icon: '\uD83C\uDF93', label: 'The Handoff',
-    file: 'demos/story-e-handoff.cast', short: 'demos/short-e-handoff.cast',
-    desc: 'Senior engineer onboards a new team member: inspect, lint, diff, pin, and probe.',
-    shortDesc: '"How do I check the cert?" One command. "...that\'s it?" That\'s it.' },
-  { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision',
-    file: 'demos/story-f-vision.cast', short: 'demos/short-f-vision.cast',
-    desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.',
-    shortDesc: 'Every era said "this is fine." We\'re building the exit.' },
-  { key: 'signing', icon: '\u270D\uFE0F', label: 'Code Signing',
-    file: 'demos/signing-service.cast', short: 'demos/signing-service.cast',
-    desc: 'Enterprise code signing best practices — batch limits, PE/Authenticode, HSM keys, audit trails.',
-    shortDesc: 'Enterprise code signing training module with QN intro.' },
-  { key: 'quantum-ops', icon: '\u269B\uFE0F', label: 'Quantum Ops',
-    file: 'demos/pki-flex-demo.cast', short: 'demos/pki-flex-demo.cast',
-    desc: 'End-to-end PKI operations: enterprise cert inspection, key generation, CSR, and ML-DSA-87 post-quantum hierarchy.',
-    shortDesc: 'Classical to post-quantum — the full operational workflow.' },
+  { key: 'taco-tuesday', icon: '\uD83C\uDF2E', label: 'Tacoo Tuesday',
+    file: 'demos/tacoo-tuesday.cast',
+    desc: 'A taco shop in McKinney TX goes full post-quantum. 3-tier all-PQC hierarchy — ML-DSA-87/65/44. No RSA. No EC. Pure lattice.' },
   { key: 'enterprise', icon: '\uD83C\uDFE2', label: 'Enterprise PKI',
-    file: 'demos/pki-enterprise-demo.cast', short: 'demos/pki-enterprise-demo.cast',
-    desc: '3-tier corporate PKI (RSA-4096) vs QuantumNexum PQC (ML-DSA-87) — build, inspect, diff, verify.',
-    shortDesc: 'RSA-4096 meets ML-DSA-87. 20 lines of TOML. Full PKI.' }
+    file: 'demos/pki-enterprise-demo.cast',
+    desc: '3-tier corporate PKI (RSA-4096) vs QuantumNexum PQC (ML-DSA-87) — build, inspect, diff, verify.' },
+  { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision',
+    file: 'demos/story-f-vision.cast',
+    desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.' },
+  { key: 'signing', icon: '\u270D\uFE0F', label: 'Code Signing',
+    file: 'demos/signing-service.cast',
+    desc: 'Enterprise code signing best practices — batch limits, PE/Authenticode, HSM keys, audit trails.' },
+  { key: 'quantum-ops', icon: '\u269B\uFE0F', label: 'Quantum Ops',
+    file: 'demos/pki-flex-demo.cast',
+    desc: 'End-to-end PKI operations: enterprise cert inspection, key generation, CSR, and ML-DSA-87 post-quantum hierarchy.' }
 ];
 
-var currentKey = 'audit';
+var currentKey = 'taco-tuesday';
 
 var tabsEl = document.getElementById('tabs');
 demos.forEach(function(d, i) {
