@@ -30,8 +30,8 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y musl-tools
           fi
-      - name: Build static binary
-        run: cargo build --release --target x86_64-unknown-linux-musl
+      - name: Build static binary (with PQC support)
+        run: cargo build --release --features pqc --target x86_64-unknown-linux-musl
       - name: Strip binary
         run: strip target/x86_64-unknown-linux-musl/release/pki
       - name: Verify static linking
