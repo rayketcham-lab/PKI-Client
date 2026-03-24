@@ -73,7 +73,7 @@ nav {
 nav.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,0.4); }
 
 .nav-inner {
-  max-width: 1440px; margin: 0 auto;
+  max-width: 1200px; margin: 0 auto;
   display: flex; align-items: center; justify-content: space-between; height: 64px;
 }
 .nav-logo {
@@ -187,12 +187,12 @@ h1 .gradient {
 
 .hero-sub {
   font-size: 1.2rem; color: var(--text-muted);
-  max-width: 744px; margin: 0 auto 3rem; line-height: 1.8;
+  max-width: 620px; margin: 0 auto 3rem; line-height: 1.8;
 }
 .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; position: relative; }
 
 /* ── Stats ── */
-.stats { max-width: 1080px; margin: -2rem auto 0; padding: 0 2rem; position: relative; z-index: 2; }
+.stats { max-width: 900px; margin: -2rem auto 0; padding: 0 2rem; position: relative; z-index: 2; }
 .stats-inner {
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--surface); border: 1px solid var(--border);
@@ -211,7 +211,7 @@ h1 .gradient {
 }
 
 /* ── Sections ── */
-.section { max-width: 1440px; margin: 0 auto; padding: 6rem 2rem; position: relative; }
+.section { max-width: 1200px; margin: 0 auto; padding: 6rem 2rem; position: relative; }
 .section-label {
   font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.15em; color: var(--accent-light); margin-bottom: 0.75rem;
@@ -224,7 +224,7 @@ h1 .gradient {
 .section h2 {
   font-size: 2.25rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.75rem;
 }
-.section > p { color: var(--text-muted); max-width: 672px; margin-bottom: 3rem; font-size: 1.05rem; }
+.section > p { color: var(--text-muted); max-width: 560px; margin-bottom: 3rem; font-size: 1.05rem; }
 
 /* ── Fade ── */
 .fade-up { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
@@ -368,13 +368,13 @@ h1 .gradient {
 }
 .cta-section p {
   color: var(--text-muted); margin-bottom: 2.5rem;
-  max-width: 624px; margin-left: auto; margin-right: auto;
+  max-width: 520px; margin-left: auto; margin-right: auto;
   position: relative; font-size: 1.1rem;
 }
 
 /* ── Divider ── */
 .divider {
-  max-width: 1440px; margin: 0 auto; border: 0; height: 1px;
+  max-width: 1200px; margin: 0 auto; border: 0; height: 1px;
   background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
 
@@ -386,7 +386,7 @@ footer {
 footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
 footer a:hover { color: var(--text); }
 .footer-inner {
-  max-width: 1440px; margin: 0 auto;
+  max-width: 1200px; margin: 0 auto;
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 1rem;
 }
@@ -563,7 +563,7 @@ footer a:hover { color: var(--text); }
   <div class="section-label">Live Demos</div>
   <h2>Watch it in action</h2>
   <p>Six real-world scenarios — from auditing expired certs to building a post-quantum PKI from scratch. Full demos or 15-second TL;DRs.</p>
-  <div style="max-width:840px;margin:2rem auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
+  <div style="max-width:700px;margin:2rem auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
     <a href="demo.html?demo=audit" style="display:block;padding:1rem 1.2rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color 0.2s;">
       <div style="font-size:0.85rem;font-weight:600;color:var(--accent);margin-bottom:0.3rem;">The Audit</div>
       <div style="font-size:0.78rem;color:var(--text-muted);">Expired RSA, hybrid, PQC certs</div>
