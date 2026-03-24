@@ -219,9 +219,9 @@ def build_act1() -> None:
 def build_act2() -> None:
     # t=12.0: bash prompt + ssh command
     ts = 12.0
-    emit_at(ts, f"\r\n{c('1;32')}pleb@workstation:~$ {RESET}")
+    emit_at(ts, f"\r\n{c('1;32')}qnadmin@workstation:~$ {RESET}")
     ts = round(ts + 0.3, 4)
-    ts = type_string("ssh pleb@secure.quantumnexum.com", ts)
+    ts = type_string("ssh qnadmin@secure.quantumnexum.com", ts)
     ts = round(ts + 0.1, 4)
     emit_at(ts, "\r\n")
 
@@ -241,7 +241,7 @@ def build_act2() -> None:
 
     # t=17.0: new bash prompt, type `pki`
     ts = 17.0
-    emit_at(ts, f"{c('1;32')}pleb@qn-secure:~$ {RESET}")
+    emit_at(ts, f"{c('1;32')}qnadmin@qn-secure:~$ {RESET}")
     ts = round(ts + 0.3, 4)
     ts = type_string("pki", ts)
     ts = round(ts + 0.1, 4)
@@ -467,14 +467,14 @@ def build_act5() -> None:
     ts = 81.0
     emit_at(ts, PKI_PROMPT)
     ts = round(ts + 0.2, 4)
-    ts = type_string("key gen rsa --bits 4096 -o /home/pleb/demo.key", ts)
+    ts = type_string("key gen rsa --bits 4096 -o /home/qnadmin/demo.key", ts)
     ts = round(ts + 0.1, 4)
     emit_at(ts, "\r\n")
 
     ts = round(ts + 0.1, 4)
     key_lines = [
         f"{BOLD_GREEN}●{RESET} Generating RSA-4096 key...",
-        f"{BOLD_GREEN}✓{RESET} Key saved to /home/pleb/demo.key (mode 0600)",
+        f"{BOLD_GREEN}✓{RESET} Key saved to /home/qnadmin/demo.key (mode 0600)",
         f"  Algorithm: RSA-4096",
         f"  Security:  {BOLD_GREEN}Strong{RESET} (128-bit equivalent)",
         "",
@@ -485,7 +485,7 @@ def build_act5() -> None:
     ts = round(ts + 1.5, 4)
     emit_at(ts, PKI_PROMPT)
     ts = round(ts + 0.2, 4)
-    csr_cmd = "csr create --key /home/pleb/demo.key --cn demo.quantumnexum.com --san dns:www.demo.quantumnexum.com --org \"QuantumNexum\" --country US -o /home/pleb/demo.csr"
+    csr_cmd = "csr create --key /home/qnadmin/demo.key --cn demo.quantumnexum.com --san dns:www.demo.quantumnexum.com --org \"QuantumNexum\" --country US -o /home/qnadmin/demo.csr"
     ts = type_string(csr_cmd, ts)
     ts = round(ts + 0.1, 4)
     emit_at(ts, "\r\n")
@@ -493,7 +493,7 @@ def build_act5() -> None:
     ts = round(ts + 0.1, 4)
     csr_lines = [
         f"{BOLD_GREEN}●{RESET} Creating CSR for demo.quantumnexum.com using RSA-4096 key...",
-        f"{BOLD_GREEN}✓{RESET} CSR saved to /home/pleb/demo.csr",
+        f"{BOLD_GREEN}✓{RESET} CSR saved to /home/qnadmin/demo.csr",
         f"  Subject: CN=demo.quantumnexum.com",
         f"  SANs: dns:www.demo.quantumnexum.com",
         "",
@@ -550,7 +550,7 @@ def build_act6() -> None:
     ts = round(ts + 2.0, 4)
     emit_at(ts, PKI_PROMPT)
     ts = round(ts + 0.2, 4)
-    ts = type_string("pki build /etc/pki/pqc-hierarchy.toml -o /home/pleb/pqc-pki --force", ts)
+    ts = type_string("pki build /etc/pki/pqc-hierarchy.toml -o /home/qnadmin/pqc-pki --force", ts)
     ts = round(ts + 0.1, 4)
     emit_at(ts, "\r\n")
 
@@ -558,7 +558,7 @@ def build_act6() -> None:
     build_lines = [
         f"{BOLD_CYAN}→{RESET} Building hierarchy '{BOLD_WHITE}QuantumNexum PQC Demo{RESET}'...",
         f"{BOLD_GREEN}✓{RESET} Built {BOLD_WHITE}2{RESET} CAs",
-        f"{BOLD_GREEN}✓{RESET} Exported {BOLD_WHITE}8{RESET} files to /home/pleb/pqc-pki",
+        f"{BOLD_GREEN}✓{RESET} Exported {BOLD_WHITE}8{RESET} files to /home/qnadmin/pqc-pki",
         f"  • {BOLD_MAGENTA}root{RESET} (7823 bytes)",
         f"  • {BOLD_MAGENTA}issuing{RESET} (7209 bytes)",
         "",
@@ -583,7 +583,7 @@ def build_act7() -> None:
     ts = 146.0
     emit_at(ts, PKI_PROMPT)
     ts = round(ts + 0.2, 4)
-    ts = type_string("show /home/pleb/pqc-pki/root/root.cert.pem", ts)
+    ts = type_string("show /home/qnadmin/pqc-pki/root/root.cert.pem", ts)
     ts = round(ts + 0.1, 4)
     emit_at(ts, "\r\n")
 
