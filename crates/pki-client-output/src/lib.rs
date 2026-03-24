@@ -74,6 +74,7 @@ pub struct CtSct {
 
 /// Parsed X.509 certificate for display purposes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// TODO: Add #[non_exhaustive] once Certificate has a builder or Default impl
 pub struct Certificate {
     /// Certificate version (1, 2, or 3).
     pub version: u32,

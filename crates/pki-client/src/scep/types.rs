@@ -216,6 +216,8 @@ pub struct EnrollmentResponse {
     /// Issued certificate (PEM, if status is Success)
     pub certificate: Option<String>,
     /// Private key PEM (generated during enrollment)
+    /// Never serialized — use enrollment_to_json() for safe JSON output.
+    #[serde(skip_serializing)]
     pub private_key_pem: Option<String>,
 }
 

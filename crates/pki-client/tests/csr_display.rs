@@ -1609,7 +1609,7 @@ fn shell_no_buffering_delay_for_simple_commands() {
         "show command should execute immediately.\nGot: {combined}"
     );
     assert!(
-        combined.contains("0.6."),
+        combined.contains("0.7.") || combined.contains("0.6."),
         "version should also execute.\nGot: {combined}"
     );
 }
