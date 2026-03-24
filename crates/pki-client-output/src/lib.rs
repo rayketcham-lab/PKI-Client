@@ -139,6 +139,9 @@ pub struct Certificate {
     pub fingerprint_sha1: String,
     /// SPKI SHA-256 (base64, for pinning).
     pub spki_sha256_b64: String,
+    /// Signature bytes (raw).
+    #[serde(skip)]
+    pub signature_bytes: Vec<u8>,
     /// Raw DER bytes.
     #[serde(skip)]
     pub der: Vec<u8>,
@@ -332,6 +335,9 @@ impl Certificate {
             )
         };
 
+        // Signature bytes
+        let signature_bytes = cert.signature_value.data.to_vec();
+
         Ok(Self {
             version: cert.version.0 + 1,
             serial,
@@ -365,6 +371,7 @@ impl Certificate {
             fingerprint_sha256,
             fingerprint_sha1,
             spki_sha256_b64,
+            signature_bytes,
             der: der.to_vec(),
         })
     }
@@ -879,6 +886,7 @@ mod tests {
             fingerprint_sha256: "aa:bb:cc".to_string(),
             fingerprint_sha1: "dd:ee:ff".to_string(),
             spki_sha256_b64: String::new(),
+            signature_bytes: vec![],
             der: vec![0x30, 0x82],
         }
     }

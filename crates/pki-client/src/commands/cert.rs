@@ -1614,6 +1614,7 @@ mod tests {
             fingerprint_sha256: "aa:bb".to_string(),
             fingerprint_sha1: "cc:dd".to_string(),
             spki_sha256_b64: "abc".to_string(),
+            signature_bytes: vec![],
             der: vec![],
         }
     }

@@ -760,6 +760,23 @@ impl CertFormatter {
             cert.signature_algorithm_name
         ));
 
+        // Signature hex dump (like openssl x509 -text)
+        if !cert.signature_bytes.is_empty() {
+            output.push_str(&format!("    {}:\n", "Signature Value".cyan()));
+            let hex = hex::encode(&cert.signature_bytes);
+            for chunk in hex.as_bytes().chunks(36) {
+                let line = std::str::from_utf8(chunk).unwrap_or("");
+                // Format as colon-separated pairs
+                let formatted: String = line
+                    .as_bytes()
+                    .chunks(2)
+                    .map(|pair| std::str::from_utf8(pair).unwrap_or(""))
+                    .collect::<Vec<&str>>()
+                    .join(":");
+                output.push_str(&format!("        {}\n", formatted.dimmed()));
+            }
+        }
+
         // Fingerprints section
         output.push_str(&format!("\n{}:\n", "Fingerprints".cyan().bold()));
         output.push_str(&format!(
@@ -774,6 +791,13 @@ impl CertFormatter {
             "    SPKI Pin:       {}\n",
             cert.spki_sha256_b64.green()
         ));
+
+        // PEM certificate
+        if !cert.der.is_empty() {
+            output.push_str(&format!("\n{}:\n", "PEM".cyan().bold()));
+            let pem_data = pem::Pem::new("CERTIFICATE", cert.der.clone());
+            output.push_str(&format!("{}\n", pem::encode(&pem_data).dimmed()));
+        }
 
         output
     }
@@ -2378,6 +2402,7 @@ mod tests {
             fingerprint_sha256: "aa:bb".to_string(),
             fingerprint_sha1: "cc:dd".to_string(),
             spki_sha256_b64: "base64==".to_string(),
+            signature_bytes: vec![],
             der: vec![],
         }
     }
