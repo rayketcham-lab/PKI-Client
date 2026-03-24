@@ -1,4 +1,4 @@
-{"version": 2, "width": 120, "height": 40, "timestamp": 1774158900, "env": {"SHELL": "/bin/bash", "TERM": null}, "title": "Story F: The Vision \u2014 QuantumNexum"}
+{"version": 2, "width": 120, "height": 40, "timestamp": 1774158900, "env": {"SHELL": "/bin/bash", "TERM": null}, "title": "The Vision \u2014 PKI Client v0.7.0 | QuantumNexum"}
 [0.0, "o", "\u001b[2J\u001b[1;1H"]
 [0.5, "o", "\u001b[2J\u001b[1;1H"]
 [1.0, "o", "\u001b[2J\u001b[1;1H\u001b[8;46H\u001b[1;37mThe clock is already ticking.\u001b[0m\u001b[10;39H\u001b[2mFederal PQC compliance deadlines \u2014 CNSA 2.0\u001b[0m"]
@@ -365,7 +365,7 @@
 [109.8, "o", "\u001b[1;37m                                       QuantumNexum\u001b[0m\r\n"]
 [110.3, "o", "\u001b[2m                                Building for 2050. Shipping today.\u001b[0m\r\n"]
 [111.1, "o", "\r\n"]
-[111.4, "o", "\u001b[32m  \u2713 PKI-Client\u001b[0m\u001b[2m \u2014 19 commands. One binary. Post-quantum native.\u001b[0m\r\n"]
+[111.4, "o", "\u001b[32m  \u2713 PKI-Client\u001b[0m\u001b[2m \u2014 20 commands. One binary. Post-quantum native.\u001b[0m\r\n"]
 [111.9, "o", "\u001b[32m  \u2713 PKI-Signing-Service\u001b[0m\u001b[2m \u2014 multi-algorithm signing. Audit logging. API-first.\u001b[0m\r\n"]
 [112.4, "o", "\u001b[32m  \u2713 PKI-CA-Engine\u001b[0m\u001b[2m \u2014 certificate authority as code. Declarative. Automated.\u001b[0m\r\n"]
 [113.2, "o", "\r\n"]
