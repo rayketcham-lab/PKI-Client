@@ -597,17 +597,58 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_target() {
+    fn test_parse_target_default_port() {
         let (host, port) = parse_target("example.com");
         assert_eq!(host, "example.com");
         assert_eq!(port, 443);
+    }
 
+    #[test]
+    fn test_parse_target_explicit_443() {
+        let (host, port) = parse_target("example.com:443");
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 443);
+    }
+
+    #[test]
+    fn test_parse_target_custom_port() {
         let (host, port) = parse_target("example.com:8443");
         assert_eq!(host, "example.com");
         assert_eq!(port, 8443);
+    }
 
+    #[test]
+    fn test_parse_target_arbitrary_port() {
+        let (host, port) = parse_target("example.com:1234");
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 1234);
+    }
+
+    #[test]
+    fn test_parse_target_url_without_port() {
         let (host, port) = parse_target("https://example.com/path");
         assert_eq!(host, "example.com");
+        assert_eq!(port, 443);
+    }
+
+    #[test]
+    fn test_parse_target_url_with_port() {
+        let (host, port) = parse_target("https://example.com:8443/path");
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 8443);
+    }
+
+    #[test]
+    fn test_parse_target_ipv6_with_port() {
+        let (host, port) = parse_target("[::1]:8443");
+        assert_eq!(host, "[::1]");
+        assert_eq!(port, 8443);
+    }
+
+    #[test]
+    fn test_parse_target_ipv6_without_port() {
+        let (host, port) = parse_target("[::1]");
+        assert_eq!(host, "[::1]");
         assert_eq!(port, 443);
     }
 
