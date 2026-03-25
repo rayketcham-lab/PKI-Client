@@ -1613,3 +1613,73 @@ fn shell_no_buffering_delay_for_simple_commands() {
         "version should also execute.\nGot: {combined}"
     );
 }
+
+// ============================================================================
+// Issue #47: shell should parse flags before positional args
+// ============================================================================
+
+#[test]
+fn issue_47_show_flag_before_file() {
+    // "show --lint <file>" should work the same as "show <file> --lint"
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key = dir.path().join("issue47.key");
+    let _ = pki_cmd()
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key)
+        .output();
+
+    // Flag AFTER file (works before fix)
+    let input_after = format!("show {} --lint", key.display());
+    let (stdout_after, stderr_after, _) = shell_input(&input_after);
+    let combined_after = format!("{stdout_after}{stderr_after}");
+
+    // Flag BEFORE file (broken before fix)
+    let input_before = format!("show --lint {}", key.display());
+    let (stdout_before, stderr_before, _) = shell_input(&input_before);
+    let combined_before = format!("{stdout_before}{stderr_before}");
+
+    // Neither should contain "error" about missing/invalid file
+    assert!(
+        !combined_before.contains("No such file")
+            && !combined_before.contains("not found")
+            && !combined_before.contains("Usage: show"),
+        "show --lint <file> should parse the file correctly.\nGot: {combined_before}"
+    );
+
+    // Both should produce similar output (key info)
+    let has_key_info_after =
+        combined_after.contains("EC") || combined_after.contains("Private Key");
+    let has_key_info_before =
+        combined_before.contains("EC") || combined_before.contains("Private Key");
+    assert!(
+        has_key_info_after == has_key_info_before,
+        "show <file> --lint and show --lint <file> should produce equivalent output.\n\
+         After:  {combined_after}\nBefore: {combined_before}"
+    );
+}
+
+#[test]
+fn issue_47_cert_show_flag_before_file() {
+    // "cert show --lint <file>" should work the same as "cert show <file> --lint"
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+    let key = dir.path().join("issue47b.key");
+    let _ = pki_cmd()
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key)
+        .output();
+
+    let input = format!("cert show --lint {}", key.display());
+    let (stdout, stderr, _) = shell_input(&input);
+    let combined = format!("{stdout}{stderr}");
+
+    assert!(
+        !combined.contains("Usage: cert show"),
+        "cert show --lint <file> should parse the file correctly.\nGot: {combined}"
+    );
+}

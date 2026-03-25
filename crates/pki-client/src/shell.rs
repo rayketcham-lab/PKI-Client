@@ -26,10 +26,10 @@ PKI Interactive Shell - PKI operations made human
 
 Commands:
   show <file>                   Show certificate details (shortcut)
-  show <file> --lint            Run security lint checks
-  show <file> --check           Check revocation status (OCSP/CRL)
-  show <file> --all             Full analysis (details + lint + revocation)
-  show <file> --interactive     Interactive menu mode
+  show [--lint] <file>          Run security lint checks
+  show [--check] <file>         Check revocation status (OCSP/CRL)
+  show [--all] <file>           Full analysis (details + lint + revocation)
+  show [--interactive] <file>   Interactive menu mode
 
   cert show <file>              Show certificate details
   cert expires <file>           Check certificate expiration
@@ -838,7 +838,8 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
     match args[0].as_str() {
         "show" => {
             // Shortcut for cert show
-            if args.len() < 2 {
+            let positionals = positional_args(args, 1);
+            if positionals.is_empty() {
                 println!("Usage: show <file|PEM> [options]");
                 println!("Options:");
                 println!("  --check, -c     Check revocation status");
@@ -850,13 +851,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                 return Ok(());
             }
 
-            // Check if arg looks like PEM content (may be multi-line joined)
-            let file_arg = if args[1].starts_with("-----BEGIN") {
-                // It's inline PEM content
-                args[1].clone()
-            } else {
-                args[1].clone()
-            };
+            let file_arg = positionals[0].clone();
 
             let cmd = cert::CertCommands::Show(cert::ShowArgs {
                 file: file_arg.into(),
@@ -880,7 +875,8 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
             }
             match args[1].as_str() {
                 "show" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: cert show <file|PEM> [options]");
                         println!("Options:");
                         println!("  --check, -c     Check revocation status");
@@ -896,7 +892,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         return Ok(());
                     }
                     let cmd = cert::CertCommands::Show(cert::ShowArgs {
-                        file: args[2].clone().into(),
+                        file: positionals[0].clone().into(),
                         subject: args.contains(&"--subject".to_string()),
                         san: args.contains(&"--san".to_string()),
                         issuer: args.contains(&"--issuer".to_string()),
@@ -914,7 +910,8 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                     cert::run(cmd, config)?;
                 }
                 "expires" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: cert expires <file> [--within <duration>]");
                         return Ok(());
                     }
@@ -924,19 +921,20 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         .and_then(|i| args.get(i + 1))
                         .cloned();
                     let cmd = cert::CertCommands::Expires(cert::ExpiresArgs {
-                        files: vec![args[2].clone().into()],
+                        files: vec![positionals[0].clone().into()],
                         within,
                         epoch: args.contains(&"--epoch".to_string()),
                     });
                     cert::run(cmd, config)?;
                 }
                 "fingerprint" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: cert fingerprint <file>");
                         return Ok(());
                     }
                     let cmd = cert::CertCommands::Fingerprint(cert::FingerprintArgs {
-                        file: args[2].clone().into(),
+                        file: positionals[0].clone().into(),
                         sha1: args.contains(&"--sha1".to_string()),
                         raw: args.contains(&"--raw".to_string()),
                     });
@@ -955,7 +953,8 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
             }
             match args[1].as_str() {
                 "gen" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: key gen <ec|rsa|ed25519> [options]");
                         println!("Options:");
                         println!("  --bits <size>   RSA key size (default: 4096)");
@@ -981,7 +980,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         .cloned()
                         .unwrap_or_else(|| "p384".to_string());
                     let cmd = key::KeyCommands::Gen(key::GenArgs {
-                        algorithm: args[2].clone(),
+                        algorithm: positionals[0].clone(),
                         bits,
                         curve,
                         output,
@@ -989,24 +988,26 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                     key::run(cmd, config)?;
                 }
                 "show" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: key show <file> [--public]");
                         return Ok(());
                     }
                     let cmd = key::KeyCommands::Show(key::ShowArgs {
-                        file: args[2].clone().into(),
+                        file: positionals[0].clone().into(),
                         public: args.contains(&"--public".to_string()),
                     });
                     key::run(cmd, config)?;
                 }
                 "match" => {
-                    if args.len() < 4 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.len() < 2 {
                         println!("Usage: key match <key-file> <cert-file>");
                         return Ok(());
                     }
                     let cmd = key::KeyCommands::Match(key::MatchArgs {
-                        key: args[2].clone().into(),
-                        cert: args[3].clone().into(),
+                        key: positionals[0].clone().into(),
+                        cert: positionals[1].clone().into(),
                     });
                     key::run(cmd, config)?;
                 }
@@ -1023,7 +1024,8 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
             }
             match args[1].as_str() {
                 "build" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: chain build <file> [options]");
                         println!("Options:");
                         println!("  -o <file>       Output chain to file");
@@ -1042,7 +1044,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         .and_then(|i| args.get(i + 1))
                         .cloned();
                     let cmd = chain::ChainCommands::Build {
-                        file: args[2].clone(),
+                        file: positionals[0].clone(),
                         output,
                         no_fetch: args.contains(&"--no-fetch".to_string()),
                         ca,
@@ -1050,18 +1052,20 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                     chain::run(cmd, config)?;
                 }
                 "show" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: chain show <file> [--verify]");
                         return Ok(());
                     }
                     let cmd = chain::ChainCommands::Show {
-                        file: args[2].clone(),
+                        file: positionals[0].clone(),
                         verify: args.contains(&"--verify".to_string()),
                     };
                     chain::run(cmd, config)?;
                 }
                 "verify" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: chain verify <file> [--ca <ca-file>] [--no-revocation]");
                         return Ok(());
                     }
@@ -1071,7 +1075,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         .and_then(|i| args.get(i + 1))
                         .cloned();
                     let cmd = chain::ChainCommands::Verify {
-                        file: args[2].clone(),
+                        file: positionals[0].clone(),
                         ca,
                         no_revocation: args.contains(&"--no-revocation".to_string()),
                         no_check_time: args.contains(&"--no-check-time".to_string()),
@@ -1140,12 +1144,13 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                     csr::run(cmd, config)?;
                 }
                 "show" => {
-                    if args.len() < 3 {
+                    let positionals = positional_args(args, 2);
+                    if positionals.is_empty() {
                         println!("Usage: csr show <file>");
                         return Ok(());
                     }
                     let cmd = csr::CsrCommands::Show(csr::ShowArgs {
-                        file: args[2].clone().into(),
+                        file: positionals[0].clone().into(),
                     });
                     csr::run(cmd, config)?;
                 }
@@ -1220,6 +1225,55 @@ fn show_inline_pem(pem_text: &str, config: &GlobalConfig) -> Result<()> {
     result
 }
 
+/// Known flags that take a value argument (the next token is consumed).
+const FLAGS_WITH_VALUE: &[&str] = &[
+    "--bits",
+    "--curve",
+    "--ca",
+    "--key",
+    "-k",
+    "--cn",
+    "--san",
+    "--org",
+    "--ou",
+    "--country",
+    "--state",
+    "--locality",
+    "--within",
+    "--issuer-cert",
+    "-o",
+    "--output",
+    "--to",
+];
+
+/// Extract positional (non-flag) arguments from a slice, skipping flags and
+/// their values. `skip` is the number of leading tokens to ignore (e.g. the
+/// command name itself).  Returns the positional args in order.
+fn positional_args(args: &[String], skip: usize) -> Vec<String> {
+    let mut positionals = Vec::new();
+    let tail = if skip < args.len() {
+        &args[skip..]
+    } else {
+        return positionals;
+    };
+    let mut i = 0;
+    while i < tail.len() {
+        let arg = &tail[i];
+        if arg.starts_with('-') {
+            // Check if this flag eats the next token
+            if FLAGS_WITH_VALUE.contains(&arg.as_str()) {
+                i += 2; // skip flag + its value
+            } else {
+                i += 1; // boolean flag
+            }
+        } else {
+            positionals.push(arg.clone());
+            i += 1;
+        }
+    }
+    positionals
+}
+
 /// Split a command line respecting double and single quotes.
 fn shell_split(input: &str) -> Vec<String> {
     let mut args = Vec::new();
@@ -1262,5 +1316,90 @@ mod dirs {
         std::env::var_os("HOME")
             .map(PathBuf::from)
             .map(|p| p.join(".local").join("share"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(strs: &[&str]) -> Vec<String> {
+        strs.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn positional_args_skips_boolean_flags() {
+        let a = args(&["show", "--lint", "cert.pem"]);
+        let pos = positional_args(&a, 1);
+        assert_eq!(pos, vec!["cert.pem"]);
+    }
+
+    #[test]
+    fn positional_args_file_before_flag() {
+        let a = args(&["show", "cert.pem", "--lint"]);
+        let pos = positional_args(&a, 1);
+        assert_eq!(pos, vec!["cert.pem"]);
+    }
+
+    #[test]
+    fn positional_args_skips_valued_flags() {
+        let a = args(&["chain", "build", "--ca", "ca.pem", "--no-fetch", "cert.pem"]);
+        let pos = positional_args(&a, 2);
+        assert_eq!(pos, vec!["cert.pem"]);
+    }
+
+    #[test]
+    fn positional_args_multiple_positionals() {
+        let a = args(&["key", "match", "key.pem", "cert.pem"]);
+        let pos = positional_args(&a, 2);
+        assert_eq!(pos, vec!["key.pem", "cert.pem"]);
+    }
+
+    #[test]
+    fn positional_args_empty_when_only_flags() {
+        let a = args(&["show", "--lint", "--all"]);
+        let pos = positional_args(&a, 1);
+        assert!(pos.is_empty());
+    }
+
+    #[test]
+    fn positional_args_with_output_flag() {
+        let a = args(&["key", "gen", "-o", "out.pem", "ec"]);
+        let pos = positional_args(&a, 2);
+        assert_eq!(pos, vec!["ec"]);
+    }
+
+    #[test]
+    fn shell_split_basic() {
+        let result = shell_split("show --lint cert.pem");
+        assert_eq!(result, vec!["show", "--lint", "cert.pem"]);
+    }
+
+    #[test]
+    fn shell_split_quoted() {
+        let result = shell_split(r#"show "my cert.pem" --lint"#);
+        assert_eq!(result, vec!["show", "my cert.pem", "--lint"]);
+    }
+
+    #[test]
+    fn handle_shell_command_returns_run_for_show() {
+        let config = GlobalConfig::default();
+        match handle_shell_command("show --lint cert.pem", &config) {
+            ShellAction::RunCommand(a) => {
+                assert_eq!(a, vec!["show", "--lint", "cert.pem"]);
+            }
+            _ => panic!("Expected RunCommand"),
+        }
+    }
+
+    #[test]
+    fn handle_shell_command_strips_pki_prefix() {
+        let config = GlobalConfig::default();
+        match handle_shell_command("pki show cert.pem", &config) {
+            ShellAction::RunCommand(a) => {
+                assert_eq!(a, vec!["show", "cert.pem"]);
+            }
+            _ => panic!("Expected RunCommand"),
+        }
     }
 }
