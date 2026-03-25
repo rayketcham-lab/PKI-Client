@@ -456,7 +456,7 @@ footer a:hover { color: var(--text); }
 
   <div class="hero-badge">
     <span class="pulse"></span>
-    v0.6.3 &middot; Pure Rust &middot; Apache-2.0
+    v0.7.0 &middot; Pure Rust &middot; Apache-2.0
   </div>
 
   <h1>
@@ -484,7 +484,7 @@ footer a:hover { color: var(--text); }
 <div class="stats fade-up">
   <div class="stats-inner">
     <div class="stat">
-      <div class="stat-value">19</div>
+      <div class="stat-value">20</div>
       <div class="stat-label">Subcommands</div>
     </div>
     <div class="stat">
@@ -676,7 +676,7 @@ footer a:hover { color: var(--text); }
 <!-- Commands -->
 <section class="section fade-up" id="commands">
   <div class="section-label">Commands</div>
-  <h2>19 subcommands</h2>
+  <h2>20 subcommands</h2>
   <p>From inspection to enrollment, every PKI operation in one tool.</p>
 
   <table class="command-table">
@@ -790,7 +790,7 @@ footer a:hover { color: var(--text); }
   <table class="command-table">
     <thead><tr><th>Crate</th><th>Role</th></tr></thead>
     <tbody>
-      <tr><td>pki-client</td><td>Binary &mdash; CLI entry point, 17 subcommands, interactive shell</td></tr>
+      <tr><td>pki-client</td><td>Binary &mdash; CLI entry point, 20 subcommands, interactive shell</td></tr>
       <tr><td>pki-client-output</td><td>Library &mdash; certificate formatting, OID registry, display</td></tr>
       <tr><td>pki-probe</td><td>Library &mdash; TLS inspection, cipher analysis, security linting</td></tr>
       <tr><td>pki-hierarchy</td><td>Library &mdash; declarative PKI hierarchy builder</td></tr>
@@ -814,6 +814,41 @@ footer a:hover { color: var(--text); }
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       Star on GitHub
     </a>
+  </div>
+</section>
+
+<!-- Command Status -->
+<section class="section fade-up" id="status">
+  <div class="section-inner">
+  <span class="section-tag">v0.7.0 Command Status</span>
+  <h2>What Works</h2>
+  <table class="command-table">
+    <thead><tr><th>Command</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>show</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Auto-detects cert, key, CSR, CRL, PKCS#7, PKCS#12</td></tr>
+      <tr><td>cert (show, expires, fingerprint)</td><td style="color:#22c55e;">&#x2713; Stable</td><td></td></tr>
+      <tr><td>key (gen, show, match)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>RSA, EC P-256/P-384. Ed25519 keygen not yet supported.</td></tr>
+      <tr><td>csr (create, show)</td><td style="color:#22c55e;">&#x2713; Stable</td><td></td></tr>
+      <tr><td>chain (build, show, verify)</td><td style="color:#22c55e;">&#x2713; Stable</td><td></td></tr>
+      <tr><td>diff</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Compares any two certs or CSRs</td></tr>
+      <tr><td>convert</td><td style="color:#eab308;">&#x26A0; Known Issue</td><td>PEM&harr;DER&harr;Base64 works for certs/CSRs. <a href="https://github.com/rayketcham-lab/PKI-Client/issues/59" style="color:#00d4ff;">DER key auto-detect fails (#59)</a></td></tr>
+      <tr><td>compliance (levels, check, cps, bridge)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>FIPS 140-3, NIST SP 800-57, Federal Bridge</td></tr>
+      <tr><td>dane (generate, verify)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>TLSA record generation (RFC 6698)</td></tr>
+      <tr><td>probe (server, check, lint, fetch)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>TLS inspection, certificate linting, chain fetch</td></tr>
+      <tr><td>revoke (check, crl-show)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>OCSP + CRL checking</td></tr>
+      <tr><td>pki (preview, build, export)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Declarative PKI hierarchy from TOML</td></tr>
+      <tr><td>acme</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>20 subcommands. Directory fetch works. Full flow requires ACME server.</td></tr>
+      <tr><td>est</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>RFC 7030. Requires EST server for enrollment.</td></tr>
+      <tr><td>scep</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>RFC 8894. Requires SCEP server for enrollment.</td></tr>
+      <tr><td>batch</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Run commands from script file</td></tr>
+      <tr><td>shell</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Interactive REPL</td></tr>
+      <tr><td>completions, manpages</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Bash/Zsh/Fish completions, man page generation</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:1.5rem;color:var(--text-muted);font-size:0.9rem;">
+    <strong>Note:</strong> <code>convert</code> is format conversion (PEM &harr; DER &harr; Base64), not algorithm conversion.
+    To migrate from RSA to PQC, use <code>key gen</code> &rarr; <code>csr create</code> &rarr; <code>pki build</code>.
+  </p>
   </div>
 </section>
 
