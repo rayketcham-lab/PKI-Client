@@ -94,7 +94,9 @@ pub fn run(args: ConvertArgs, config: &GlobalConfig) -> Result<CmdResult> {
         }
         _ => {
             return Err(anyhow::anyhow!(
-                "Cannot convert file type: {}. Supported: cert, crl, csr, key",
+                "Cannot convert file type: {}. Supported: cert, crl, csr, key.\n\
+                 Hint: DER-encoded files cannot always be auto-detected. \
+                 Try specifying the type with --from (e.g. --from key)",
                 super::show::type_name(file_type)
             ));
         }
@@ -346,5 +348,33 @@ mod tests {
         let result_str = String::from_utf8_lossy(&result);
         assert!(result_str.contains("Private Key (DER)"));
         assert!(result_str.contains("4 bytes"));
+    }
+
+    /// Issue #59: DER-encoded private keys should be auto-detected without --from flag.
+    #[test]
+    fn test_der_private_key_autodetect_roundtrip() {
+        use spork_core::{AlgorithmId, KeyPair};
+
+        // Generate a real ECDSA P-256 key and export as PKCS#8 DER
+        let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+        let der_bytes = kp.private_key_der().unwrap();
+
+        // Auto-detection should identify it as a private key
+        let detection =
+            DetectedFileType::detect_with_confidence(&der_bytes, std::path::Path::new("key.der"));
+        assert_eq!(
+            detection.file_type,
+            DetectedFileType::PrivateKey,
+            "DER private key should be auto-detected as PrivateKey, got {:?}",
+            detection.file_type,
+        );
+
+        // Converting DER -> PEM should produce valid PEM output
+        let pem_output = convert_key(&der_bytes, OutputFormat::Pem).unwrap();
+        let pem_str = String::from_utf8_lossy(&pem_output);
+        assert!(
+            pem_str.contains("-----BEGIN PRIVATE KEY-----"),
+            "DER->PEM conversion should produce PEM with PRIVATE KEY header",
+        );
     }
 }

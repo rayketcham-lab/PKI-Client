@@ -221,12 +221,66 @@ impl DetectedFileType {
                     confidence: 90,
                 };
             }
+
+            // Try PKCS#8 PrivateKeyInfo: SEQUENCE { INTEGER(0), SEQUENCE(AlgId), OCTET STRING }
+            if is_pkcs8_private_key(data) {
+                return DetectionResult {
+                    file_type: Self::PrivateKey,
+                    confidence: 85,
+                };
+            }
         }
 
         DetectionResult {
             file_type: Self::Unknown,
             confidence: 0,
         }
+    }
+}
+
+/// Check if DER data looks like a PKCS#8 PrivateKeyInfo structure.
+///
+/// PKCS#8 PrivateKeyInfo is: SEQUENCE { version INTEGER, algorithmIdentifier SEQUENCE, privateKey OCTET STRING }
+/// We validate the outer SEQUENCE tag, skip the length encoding, then check for
+/// version INTEGER(0) followed by an AlgorithmIdentifier SEQUENCE.
+fn is_pkcs8_private_key(data: &[u8]) -> bool {
+    // Must start with SEQUENCE tag (0x30)
+    if data.len() < 10 || data[0] != 0x30 {
+        return false;
+    }
+
+    // Skip the outer SEQUENCE length to get to the body
+    let body = match skip_der_tag_and_length(data) {
+        Some(b) => b,
+        None => return false,
+    };
+
+    // First element: version INTEGER = 0 → encoded as 0x02 0x01 0x00
+    if body.len() < 5 || body[0] != 0x02 || body[1] != 0x01 || body[2] != 0x00 {
+        return false;
+    }
+
+    // Second element: AlgorithmIdentifier SEQUENCE (tag 0x30)
+    body[3] == 0x30
+}
+
+/// Skip the DER tag and length bytes, returning the body.
+fn skip_der_tag_and_length(data: &[u8]) -> Option<&[u8]> {
+    if data.len() < 2 {
+        return None;
+    }
+    // Skip tag byte
+    let len_byte = data[1];
+    if len_byte < 0x80 {
+        // Short form: length in a single byte
+        data.get(2..)
+    } else {
+        // Long form: number of length bytes encoded in low 7 bits
+        let num_len_bytes = (len_byte & 0x7F) as usize;
+        if num_len_bytes == 0 || num_len_bytes > 4 {
+            return None;
+        }
+        data.get(2 + num_len_bytes..)
     }
 }
 
@@ -2354,6 +2408,36 @@ mod tests {
             encrypted: false,
         };
         assert_eq!(weak_key.security_assessment(), "WEAK - Upgrade immediately");
+    }
+
+    #[test]
+    fn test_detect_der_private_key_pkcs8() {
+        // Generate a real PKCS#8 DER private key
+        let kp = spork_core::KeyPair::generate(spork_core::AlgorithmId::EcdsaP256).unwrap();
+        let der_bytes = kp.private_key_der().unwrap();
+
+        let result =
+            DetectedFileType::detect_with_confidence(&der_bytes, std::path::Path::new("key.der"));
+        assert_eq!(result.file_type, DetectedFileType::PrivateKey);
+        assert!(
+            result.confidence >= 80,
+            "confidence should be >= 80, got {}",
+            result.confidence
+        );
+    }
+
+    #[test]
+    fn test_is_pkcs8_private_key_valid() {
+        let kp = spork_core::KeyPair::generate(spork_core::AlgorithmId::EcdsaP256).unwrap();
+        let der_bytes = kp.private_key_der().unwrap();
+        assert!(is_pkcs8_private_key(&der_bytes));
+    }
+
+    #[test]
+    fn test_is_pkcs8_private_key_rejects_garbage() {
+        assert!(!is_pkcs8_private_key(b"not a key"));
+        assert!(!is_pkcs8_private_key(&[]));
+        assert!(!is_pkcs8_private_key(&[0x30, 0x00])); // empty sequence
     }
 
     #[test]
