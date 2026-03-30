@@ -48,6 +48,11 @@ fn skip_if_missing() -> bool {
     }
 }
 
+/// Skip RSA-2048 tests when compiled with FIPS (FIPS rejects RSA < 3072).
+fn skip_if_fips() -> bool {
+    cfg!(feature = "fips")
+}
+
 /// Generate a key of the given type into `dir` and return the file path.
 ///
 /// `algo` must be one of: `("rsa", &["--bits", "2048"])`,
@@ -56,7 +61,21 @@ fn gen_key(dir: &TempDir, name: &str, algo: &str, extra_args: &[&str]) -> PathBu
     let key_path = dir.path().join(name);
     let mut cmd = pki_cmd();
     cmd.args(["key", "gen", algo]);
-    for arg in extra_args {
+
+    // In FIPS mode, RSA-2048 is rejected — auto-upgrade to 3072 for tests
+    // that just need "some RSA key" and don't assert on exact bit count.
+    let fips_args: Vec<&str>;
+    let args: &[&str] = if skip_if_fips() && algo == "rsa" && extra_args.contains(&"2048") {
+        fips_args = extra_args
+            .iter()
+            .map(|a| if *a == "2048" { "3072" } else { *a })
+            .collect();
+        &fips_args
+    } else {
+        extra_args
+    };
+
+    for arg in args {
         cmd.arg(arg);
     }
     cmd.arg("-o").arg(&key_path);
@@ -230,7 +249,7 @@ fn extract_bits_from_parens(s: &str) -> Option<u32> {
 
 #[test]
 fn test_csr_show_key_size_rsa2048() {
-    if skip_if_missing() {
+    if skip_if_missing() || skip_if_fips() {
         return;
     }
     let dir = TempDir::new().unwrap();
@@ -1127,8 +1146,9 @@ fn issue_28_shell_multiline_paste_runs_all_commands() {
     let key2 = dir.path().join("b.key");
 
     // Paste two key gen commands at once
+    let rsa_bits = if skip_if_fips() { "3072" } else { "2048" };
     let input = format!(
-        "key gen ec --curve p256 -o {}\nkey gen rsa --bits 2048 -o {}",
+        "key gen ec --curve p256 -o {}\nkey gen rsa --bits {rsa_bits} -o {}",
         key1.display(),
         key2.display()
     );
@@ -1436,8 +1456,9 @@ fn shell_continuation_second_file_arg() {
         .args(["key", "gen", "ec", "--curve", "p256", "-o"])
         .arg(&k1)
         .output();
+    let rsa_bits = if skip_if_fips() { "3072" } else { "2048" };
     let _ = pki_cmd()
-        .args(["key", "gen", "rsa", "--bits", "2048", "-o"])
+        .args(["key", "gen", "rsa", "--bits", rsa_bits, "-o"])
         .arg(&k2)
         .output();
     let input = format!("diff {} \\\n{}", k1.display(), k2.display());

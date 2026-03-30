@@ -3557,6 +3557,11 @@ mod tests {
         let result = std::thread::Builder::new()
             .stack_size(16 * 1024 * 1024)
             .spawn(|| {
+                // Re-check inside thread — FIPS may have been enabled by
+                // another test between our outer check and thread start.
+                if crate::fips::is_fips_mode() {
+                    return;
+                }
                 let (root_cert, mut root_ca) =
                     create_root_ca("ML-DSA-87 Root", AlgorithmId::MlDsa87);
                 let (_int_cert, mut int_ca) =
