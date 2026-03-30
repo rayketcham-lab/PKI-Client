@@ -10,4 +10,6 @@ mod response;
 mod types;
 
 pub use client::ScepClient;
+#[cfg(test)]
+pub use types::PkiStatus;
 pub use types::{EnrollConfig, EnrollmentResponse};

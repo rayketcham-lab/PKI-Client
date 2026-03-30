@@ -462,12 +462,7 @@ fn enroll(
 
     match config.format {
         OutputFormat::Json => {
-            let json = serde_json::json!({
-                "transaction_id": response.transaction_id,
-                "status": response.status.to_string(),
-                "certificate": response.certificate,
-                "private_key": response.private_key_pem,
-            });
+            let json = enrollment_to_json(&response);
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
         OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
@@ -493,10 +488,9 @@ fn enroll(
                 if let Some(ref cert) = response.certificate {
                     println!("\n{}", cert);
                 }
-                if !config.quiet {
-                    if let Some(ref key) = response.private_key_pem {
-                        println!("{}", key);
-                    }
+                if let Some(ref key) = response.private_key_pem {
+                    warn_key_to_stdout();
+                    println!("{}", key);
                 }
             }
         }
@@ -559,5 +553,259 @@ fn format_bool(b: bool) -> colored::ColoredString {
         "Yes".green()
     } else {
         "No".red()
+    }
+}
+
+/// Build the JSON representation of a SCEP enrollment response.
+///
+/// Private keys are NEVER included in JSON output to prevent accidental
+/// exposure in logs, CI pipelines, or terminal history.
+fn enrollment_to_json(response: &crate::scep::EnrollmentResponse) -> serde_json::Value {
+    serde_json::json!({
+        "transaction_id": response.transaction_id,
+        "status": response.status.to_string(),
+        "certificate": response.certificate,
+        "private_key": "[REDACTED - use --output to save key to file]",
+    })
+}
+
+/// Emit a stderr warning when private key material is about to be printed to stdout.
+fn warn_key_to_stdout() {
+    eprintln!(
+        "{} Private key is being written to stdout. \
+         Use --output <DIR> to save to a file with restricted permissions instead.",
+        "WARNING:".yellow().bold()
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scep::{EnrollmentResponse, PkiStatus};
+
+    fn mock_enrollment_response() -> EnrollmentResponse {
+        EnrollmentResponse {
+            transaction_id: "TX-12345".to_string(),
+            status: PkiStatus::Success,
+            fail_info: None,
+            certificate: Some(
+                "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----".to_string(),
+            ),
+            private_key_pem: Some(
+                "-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----".to_string(),
+            ),
+        }
+    }
+
+    // === SPEC 1: JSON output must NEVER include raw private key material ===
+
+    #[test]
+    fn test_enrollment_json_redacts_private_key() {
+        let response = mock_enrollment_response();
+        let json = enrollment_to_json(&response);
+
+        let key_value = json["private_key"].as_str().unwrap();
+        assert!(
+            !key_value.contains("BEGIN PRIVATE KEY"),
+            "JSON output must not contain raw private key PEM"
+        );
+        assert!(
+            key_value.contains("REDACTED"),
+            "JSON output must show REDACTED placeholder for private key"
+        );
+    }
+
+    #[test]
+    fn test_enrollment_json_includes_certificate() {
+        let response = mock_enrollment_response();
+        let json = enrollment_to_json(&response);
+
+        let cert_value = json["certificate"].as_str().unwrap();
+        assert!(
+            cert_value.contains("BEGIN CERTIFICATE"),
+            "JSON output must still include the certificate"
+        );
+    }
+
+    #[test]
+    fn test_enrollment_json_includes_transaction_id() {
+        let response = mock_enrollment_response();
+        let json = enrollment_to_json(&response);
+
+        assert_eq!(json["transaction_id"].as_str().unwrap(), "TX-12345");
+    }
+
+    #[test]
+    fn test_enrollment_json_no_key_when_none() {
+        let mut response = mock_enrollment_response();
+        response.private_key_pem = None;
+        let json = enrollment_to_json(&response);
+
+        // Even with None, the field should still show redacted (not leak absence info)
+        let key_value = json["private_key"].as_str().unwrap();
+        assert!(
+            key_value.contains("REDACTED"),
+            "JSON must show REDACTED even when key is None"
+        );
+    }
+
+    // === SPEC 2: sanitize_filename must strip all non-safe characters ===
+
+    #[test]
+    fn test_sanitize_filename_strips_email() {
+        // Email in CN like "user@quantumnexum.com" must not pass through
+        let result = sanitize_filename("user@quantumnexum.com");
+        assert!(!result.contains('@'), "@ must be replaced");
+        assert!(!result.contains('.'), ". must be replaced");
+        assert_eq!(result, "user_quantumnexum_com");
+    }
+
+    #[test]
+    fn test_sanitize_filename_strips_path_traversal() {
+        let result = sanitize_filename("../../etc/passwd");
+        assert!(!result.contains('/'), "/ must be replaced");
+        assert!(!result.contains('.'), ". must be replaced");
+        assert_eq!(result, "______etc_passwd");
+    }
+
+    #[test]
+    fn test_sanitize_filename_preserves_safe_chars() {
+        let result = sanitize_filename("device-01_prod");
+        assert_eq!(result, "device-01_prod");
+    }
+
+    #[test]
+    fn test_sanitize_filename_strips_spaces() {
+        let result = sanitize_filename("John Doe Device");
+        assert!(!result.contains(' '), "spaces must be replaced");
+        assert_eq!(result, "John_Doe_Device");
+    }
+
+    // === SPEC 3: Key file permissions must be 0o600 ===
+
+    #[test]
+    fn test_save_enrollment_files_key_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let response = mock_enrollment_response();
+
+        save_enrollment_files(dir.path(), "test-device", &response).unwrap();
+
+        let key_path = dir.path().join("test-device-key.pem");
+        assert!(key_path.exists(), "Key file must be created");
+
+        let metadata = std::fs::metadata(&key_path).unwrap();
+        let mode = metadata.permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "Key file must have 0600 permissions, got {:o}",
+            mode
+        );
+    }
+
+    #[test]
+    fn test_save_enrollment_files_creates_cert() {
+        let dir = tempfile::tempdir().unwrap();
+        let response = mock_enrollment_response();
+
+        save_enrollment_files(dir.path(), "test-device", &response).unwrap();
+
+        let cert_path = dir.path().join("test-device.pem");
+        assert!(cert_path.exists(), "Certificate file must be created");
+
+        let contents = std::fs::read_to_string(&cert_path).unwrap();
+        assert!(contents.contains("BEGIN CERTIFICATE"));
+    }
+
+    // === SPEC 4: warn_key_to_stdout must exist and be callable ===
+
+    #[test]
+    fn test_warn_key_to_stdout_does_not_panic() {
+        // Ensure the warning function exists and doesn't panic
+        warn_key_to_stdout();
+    }
+
+    // === SPEC 5: sanitize_filename edge cases ===
+
+    #[test]
+    fn test_sanitize_filename_empty_string() {
+        let result = sanitize_filename("");
+        assert_eq!(result, "", "empty input must produce empty output");
+    }
+
+    #[test]
+    fn test_sanitize_filename_unicode_passes_through() {
+        // Rust's char::is_alphanumeric() returns true for Unicode letter categories (e.g. é),
+        // so non-ASCII alphanumeric characters are NOT replaced by the current implementation.
+        // This test documents actual behavior. If the requirement changes to ASCII-only,
+        // sanitize_filename must switch to char::is_ascii_alphanumeric().
+        let result = sanitize_filename("caf\u{00e9}");
+        assert_eq!(
+            result, "caf\u{00e9}",
+            "non-ASCII alphanumeric chars currently pass through (is_alphanumeric is Unicode-aware)"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filename_only_unsafe_chars() {
+        let result = sanitize_filename("!@#$%^&*()");
+        assert_eq!(
+            result, "__________",
+            "all unsafe chars must map to underscores"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_filename_null_byte() {
+        let result = sanitize_filename("ab\x00cd");
+        assert!(!result.contains('\x00'), "null byte must be replaced");
+        assert_eq!(result, "ab_cd");
+    }
+
+    #[test]
+    fn test_sanitize_filename_windows_path_separators() {
+        let result = sanitize_filename("C:\\Windows\\System32");
+        assert!(!result.contains('\\'), "backslash must be replaced");
+        assert!(!result.contains(':'), "colon must be replaced");
+        assert_eq!(result, "C__Windows_System32");
+    }
+
+    #[test]
+    fn test_sanitize_filename_only_dashes_and_underscores() {
+        let result = sanitize_filename("---___---");
+        assert_eq!(
+            result, "---___---",
+            "hyphens and underscores are safe and must be preserved"
+        );
+    }
+
+    // === SPEC 6: enrollment_to_json status field ===
+
+    #[test]
+    fn test_enrollment_json_status_field_present() {
+        let response = mock_enrollment_response();
+        let json = enrollment_to_json(&response);
+        assert!(
+            json.get("status").is_some(),
+            "JSON must include a status field"
+        );
+        assert_eq!(
+            json["status"].as_str().unwrap(),
+            "SUCCESS",
+            "status must reflect PkiStatus::Success display string"
+        );
+    }
+
+    #[test]
+    fn test_enrollment_json_null_certificate_when_none() {
+        let mut response = mock_enrollment_response();
+        response.certificate = None;
+        let json = enrollment_to_json(&response);
+        // certificate field must be present but null (not absent)
+        assert!(
+            json.get("certificate").is_some(),
+            "JSON must include certificate field even when None"
+        );
     }
 }

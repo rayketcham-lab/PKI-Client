@@ -3166,10 +3166,12 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))] // RSA-2048 rejected in FIPS mode (minimum 3072-bit)
     fn test_valid_chain_rsa() {
-        let (root_cert, mut root_ca) = create_root_ca("RSA Root", AlgorithmId::Rsa2048);
+        // Use RSA-3072: RSA-2048 is below the FIPS minimum (SP 800-131A Rev 2)
+        // and races with tests that enable FIPS mode via the global atomic.
+        let (root_cert, mut root_ca) = create_root_ca("RSA Root", AlgorithmId::Rsa3072);
         let (_int_cert, mut int_ca) =
-            create_intermediate_ca("RSA Intermediate", AlgorithmId::Rsa2048, &mut root_ca);
-        let ee = issue_ee(&mut int_ca, "rsa.example.com", AlgorithmId::Rsa2048);
+            create_intermediate_ca("RSA Intermediate", AlgorithmId::Rsa3072, &mut root_ca);
+        let ee = issue_ee(&mut int_ca, "rsa.example.com", AlgorithmId::Rsa3072);
 
         let chain = vec![ee, int_ca.certificate.clone(), root_cert.clone()];
         let trust = vec![root_cert.to_der().unwrap()];

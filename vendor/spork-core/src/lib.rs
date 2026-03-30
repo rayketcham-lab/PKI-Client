@@ -194,6 +194,11 @@ mod integration_tests {
     #[test]
     #[cfg(all(feature = "ceremony", feature = "pqc", not(feature = "fips")))]
     fn test_pqc_full_workflow() {
+        // Skip if FIPS mode is active at runtime (other tests may enable it
+        // via the global atomic, and ML-DSA is not FIPS-approved yet).
+        if fips::is_fips_mode() {
+            return;
+        }
         // PQC Root CA
         let root_config = CaConfig::root("PQC Root CA", AlgorithmId::MlDsa65);
         let root_result = CaCeremony::init_root(root_config).unwrap();
@@ -265,6 +270,10 @@ mod integration_tests {
     #[test]
     #[cfg(all(feature = "ceremony", feature = "pqc", not(feature = "fips")))]
     fn test_pqc_algorithm_parity() {
+        // Skip if FIPS mode is active at runtime (races with FIPS tests).
+        if fips::is_fips_mode() {
+            return;
+        }
         // Test that all PQC algorithms work for CA creation
         let algorithms = [
             AlgorithmId::MlDsa44,

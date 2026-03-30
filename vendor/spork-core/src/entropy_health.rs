@@ -314,9 +314,27 @@ mod tests {
 
     #[test]
     fn test_byte_distribution_random_passes() {
-        let sample = generate_sample(4096); // Larger sample for distribution
+        // Use 16384 bytes: with 256 bins, expected=64/bin, std_dev≈7.97,
+        // threshold=5σ≈39.9. Much more headroom than 4096 (expected=16,
+        // threshold≈19.8) which was flaky due to multiple-comparison effects
+        // across 256 bins.
+        let sample = generate_sample(16384);
         let result = byte_distribution_test(&sample);
         assert!(result.passed, "Random sample should pass distribution test");
+    }
+
+    /// Verify the distribution test accepts a perfectly uniform sample.
+    #[test]
+    fn test_byte_distribution_uniform_passes() {
+        // Exactly 64 of each byte value — zero deviation, must always pass.
+        let sample: Vec<u8> = (0..256u16)
+            .flat_map(|b| std::iter::repeat_n(b as u8, 64))
+            .collect();
+        let result = byte_distribution_test(&sample);
+        assert!(
+            result.passed,
+            "Perfectly uniform sample must pass distribution test"
+        );
     }
 
     #[test]
