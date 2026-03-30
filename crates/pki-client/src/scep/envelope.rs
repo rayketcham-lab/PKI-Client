@@ -325,7 +325,7 @@ fn algorithm_identifier_no_params(oid_value: &[u8]) -> Vec<u8> {
 ///
 /// Encrypts `plaintext` (the CSR DER) with AES-256-CBC.
 /// The AES key is encrypted to `ca_pub_key_der` (RSA SPKI) using RSAES-OAEP.
-#[allow(unreachable_code, unused_variables)]
+#[allow(unreachable_code, unused_variables, clippy::diverging_sub_expression)]
 pub fn build_enveloped_data(plaintext: &[u8], ca_pub_key_der: &[u8]) -> Result<Vec<u8>> {
     #[cfg(feature = "fips")]
     anyhow::bail!("SCEP enrollment is not available in FIPS mode");
