@@ -10,12 +10,11 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 
 | Scenario | Description |
 |----------|-------------|
-| [The Audit](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=audit) | Security auditor reviews expired RSA, hybrid, and PQC certificates |
-| [The Renewal](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=renewal) | Cron catches an expiring cert — full renewal workflow |
-| [The Migration](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=migration) | PKI architect presents the RSA → Hybrid → PQC roadmap |
-| [The Build](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=build) | 20 lines of TOML. One command. Full PQC hierarchy from scratch |
-| [The Handoff](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=handoff) | Senior engineer onboards a new team member |
-| [The Vision](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=vision) | From MD5 to 2050 — the past, present, and future of PKI |
+| [Tacoo Tuesday](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=taco-tuesday) | A taco shop goes full post-quantum — 3-tier all-PQC hierarchy with ML-DSA |
+| [Enterprise PKI](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=enterprise) | 3-tier corporate PKI (RSA-4096) vs PQC (ML-DSA-87) — build, inspect, diff, verify |
+| [The Vision](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=vision) | From MD5 to ML-DSA-87 to 2050 — the past, present, and future of PKI |
+| [Signing Service](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=signing) | Enterprise signing — PE/Authenticode, detached CMS, PowerShell, RFC 3161 TSA |
+| [Quantum Ops](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=quantum-ops) | End-to-end PKI operations: cert inspection, key gen, CSR, and ML-DSA-87 hierarchy |
 
 ---
 
@@ -34,7 +33,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.6.3-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -122,7 +121,7 @@ pki
 | **`probe`** | TLS server inspection and security linting | TLS 1.3 (RFC 8446) |
 | **`acme`** | Let's Encrypt / ACME certificate enrollment | RFC 8555 |
 | **`est`** | Enrollment over Secure Transport | RFC 7030 |
-| **`scep`** | SCEP CA discovery and capabilities | RFC 8894 |
+| **`scep`** | SCEP enrollment, CA discovery and capabilities | RFC 8894 |
 | **`compliance`** | FIPS 140-3, NIST, Federal Bridge validation | NIST SP 800-57 |
 | **`dane`** | TLSA record generation and verification | RFC 6698 |
 | **`diff`** | Side-by-side certificate comparison | — |
@@ -150,7 +149,7 @@ pki
 ### Enrollment Protocols
 - **ACME** — full RFC 8555 client with HTTP-01 and DNS-01 challenges, auto-renewal, server deployment
 - **EST** — RFC 7030 enrollment, re-enrollment, server keygen, CSR attributes
-- **SCEP** — RFC 8894 CA capabilities and certificate discovery; full enrollment planned ([#1](https://github.com/rayketcham-lab/PKI-Client/issues/1))
+- **SCEP** — RFC 8894 enrollment, CA capabilities, and certificate discovery
 
 ### Compliance & Security
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms with `--fips`
@@ -226,7 +225,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 
 **Pin to a specific version:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.6.3
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.7.0
 ```
 
 > **Note:** `sudo` must be on `bash`, not `curl`. To install without sudo, set a writable directory: `INSTALL_DIR=~/.local/bin ... | bash`
@@ -234,7 +233,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 Or download manually from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases):
 
 ```bash
-curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.6.3-x86_64-linux.tar.gz
+curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.7.0-x86_64-linux.tar.gz
 tar xzf pki.tar.gz
 sudo mv pki /usr/local/bin/
 ```
@@ -253,17 +252,17 @@ sha256sum -c SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-v0.6.3-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-v0.7.0-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore):**
 ```bash
-curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.6.3-x86_64-linux.tar.gz.bundle
+curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.7.0-x86_64-linux.tar.gz.bundle
 cosign verify-blob \
-  --bundle pki-v0.6.3-x86_64-linux.tar.gz.bundle \
+  --bundle pki-v0.7.0-x86_64-linux.tar.gz.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-v0.6.3-x86_64-linux.tar.gz
+  pki-v0.7.0-x86_64-linux.tar.gz
 ```
 
 ### Shell completions
