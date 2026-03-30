@@ -933,6 +933,11 @@ mod tests {
 
     #[test]
     fn test_build_message_material_rsa2048() {
+        // RSA-2048 is rejected when FIPS mode is active at runtime
+        // (other tests may enable it via the global atomic).
+        if spork_core::fips::is_fips_mode() {
+            return;
+        }
         let mat = build_message_material(
             "test.example.com",
             Some("secret"),
