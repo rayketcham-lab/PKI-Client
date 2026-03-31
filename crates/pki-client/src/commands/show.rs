@@ -294,6 +294,8 @@ fn show_key(
                 }
                 KeyAlgorithm::EcP256 | KeyAlgorithm::EcP384 => "STRONG".green(),
                 KeyAlgorithm::Ed25519 | KeyAlgorithm::Ed448 => "STRONG".green(),
+                #[cfg(feature = "pqc")]
+                KeyAlgorithm::MlDsa(_) | KeyAlgorithm::SlhDsa(_) => "STRONG".green(),
             };
             println!(
                 "    Key Size:           {} bits {}",

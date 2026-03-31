@@ -1704,3 +1704,112 @@ fn issue_47_cert_show_flag_before_file() {
         "cert show --lint <file> should parse the file correctly.\nGot: {combined}"
     );
 }
+
+// ============================================================================
+// PQC Key Generation + CSR — end-to-end tests
+// ============================================================================
+
+/// Generate a PQC key via `pki key gen <algo>`, create a CSR, and verify
+/// that `pki show` displays it without crashing.
+#[cfg(feature = "pqc")]
+fn pqc_keygen_csr_roundtrip(algo: &str, expected_algo_name: &str) {
+    if skip_if_missing() {
+        return;
+    }
+    let dir = TempDir::new().unwrap();
+
+    // Step 1: Generate PQC key
+    let key_path = dir.path().join(format!("{algo}.key"));
+    let out = pki_cmd()
+        .args(["key", "gen", algo, "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("failed to run pki key gen");
+    assert!(
+        out.status.success(),
+        "pki key gen {algo} failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    assert!(key_path.exists(), "PQC key file not created");
+
+    // Step 2: Verify key file is valid PEM
+    let key_pem = fs::read_to_string(&key_path).expect("read key");
+    assert!(
+        key_pem.contains("BEGIN PRIVATE KEY"),
+        "PQC key should be PKCS#8 PEM, got:\n{}",
+        &key_pem[..key_pem.len().min(200)]
+    );
+
+    // Step 3: Create CSR from PQC key (--algorithm required for PQC)
+    let csr_path = dir.path().join(format!("{algo}.csr"));
+    let out = pki_cmd()
+        .args([
+            "csr",
+            "create",
+            "--key",
+            key_path.to_str().unwrap(),
+            "--cn",
+            &format!("{algo}.example.com"),
+            "--algorithm",
+            algo,
+            "-o",
+        ])
+        .arg(&csr_path)
+        .output()
+        .expect("failed to run pki csr create");
+    assert!(
+        out.status.success(),
+        "pki csr create with {algo} key failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    assert!(csr_path.exists(), "PQC CSR file not created");
+
+    // Step 4: Verify CSR displays correctly
+    let show_output = pki_show(&csr_path);
+    assert!(
+        show_output.contains(expected_algo_name),
+        "`pki show` output for {algo} CSR should mention '{expected_algo_name}':\n{show_output}"
+    );
+    assert!(
+        show_output.contains(&format!("{algo}.example.com")),
+        "`pki show` should display the subject CN:\n{show_output}"
+    );
+}
+
+#[test]
+#[cfg(feature = "pqc")]
+fn test_pqc_keygen_csr_ml_dsa_44() {
+    pqc_keygen_csr_roundtrip("ml-dsa-44", "ML-DSA");
+}
+
+#[test]
+#[cfg(feature = "pqc")]
+fn test_pqc_keygen_csr_ml_dsa_65() {
+    pqc_keygen_csr_roundtrip("ml-dsa-65", "ML-DSA");
+}
+
+#[test]
+#[cfg(feature = "pqc")]
+fn test_pqc_keygen_csr_ml_dsa_87() {
+    pqc_keygen_csr_roundtrip("ml-dsa-87", "ML-DSA");
+}
+
+#[test]
+#[cfg(feature = "pqc")]
+fn test_pqc_keygen_csr_slh_dsa_128s() {
+    pqc_keygen_csr_roundtrip("slh-dsa-128s", "SLH-DSA");
+}
+
+#[test]
+#[cfg(feature = "pqc")]
+fn test_pqc_keygen_csr_slh_dsa_192s() {
+    pqc_keygen_csr_roundtrip("slh-dsa-192s", "SLH-DSA");
+}
+
+#[test]
+#[cfg(feature = "pqc")]
+fn test_pqc_keygen_csr_slh_dsa_256s() {
+    pqc_keygen_csr_roundtrip("slh-dsa-256s", "SLH-DSA");
+}

@@ -5,6 +5,8 @@ use clap::{Args, Subcommand};
 use colored::Colorize;
 use std::path::PathBuf;
 
+#[cfg(feature = "pqc")]
+use crate::compat::generate_pqc;
 use crate::compat::{generate_ec, generate_ed25519, generate_rsa, load_private_key, KeyAlgorithm};
 
 use super::CmdResult;
@@ -15,7 +17,7 @@ use crate::config::GlobalConfig;
 pub enum KeyCommands {
     /// Generate a new private key
     ///
-    /// Generate RSA, EC, or Ed25519 private keys with secure defaults.
+    /// Generate RSA, EC, Ed25519, or post-quantum keys with secure defaults.
     /// Keys are output in PKCS#8 PEM format.
     #[command(
         name = "gen",
@@ -24,6 +26,8 @@ pub enum KeyCommands {
   pki key gen ec --curve p256          EC P-256 key
   pki key gen ed25519                  Ed25519 key (modern)
   pki key gen rsa                      RSA 4096-bit key
+  pki key gen ml-dsa-65                ML-DSA-65 post-quantum key (FIPS 204)
+  pki key gen slh-dsa-128s             SLH-DSA stateless hash-based (FIPS 205)
   pki key gen ec -o server.key         Save to file"
     )]
     Gen(GenArgs),
@@ -147,14 +151,33 @@ fn gen(args: GenArgs, config: &GlobalConfig) -> Result<CmdResult> {
             }
             generate_rsa(args.bits)?
         }
+        #[cfg(feature = "pqc")]
+        "ml-dsa-44" | "ml-dsa-65" | "ml-dsa-87" | "slh-dsa-128s" | "slh-dsa-192s"
+        | "slh-dsa-256s" => {
+            if !config.quiet {
+                eprintln!("{} Generating {} key...", "●".cyan(), algo.to_uppercase());
+            }
+            generate_pqc(&algo)?
+        }
         other => {
-            anyhow::bail!(
-                "Unknown algorithm: {}\n\nSupported algorithms:\n  \
-                 ec       - ECDSA (P-256 or P-384)\n  \
-                 ed25519  - Edwards curve (modern)\n  \
-                 rsa      - RSA (3072 or 4096 bits)",
-                other
+            let mut msg = format!(
+                "Unknown algorithm: {other}\n\nSupported algorithms:\n  \
+                 ec         - ECDSA (P-256 or P-384)\n  \
+                 ed25519    - Edwards curve (modern)\n  \
+                 rsa        - RSA (3072 or 4096 bits)"
             );
+            #[cfg(feature = "pqc")]
+            {
+                msg.push_str(
+                    "\n  ml-dsa-44  - ML-DSA-44 (FIPS 204, NIST Level 2)\n  \
+                     ml-dsa-65  - ML-DSA-65 (FIPS 204, NIST Level 3)\n  \
+                     ml-dsa-87  - ML-DSA-87 (FIPS 204, NIST Level 5)\n  \
+                     slh-dsa-128s - SLH-DSA-SHA2-128s (FIPS 205)\n  \
+                     slh-dsa-192s - SLH-DSA-SHA2-192s (FIPS 205)\n  \
+                     slh-dsa-256s - SLH-DSA-SHA2-256s (FIPS 205)",
+                );
+            }
+            anyhow::bail!("{}", msg);
         }
     };
 
@@ -281,6 +304,10 @@ fn key_match(args: MatchArgs, config: &GlobalConfig) -> Result<CmdResult> {
         KeyAlgorithm::EcP256 | KeyAlgorithm::EcP384 => "EC",
         KeyAlgorithm::Ed25519 => "Ed25519",
         KeyAlgorithm::Ed448 => "Ed448",
+        #[cfg(feature = "pqc")]
+        KeyAlgorithm::MlDsa(_) => "ML-DSA",
+        #[cfg(feature = "pqc")]
+        KeyAlgorithm::SlhDsa(_) => "SLH-DSA",
     };
 
     let cert_algo = if cert.key_algorithm.contains("1.2.840.113549.1.1") {

@@ -1128,7 +1128,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         .filter(|(_, a)| *a == "--san")
                         .filter_map(|(i, _)| args.get(i + 1).cloned())
                         .collect();
-                    let cmd = csr::CsrCommands::Create(csr::CreateArgs {
+                    let cmd = csr::CsrCommands::Create(Box::new(csr::CreateArgs {
                         key: key.into(),
                         cn,
                         org: get_arg("--org"),
@@ -1137,10 +1137,11 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                         state: get_arg("--state"),
                         locality: get_arg("--locality"),
                         san,
+                        algorithm: get_arg("--algorithm"),
                         output: get_arg("-o")
                             .or_else(|| get_arg("--output"))
                             .map(|s| s.into()),
-                    });
+                    }));
                     csr::run(cmd, config)?;
                 }
                 "show" => {

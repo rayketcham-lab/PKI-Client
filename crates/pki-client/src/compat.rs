@@ -1680,6 +1680,12 @@ impl CsrBuilder {
                     "Ed25519/Ed448 not yet supported for CSR generation. Use EC P-256/P-384 or RSA."
                 ));
             }
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::MlDsa(_) | KeyAlgorithm::SlhDsa(_) => {
+                return Err(anyhow!(
+                    "ML-DSA/SLH-DSA not yet supported for CSR generation."
+                ));
+            }
         };
 
         // Load key pair from PEM
@@ -1752,7 +1758,7 @@ impl Default for CsrBuilder {
 // ============================================================================
 
 /// Key algorithm
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub enum KeyAlgorithm {
     /// RSA with key size
     Rsa(u32),
@@ -1764,6 +1770,12 @@ pub enum KeyAlgorithm {
     Ed25519,
     /// Ed448
     Ed448,
+    /// ML-DSA (FIPS 204) with security level
+    #[cfg(feature = "pqc")]
+    MlDsa(u16),
+    /// SLH-DSA (FIPS 205) with parameter set
+    #[cfg(feature = "pqc")]
+    SlhDsa(String),
 }
 
 impl std::fmt::Display for KeyAlgorithm {
@@ -1774,6 +1786,10 @@ impl std::fmt::Display for KeyAlgorithm {
             Self::EcP384 => write!(f, "EC P-384"),
             Self::Ed25519 => write!(f, "Ed25519"),
             Self::Ed448 => write!(f, "Ed448"),
+            #[cfg(feature = "pqc")]
+            Self::MlDsa(level) => write!(f, "ML-DSA-{level}"),
+            #[cfg(feature = "pqc")]
+            Self::SlhDsa(ref params) => write!(f, "SLH-DSA-{params}"),
         }
     }
 }
@@ -1790,6 +1806,14 @@ impl KeyAlgorithm {
             Self::EcP384 => "Very Strong (192-bit equivalent)",
             Self::Ed25519 => "Strong (128-bit equivalent)",
             Self::Ed448 => "Very Strong (224-bit equivalent)",
+            #[cfg(feature = "pqc")]
+            Self::MlDsa(44) => "Strong (NIST Level 2, quantum-resistant)",
+            #[cfg(feature = "pqc")]
+            Self::MlDsa(65) => "Very Strong (NIST Level 3, quantum-resistant)",
+            #[cfg(feature = "pqc")]
+            Self::MlDsa(_) => "Very Strong (NIST Level 5, quantum-resistant)",
+            #[cfg(feature = "pqc")]
+            Self::SlhDsa(_) => "Strong (stateless hash-based, quantum-resistant)",
         }
     }
 }
@@ -1813,15 +1837,19 @@ pub struct PrivateKey {
 impl PrivateKey {
     /// Get security assessment for this key
     pub fn security_assessment(&self) -> String {
-        match self.algorithm {
-            KeyAlgorithm::Rsa(bits) if bits >= 4096 => "Strong".to_string(),
-            KeyAlgorithm::Rsa(bits) if bits >= 3072 => "Good".to_string(),
-            KeyAlgorithm::Rsa(bits) if bits >= 2048 => "Acceptable".to_string(),
+        match &self.algorithm {
+            KeyAlgorithm::Rsa(bits) if *bits >= 4096 => "Strong".to_string(),
+            KeyAlgorithm::Rsa(bits) if *bits >= 3072 => "Good".to_string(),
+            KeyAlgorithm::Rsa(bits) if *bits >= 2048 => "Acceptable".to_string(),
             KeyAlgorithm::Rsa(_) => "WEAK - Upgrade immediately".to_string(),
             KeyAlgorithm::EcP256 => "Strong".to_string(),
             KeyAlgorithm::EcP384 => "Very Strong".to_string(),
             KeyAlgorithm::Ed25519 => "Strong".to_string(),
             KeyAlgorithm::Ed448 => "Very Strong".to_string(),
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::MlDsa(_) => "STRONG".to_string(),
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::SlhDsa(_) => "STRONG".to_string(),
         }
     }
 }
@@ -1913,14 +1941,16 @@ pub fn load_private_key(path: &Path) -> Result<PrivateKey> {
         (KeyAlgorithm::Rsa(2048), 2048)
     };
 
+    let curve = match algorithm {
+        KeyAlgorithm::EcP256 => Some("P-256".to_string()),
+        KeyAlgorithm::EcP384 => Some("P-384".to_string()),
+        _ => None,
+    };
+
     Ok(PrivateKey {
         algorithm,
         key_size: Some(bits),
-        curve: match algorithm {
-            KeyAlgorithm::EcP256 => Some("P-256".to_string()),
-            KeyAlgorithm::EcP384 => Some("P-384".to_string()),
-            _ => None,
-        },
+        curve,
         pem: data,
         bits,
         encrypted,
@@ -1981,6 +2011,38 @@ pub fn generate_rsa(bits: u32) -> Result<GeneratedKey> {
     })
 }
 
+/// Generate a PQC key (ML-DSA or SLH-DSA)
+#[cfg(feature = "pqc")]
+pub fn generate_pqc(algo_name: &str) -> Result<GeneratedKey> {
+    let (algo_id, key_algo) = match algo_name {
+        "ml-dsa-44" => (spork_core::AlgorithmId::MlDsa44, KeyAlgorithm::MlDsa(44)),
+        "ml-dsa-65" => (spork_core::AlgorithmId::MlDsa65, KeyAlgorithm::MlDsa(65)),
+        "ml-dsa-87" => (spork_core::AlgorithmId::MlDsa87, KeyAlgorithm::MlDsa(87)),
+        "slh-dsa-128s" => (
+            spork_core::AlgorithmId::SlhDsaSha2_128s,
+            KeyAlgorithm::SlhDsa("SHA2-128s".to_string()),
+        ),
+        "slh-dsa-192s" => (
+            spork_core::AlgorithmId::SlhDsaSha2_192s,
+            KeyAlgorithm::SlhDsa("SHA2-192s".to_string()),
+        ),
+        "slh-dsa-256s" => (
+            spork_core::AlgorithmId::SlhDsaSha2_256s,
+            KeyAlgorithm::SlhDsa("SHA2-256s".to_string()),
+        ),
+        other => return Err(anyhow!("Unknown PQC algorithm: {}", other)),
+    };
+
+    let keypair = spork_core::KeyPair::generate(algo_id)?;
+    let pem = keypair.private_key_pem()?;
+    let pem_string = (*pem).clone();
+
+    Ok(GeneratedKey {
+        algorithm: key_algo,
+        pem: pem_string,
+    })
+}
+
 /// Generate a private key (generic)
 #[allow(dead_code)] // Available for future use
 pub fn generate_key(algorithm: KeyAlgorithm, bits: Option<u32>) -> Result<PrivateKey> {
@@ -1990,6 +2052,10 @@ pub fn generate_key(algorithm: KeyAlgorithm, bits: Option<u32>) -> Result<Privat
         KeyAlgorithm::EcP384 => generate_ec("p384")?,
         KeyAlgorithm::Ed25519 => generate_ed25519()?,
         KeyAlgorithm::Ed448 => return Err(anyhow!("Ed448 key generation not supported")),
+        #[cfg(feature = "pqc")]
+        KeyAlgorithm::MlDsa(_) | KeyAlgorithm::SlhDsa(_) => {
+            return Err(anyhow!("ML-DSA/SLH-DSA key generation not yet supported"))
+        }
     };
 
     let bits_val = match generated.algorithm {
@@ -1998,16 +2064,26 @@ pub fn generate_key(algorithm: KeyAlgorithm, bits: Option<u32>) -> Result<Privat
         KeyAlgorithm::EcP384 => 384,
         KeyAlgorithm::Ed25519 => 256,
         KeyAlgorithm::Ed448 => 456,
+        #[cfg(feature = "pqc")]
+        KeyAlgorithm::MlDsa(level) => match level {
+            44 => 1312,
+            65 => 1952,
+            _ => 2592,
+        },
+        #[cfg(feature = "pqc")]
+        KeyAlgorithm::SlhDsa(_) => 0,
+    };
+
+    let curve = match generated.algorithm {
+        KeyAlgorithm::EcP256 => Some("P-256".to_string()),
+        KeyAlgorithm::EcP384 => Some("P-384".to_string()),
+        _ => None,
     };
 
     Ok(PrivateKey {
         algorithm: generated.algorithm,
         key_size: Some(bits_val),
-        curve: match generated.algorithm {
-            KeyAlgorithm::EcP256 => Some("P-256".to_string()),
-            KeyAlgorithm::EcP384 => Some("P-384".to_string()),
-            _ => None,
-        },
+        curve,
         pem: generated.pem,
         bits: bits_val,
         encrypted: false,
