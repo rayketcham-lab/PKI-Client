@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Server probing and TLS inspection.
 //!
 //! This module provides functionality for probing servers to inspect their

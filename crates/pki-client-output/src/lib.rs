@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! # pki-client-output
 //!
 //! Output formatting library for PKI Client - human-readable and machine-parseable output.

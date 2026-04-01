@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Declarative PKI Hierarchy Builder
 //!
 //! Build complete CA hierarchies from TOML configuration files.

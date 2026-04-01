@@ -24,6 +24,8 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 [![CI](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
 [![Daily Health Check](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/daily-check.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/daily-check.yml)
 [![Interop Tests](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/interop.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/interop.yml)
+[![Crypto Validation](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/crypto-validation.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/crypto-validation.yml)
+[![SCEP Interop](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/scep-interop.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/scep-interop.yml)
 
 <!-- Security & Compliance -->
 [![Security Audit](https://img.shields.io/badge/cargo--audit-passing-brightgreen?logo=hackthebox&logoColor=white)](https://rustsec.org/)
@@ -113,7 +115,7 @@ pki
 |---|---|---|
 | **`show`** | Auto-detect and display any PKI file | — |
 | **`cert`** | Certificate inspection, fingerprint, expiry | X.509 (RFC 5280) |
-| **`key`** | Key generation (RSA, EC, Ed25519) and inspection | PKCS#8 (RFC 5958) |
+| **`key`** | Key generation (RSA, EC, Ed25519, ML-DSA, SLH-DSA) and inspection | PKCS#8 (RFC 5958) |
 | **`chain`** | Certificate chain building and verification | RFC 5280 path validation |
 | **`csr`** | CSR creation and inspection | PKCS#10 (RFC 2986) |
 | **`crl`** | CRL viewing and revocation checking | RFC 5280 |
@@ -130,13 +132,14 @@ pki
 | **`completions`** | Shell completion scripts (bash, zsh, fish) | — |
 | **`manpages`** | Generate man pages | — |
 | **`shell`** | Interactive REPL session | — |
+| **`batch`** | Run commands from a script file (batch mode) | — |
 
 ## Features
 
 ### Certificate & Key Management
 - Decode, verify, fingerprint, and expiry-check X.509 certificates
-- Generate RSA (2048–4096), ECDSA (P-256, P-384), and Ed25519 keys
-- Create and inspect Certificate Signing Requests (CSRs)
+- Generate RSA (3072–4096), ECDSA (P-256, P-384), Ed25519, and post-quantum keys (ML-DSA, SLH-DSA)
+- Create and inspect Certificate Signing Requests (CSRs), including PQC CSRs
 - View CRLs and check revocation status via OCSP and CRL
 - Convert between PEM, DER, PKCS#12, and Base64
 
@@ -153,7 +156,7 @@ pki
 
 ### Compliance & Security
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms with `--fips`
-- **Post-quantum cryptography** — ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) with `--features pqc`
+- **Post-quantum cryptography** — ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) key generation, CSR creation, and certificate inspection with `--features pqc`
 - **Compliance validation** — check CA configurations against NIST, FIPS, and Federal Bridge policies
 - **Static binaries** — musl builds with zero runtime dependencies
 
@@ -177,7 +180,7 @@ pki
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                     pki (binary)                          │
-│              19 subcommands + interactive shell            │
+│              20 subcommands + interactive shell            │
 ├───────────┬───────────────┬──────────────────────────────┤
 │           │               │                              │
 │ pki-client-output         │  pki-probe                   │
@@ -196,7 +199,7 @@ pki
 
 | Crate | Role |
 |---|---|
-| `pki-client` | Binary — CLI entry point, 19 subcommands + shell |
+| `pki-client` | Binary — CLI entry point, 20 subcommands + shell |
 | `pki-client-output` | Library — formatting, OID registry |
 | `pki-probe` | Library — TLS inspection and linting |
 | `pki-hierarchy` | Library — declarative PKI hierarchy builder |
@@ -334,6 +337,9 @@ PKI-Client runs automated interop tests against real protocol implementations:
 | **ACME vs Pebble** | [Pebble](https://github.com/letsencrypt/pebble) (Let's Encrypt test CA) | Account registration, order creation, certificate issuance |
 | **TLS Probe** | google.com, cloudflare.com, github.com | TLS version detection, chain fetch, certificate inspection |
 | **Cert Round-Trip** | Local key/CSR generation | Key gen, CSR creation, PEM/DER conversion, format consistency |
+| **Cross-Validate** | Reference tools (GnuTLS, etc.) | DANE TLSA output matches reference implementations byte-for-byte |
+| **Crypto Validation** | Key gen + signature algorithms | Algorithm correctness across RSA, EC, Ed25519, and PQC |
+| **SCEP Enrollment** | SCEP CA server | SCEP enrollment, CA discovery, certificate retrieval |
 
 Interop tests run daily and on PRs that touch protocol code. Run locally:
 
@@ -347,7 +353,7 @@ bash tests/interop/tls_probe.sh
 
 - **No OpenSSL dependency** — pure Rust crypto stack (`rustls`, `ring`, `aws-lc-rs`) eliminates C memory-safety vulnerabilities
 - **No unsafe code** in application logic — only in vetted dependencies
-- **Constant-time comparisons** for cryptographic material via underlying libraries
+- **Constant-time comparisons** for cryptographic material via underlying libraries (`ring`, `aws-lc-rs`)
 - **No secret logging** — keys and private material are never written to stdout or logs
 - **Static binaries** — musl builds eliminate shared-library supply-chain risk
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms

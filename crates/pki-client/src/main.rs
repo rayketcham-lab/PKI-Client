@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! PKI Client - Modern PKI Operations Tool
 //!
 //! A modern PKI CLI tool that makes certificate operations human-friendly.
