@@ -160,6 +160,7 @@ fn gen(args: GenArgs, config: &GlobalConfig) -> Result<CmdResult> {
             generate_pqc(&algo)?
         }
         other => {
+            #[allow(unused_mut)]
             let mut msg = format!(
                 "Unknown algorithm: {other}\n\nSupported algorithms:\n  \
                  ec         - ECDSA (P-256 or P-384)\n  \
