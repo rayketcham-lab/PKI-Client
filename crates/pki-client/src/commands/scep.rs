@@ -518,18 +518,8 @@ fn save_enrollment_files(
 
     if let Some(ref key_pem) = response.private_key_pem {
         let key_path = dir.join(format!("{}-key.pem", base));
-        std::fs::write(&key_path, key_pem)
+        crate::util::write_sensitive_file(&key_path, key_pem)
             .with_context(|| format!("Failed to write private key: {}", key_path.display()))?;
-
-        // Set restrictive permissions on the key file (Unix only)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let perms = std::fs::Permissions::from_mode(0o600);
-            std::fs::set_permissions(&key_path, perms).with_context(|| {
-                format!("Failed to set key file permissions: {}", key_path.display())
-            })?;
-        }
     }
 
     Ok(())

@@ -33,7 +33,6 @@ tokio = { workspace = true }
 
 [features]
 default = []
-fips = ["spork-core/fips"]
 
 [dev-dependencies]
 tokio = { version = "1.44", features = ["full", "macros"] }

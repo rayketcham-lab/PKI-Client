@@ -1451,7 +1451,6 @@ fn parse_pkcs7_cert(data: &[u8]) -> Result<Certificate> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
 
     // ========== format_policy_oid ==========
 
@@ -1581,42 +1580,10 @@ mod tests {
     // ========== is_bridge_or_crosscert ==========
 
     fn make_test_cert(subject: &str) -> Certificate {
-        Certificate {
-            version: 3,
-            serial: "01".to_string(),
-            subject: subject.to_string(),
-            issuer: "CN=Issuer".to_string(),
-            not_before: Utc::now(),
-            not_after: Utc::now(),
-            signature_algorithm: "1.2.840.10045.4.3.2".to_string(),
-            signature_algorithm_name: "ecdsa-with-SHA256".to_string(),
-            key_algorithm: "1.2.840.10045.2.1".to_string(),
-            key_algorithm_name: "EC".to_string(),
-            key_size: 256,
-            ec_curve: Some("P-256".to_string()),
-            rsa_modulus: None,
-            rsa_exponent: None,
-            is_ca: true,
-            path_length: -1,
-            basic_constraints_critical: true,
-            key_usage: vec![],
-            key_usage_critical: false,
-            extended_key_usage: vec![],
-            san: vec![],
-            subject_key_id: None,
-            authority_key_id: None,
-            ocsp_urls: vec![],
-            ca_issuer_urls: vec![],
-            crl_distribution_points: vec![],
-            certificate_policies: vec![],
-            ocsp_must_staple: false,
-            ct_scts: vec![],
-            fingerprint_sha256: "aa:bb".to_string(),
-            fingerprint_sha1: "cc:dd".to_string(),
-            spki_sha256_b64: "abc".to_string(),
-            signature_bytes: vec![],
-            der: vec![],
-        }
+        let mut cert = Certificate::test_stub(subject);
+        cert.is_ca = true;
+        cert.basic_constraints_critical = true;
+        cert
     }
 
     #[test]

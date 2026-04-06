@@ -17,5 +17,8 @@ hex = { workspace = true }
 const-oid = "0.9"
 chrono = { workspace = true }
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 [features]
 pqc = ["spork-core/pqc"]

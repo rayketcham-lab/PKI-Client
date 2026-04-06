@@ -75,7 +75,7 @@ pub struct CtSct {
 
 /// Parsed X.509 certificate for display purposes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// TODO: Add #[non_exhaustive] once Certificate has a builder or Default impl
+#[non_exhaustive]
 pub struct Certificate {
     /// Certificate version (1, 2, or 3).
     pub version: u32,
@@ -376,6 +376,51 @@ impl Certificate {
             signature_bytes,
             der: der.to_vec(),
         })
+    }
+
+    /// Create a minimal stub certificate for testing.
+    ///
+    /// This is the canonical way to construct a `Certificate` from outside
+    /// the crate (since the struct is `#[non_exhaustive]`). Callers can
+    /// modify the returned value's public fields as needed.
+    #[must_use]
+    pub fn test_stub(subject: &str) -> Self {
+        Certificate {
+            version: 3,
+            serial: "01".to_string(),
+            subject: subject.to_string(),
+            issuer: "CN=Stub Issuer".to_string(),
+            not_before: Utc::now(),
+            not_after: Utc::now(),
+            signature_algorithm: "1.2.840.10045.4.3.2".to_string(),
+            signature_algorithm_name: "ecdsa-with-SHA256".to_string(),
+            key_algorithm: "1.2.840.10045.2.1".to_string(),
+            key_algorithm_name: "EC".to_string(),
+            key_size: 256,
+            ec_curve: Some("P-256".to_string()),
+            rsa_modulus: None,
+            rsa_exponent: None,
+            is_ca: false,
+            path_length: -1,
+            basic_constraints_critical: false,
+            key_usage: vec![],
+            key_usage_critical: false,
+            extended_key_usage: vec![],
+            san: vec![],
+            subject_key_id: None,
+            authority_key_id: None,
+            ocsp_urls: vec![],
+            ca_issuer_urls: vec![],
+            crl_distribution_points: vec![],
+            certificate_policies: vec![],
+            ocsp_must_staple: false,
+            ct_scts: vec![],
+            fingerprint_sha256: String::new(),
+            fingerprint_sha1: String::new(),
+            spki_sha256_b64: String::new(),
+            signature_bytes: vec![],
+            der: vec![],
+        }
     }
 
     /// Parse a certificate from PEM.

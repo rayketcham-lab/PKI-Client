@@ -9,19 +9,19 @@ repository.workspace = true
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
-colored = "2"
+colored = { workspace = true }
 chrono = { workspace = true }
-tabled = "0.15"
+tabled = { workspace = true }
 
 # Certificate parsing
 x509-parser = { workspace = true }
 pem = { workspace = true }
 
 # Hashing for fingerprints
-sha1 = "0.10"
-sha2 = "0.10"
-hex = "0.4"
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 base64 = { workspace = true }
 
 # OID registry TOML loading
-toml = "0.8"
+toml = { workspace = true }

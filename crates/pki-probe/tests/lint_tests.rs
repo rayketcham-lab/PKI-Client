@@ -65,8 +65,7 @@ fn generate_ca_cert() -> Vec<u8> {
     cert.to_der().unwrap()
 }
 
-/// Generate a certificate with RSA-2048 key (non-FIPS only).
-#[cfg(not(feature = "fips"))]
+/// Generate a certificate with RSA-2048 key.
 fn generate_rsa_cert() -> Vec<u8> {
     use spork_core::algo::{AlgorithmId, KeyPair};
     use spork_core::cert::{
@@ -162,8 +161,7 @@ fn test_lint_certificate_chain() {
     }
 }
 
-/// RSA-2048 is not FIPS-approved (minimum 3072-bit)
-#[cfg(not(feature = "fips"))]
+/// RSA-2048 lint check
 #[test]
 fn test_lint_rsa_certificate() {
     let linter = CertLinter::new();
