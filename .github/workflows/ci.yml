@@ -156,6 +156,24 @@ jobs:
       - name: cargo clippy --features pqc
         run: cargo clippy --all-targets --features pqc -- -D warnings
 
+  clippy-fips:
+    name: Clippy (FIPS)
+    needs: [fmt]
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    timeout-minutes: 15
+    continue-on-error: true  # FIPS entropy health check can be non-deterministic
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          components: clippy
+          cache-prefix: v3-clippy-fips
+
+      - name: cargo clippy --features fips
+        run: cargo clippy --all-targets --features fips -- -D warnings
+
   test:
     name: Test
     needs: [fmt, clippy]
@@ -187,6 +205,23 @@ jobs:
 
       - name: cargo test --features pqc
         run: cargo test --all --features pqc
+
+  test-fips:
+    name: Test (FIPS)
+    needs: [fmt, clippy-fips]
+    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    timeout-minutes: 20
+    continue-on-error: true  # FIPS entropy health check can be non-deterministic
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          cache-prefix: v3-test-fips
+
+      - name: cargo test --features fips
+        run: cargo test --all --features fips
 
   build:
     name: Build
@@ -434,6 +469,7 @@ jobs:
 
   binary-validation:
     name: Binary Validation
+    needs: [fmt, clippy]
     runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 25
     steps:
