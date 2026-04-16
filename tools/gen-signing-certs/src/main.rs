@@ -181,7 +181,7 @@ fn write_pfx_secure(path: &Path, data: &[u8]) -> std::io::Result<()> {
             .mode(0o600)
             .open(path)?;
         f.write_all(data)?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(not(unix))]
     {
