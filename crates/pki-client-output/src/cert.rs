@@ -82,15 +82,15 @@ impl CertFormatter {
         // Check extended key usage first
         for eku in &cert.extended_key_usage {
             match eku.as_str() {
-                "TLS Web Server Authentication" | "Server Authentication" => {
-                    if !purposes.contains(&"Server") {
-                        purposes.push("Server");
-                    }
+                "TLS Web Server Authentication" | "Server Authentication"
+                    if !purposes.contains(&"Server") =>
+                {
+                    purposes.push("Server")
                 }
-                "TLS Web Client Authentication" | "Client Authentication" => {
-                    if !purposes.contains(&"Client") {
-                        purposes.push("Client");
-                    }
+                "TLS Web Client Authentication" | "Client Authentication"
+                    if !purposes.contains(&"Client") =>
+                {
+                    purposes.push("Client")
                 }
                 "Code Signing" => purposes.push("Code Signing"),
                 "Email Protection" | "E-mail Protection" => purposes.push("Email/S-MIME"),
