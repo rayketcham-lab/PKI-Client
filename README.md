@@ -375,6 +375,7 @@ PKI-Client runs automated interop tests against real protocol implementations:
 | **Cross-Validate** | Reference tools (GnuTLS, etc.) | DANE TLSA output matches reference implementations byte-for-byte |
 | **Crypto Validation** | Key gen + signature algorithms | Algorithm correctness across RSA, EC, Ed25519, and PQC |
 | **SCEP Enrollment** | SCEP CA server | SCEP enrollment, CA discovery, certificate retrieval |
+| **OpenSSL Parity** | OpenSSL 3.x as ground truth | Cert/CSR/CRL/key/PKCS#12 field coverage and JSON schema alignment |
 
 Interop tests run daily and on PRs that touch protocol code. Run locally:
 
@@ -382,7 +383,18 @@ Interop tests run daily and on PRs that touch protocol code. Run locally:
 cargo build --release
 bash tests/interop/cert_roundtrip.sh
 bash tests/interop/tls_probe.sh
+bash tests/interop/openssl_parity.sh   # requires openssl 3.x + jq
 ```
+
+### Scope boundary
+
+`pki` is a PKI client: certificates, keys, enrollment, chain validation, revocation. It deliberately does **not** replicate the non-PKI surface of `openssl`:
+
+- **`dgst`** — arbitrary file signing/verification (use a general-purpose signing tool)
+- **`cms` / `smime`** — S/MIME message envelopes (belongs in the signing service)
+- **`ts`** — RFC 3161 timestamping (belongs in the signing service)
+
+CMS/PKCS#7 primitives are used *internally* where protocols require them (SCEP, EST), but are not exposed as top-level subcommands.
 
 ## Security
 
