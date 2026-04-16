@@ -361,7 +361,7 @@ fn show_csr(path: &Path, _config: &GlobalConfig) -> Result<()> {
         println!();
         println!("{}:", "Subject Alternative Names".cyan().bold());
         for san in &csr.san {
-            println!("    - {}", san.white());
+            println!("    - {}", san.to_string().white());
         }
     }
 

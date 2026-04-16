@@ -305,6 +305,87 @@ fn test_csr_create_email_san_roundtrip() {
     );
 }
 
+/// Regression for #33: `pki csr show -f json` must emit typed SAN entries
+/// ({"Dns":"..."} / {"Email":"..."}) so JSON consumers can distinguish
+/// kinds without parsing the "DNS:" / "email:" prefix. This matches the
+/// schema already used by `pki cert show -f json`.
+#[test]
+fn test_csr_show_json_san_schema() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("schema.key");
+    let csr_path = temp_dir.path().join("schema.csr");
+
+    let _ = Command::new(pki_binary())
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key_path)
+        .output()
+        .unwrap();
+
+    let create = Command::new(pki_binary())
+        .args([
+            "csr",
+            "create",
+            "--key",
+            key_path.to_str().unwrap(),
+            "--cn",
+            "schema.example.com",
+            "--san",
+            "dns:api.example.com",
+            "--san",
+            "email:admin@example.com",
+            "-o",
+        ])
+        .arg(&csr_path)
+        .output()
+        .expect("Failed to execute pki csr create");
+
+    if !create.status.success() {
+        let stderr = String::from_utf8_lossy(&create.stderr);
+        if stderr.contains("not yet implemented") {
+            return;
+        }
+    }
+    assert!(create.status.success(), "CSR creation failed: {create:?}");
+
+    let show = Command::new(pki_binary())
+        .args(["csr", "show", "-f", "json"])
+        .arg(&csr_path)
+        .output()
+        .expect("Failed to execute pki csr show -f json");
+    assert!(show.status.success(), "pki csr show -f json failed: {show:?}");
+    let stdout = String::from_utf8_lossy(&show.stdout);
+
+    let json: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("not valid JSON: {e}\n{stdout}"));
+
+    let san = json.get("san").expect("json missing `san` field");
+    let arr = san.as_array().expect("`san` must be an array");
+    assert!(!arr.is_empty(), "san array empty: {stdout}");
+
+    let mut saw_dns = false;
+    let mut saw_email = false;
+    for entry in arr {
+        let obj = entry
+            .as_object()
+            .unwrap_or_else(|| panic!("san entry must be a typed object, got {entry}"));
+        if let Some(v) = obj.get("Dns") {
+            assert_eq!(v.as_str(), Some("api.example.com"));
+            saw_dns = true;
+        } else if let Some(v) = obj.get("Email") {
+            assert_eq!(v.as_str(), Some("admin@example.com"));
+            saw_email = true;
+        } else {
+            panic!("unexpected san variant: {entry}");
+        }
+    }
+    assert!(saw_dns, "Dns variant missing: {stdout}");
+    assert!(saw_email, "Email variant missing: {stdout}");
+}
+
 // ============================================================================
 // Format Conversion Tests
 // ============================================================================

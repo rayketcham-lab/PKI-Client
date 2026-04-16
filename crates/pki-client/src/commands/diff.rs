@@ -173,8 +173,18 @@ fn print_csr_comparison(csr1: &Csr, csr2: &Csr, args: &DiffArgs) {
     println!();
 
     // SANs
-    let sans1 = csr1.san.join(", ");
-    let sans2 = csr2.san.join(", ");
+    let sans1 = csr1
+        .san
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sans2 = csr2
+        .san
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
     let (is_match, indicator) = compare_match(&sans1, &sans2);
     if is_match {
         matches += 1;

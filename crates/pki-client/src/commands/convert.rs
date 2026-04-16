@@ -234,7 +234,13 @@ fn convert_csr(data: &[u8], to: OutputFormat) -> Result<Vec<u8>> {
                 csr.signature_algorithm
             ));
             if !csr.san.is_empty() {
-                out.push_str(&format!("SANs: {}\n", csr.san.join(", ")));
+                let sans = csr
+                    .san
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                out.push_str(&format!("SANs: {sans}\n"));
             }
             Ok(out.into_bytes())
         }
