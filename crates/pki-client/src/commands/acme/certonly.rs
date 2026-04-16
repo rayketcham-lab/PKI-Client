@@ -237,7 +237,7 @@ pub(super) fn cmd_certonly(
     if !config.quiet {
         println!("Generating domain key and CSR...");
     }
-    let domain_key_pem = generate_domain_key()?;
+    let domain_key_pem = zeroize::Zeroizing::new(generate_domain_key()?);
     let csr_der = generate_csr_der(&domain_key_pem, domains)?;
 
     // Finalize order
@@ -268,7 +268,7 @@ pub(super) fn cmd_certonly(
     let key_file = cert_dir.join("privkey.pem");
 
     fs::write(&cert_file, &cert_pem)?;
-    crate::util::write_sensitive_file(&key_file, &domain_key_pem)?;
+    crate::util::write_sensitive_file(&key_file, domain_key_pem.as_bytes())?;
 
     // Save renewal configuration for automated renewals
     let mut renewal = RenewalConfig::new(

@@ -294,7 +294,7 @@ impl ScepClient {
         // Step 3: Generate key pair, CSR, requester cert
         let material = build_message_material(
             &config.subject_cn,
-            config.challenge.as_deref(),
+            config.challenge.as_deref().map(|s| s.as_str()),
             config.key_type,
             &config.san_names,
         )
@@ -560,7 +560,7 @@ fn build_success_response(
         status: PkiStatus::Success,
         fail_info: None,
         certificate: cert_pem,
-        private_key_pem: Some(key_pem),
+        private_key_pem: Some(zeroize::Zeroizing::new(key_pem)),
     })
 }
 

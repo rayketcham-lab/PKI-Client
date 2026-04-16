@@ -1,6 +1,7 @@
 //! SCEP Types and Constants
 
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 /// SCEP operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,10 +216,11 @@ pub struct EnrollmentResponse {
     pub fail_info: Option<FailInfo>,
     /// Issued certificate (PEM, if status is Success)
     pub certificate: Option<String>,
-    /// Private key PEM (generated during enrollment)
+    /// Private key PEM (generated during enrollment).
+    /// Wrapped in `Zeroizing` so the buffer is zeroed on drop.
     /// Never serialized — use enrollment_to_json() for safe JSON output.
-    #[serde(skip_serializing)]
-    pub private_key_pem: Option<String>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub private_key_pem: Option<Zeroizing<String>>,
 }
 
 /// Configuration for SCEP enrollment.
@@ -226,8 +228,9 @@ pub struct EnrollmentResponse {
 pub struct EnrollConfig {
     /// Subject Common Name (CN)
     pub subject_cn: String,
-    /// Challenge password (optional)
-    pub challenge: Option<String>,
+    /// Challenge password (optional). Wrapped in `Zeroizing` so the buffer
+    /// is zeroed on drop even if enrollment panics or is cancelled.
+    pub challenge: Option<Zeroizing<String>>,
     /// Subject Alternative Names (DNS names)
     pub san_names: Vec<String>,
     /// Key type for enrollment
@@ -236,4 +239,22 @@ pub struct EnrollConfig {
     pub poll_interval_secs: u64,
     /// Maximum number of polling attempts
     pub max_polls: u32,
+}
+
+#[cfg(test)]
+mod zeroize_contract {
+    //! Compile-time proof that secret-bearing fields carry `Zeroizing`.
+    //!
+    //! These assertions fail to compile if a future refactor drops the
+    //! `Zeroizing<String>` wrapper on private key or challenge material.
+    use super::{EnrollConfig, EnrollmentResponse};
+    use zeroize::Zeroizing;
+
+    fn _assert_private_key_is_zeroizing(r: &EnrollmentResponse) -> &Option<Zeroizing<String>> {
+        &r.private_key_pem
+    }
+
+    fn _assert_challenge_is_zeroizing(c: &EnrollConfig) -> &Option<Zeroizing<String>> {
+        &c.challenge
+    }
 }

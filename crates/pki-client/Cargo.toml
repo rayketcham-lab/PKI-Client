@@ -81,6 +81,9 @@ p12 = "0.6"
 # Logging
 tracing = "0.1"
 
+# Zeroize secret material on drop (private keys, challenge passwords)
+zeroize = { version = "1.8", features = ["derive"] }
+
 # POSIX constants (O_NOFOLLOW, ELOOP) for symlink-refusing file writes
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
