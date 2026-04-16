@@ -459,7 +459,7 @@ fn enroll(
 
     let enroll_config = EnrollConfig {
         subject_cn: subject.to_string(),
-        challenge: challenge.map(|s| s.to_string()),
+        challenge: challenge.map(|s| zeroize::Zeroizing::new(s.to_string())),
         san_names: san_names.to_vec(),
         key_type,
         poll_interval_secs,
@@ -508,7 +508,7 @@ fn enroll(
                 }
                 if let Some(ref key) = response.private_key_pem {
                     warn_key_to_stdout();
-                    println!("{}", key);
+                    println!("{}", key.as_str());
                 }
             }
         }
@@ -536,7 +536,7 @@ fn save_enrollment_files(
 
     if let Some(ref key_pem) = response.private_key_pem {
         let key_path = dir.join(format!("{}-key.pem", base));
-        crate::util::write_sensitive_file(&key_path, key_pem)
+        crate::util::write_sensitive_file(&key_path, key_pem.as_bytes())
             .with_context(|| format!("Failed to write private key: {}", key_path.display()))?;
     }
 
@@ -599,9 +599,9 @@ mod tests {
             certificate: Some(
                 "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----".to_string(),
             ),
-            private_key_pem: Some(
+            private_key_pem: Some(zeroize::Zeroizing::new(
                 "-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----".to_string(),
-            ),
+            )),
         }
     }
 

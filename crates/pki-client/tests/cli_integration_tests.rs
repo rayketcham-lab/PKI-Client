@@ -356,11 +356,14 @@ fn test_csr_show_json_san_schema() {
         .arg(&csr_path)
         .output()
         .expect("Failed to execute pki csr show -f json");
-    assert!(show.status.success(), "pki csr show -f json failed: {show:?}");
+    assert!(
+        show.status.success(),
+        "pki csr show -f json failed: {show:?}"
+    );
     let stdout = String::from_utf8_lossy(&show.stdout);
 
-    let json: serde_json::Value = serde_json::from_str(&stdout)
-        .unwrap_or_else(|e| panic!("not valid JSON: {e}\n{stdout}"));
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).unwrap_or_else(|e| panic!("not valid JSON: {e}\n{stdout}"));
 
     let san = json.get("san").expect("json missing `san` field");
     let arr = san.as_array().expect("`san` must be an array");
