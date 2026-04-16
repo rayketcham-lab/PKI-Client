@@ -53,30 +53,13 @@ jobs:
           retention-days: 1
 
   # ──────────────────────────────────────────────────────────────────
-  # Docker availability check — warn visibly if HAS_DOCKER is unset
-  # ──────────────────────────────────────────────────────────────────
-  docker-check:
-    name: Docker Available
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
-    timeout-minutes: 1
-    steps:
-      - name: Check HAS_DOCKER variable
-        env:
-          HAS_DOCKER_VAR: ${{ vars.HAS_DOCKER }}
-        run: |
-          if [ "$HAS_DOCKER_VAR" != "true" ]; then
-            echo "::warning::HAS_DOCKER is not set to 'true' — Pebble ACME tests will be SKIPPED. Set the repository variable HAS_DOCKER=true to enable."
-          else
-            echo "OK: HAS_DOCKER=true — Pebble tests will run"
-          fi
-
-  # ──────────────────────────────────────────────────────────────────
   # ACME interop — test against Pebble (Let's Encrypt test server)
+  # Requires Docker; skipped when HAS_DOCKER repo variable is unset.
   # ──────────────────────────────────────────────────────────────────
   acme-pebble:
     name: ACME vs Pebble
     if: ${{ vars.HAS_DOCKER == 'true' }}
-    needs: [build, docker-check]
+    needs: [build]
     runs-on: [self-hosted, Linux, ubuntu3-runner]
     timeout-minutes: 15
     services:
