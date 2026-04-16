@@ -915,3 +915,104 @@ fn cert_show_openssl_format_rejects_unknown_format() {
         "unknown format should exit non-zero"
     );
 }
+
+// ============================================================================
+// Issue #12: Smoke tests for chain / crl / revoke subcommands
+//
+// Scope-limited: proves clap can parse --help and each subcommand dispatches.
+// Full behavioral coverage (fixture-based) is tracked separately.
+// ============================================================================
+
+fn assert_help_ok(args: &[&str], expect_substr: &str) {
+    if !binary_exists() {
+        return;
+    }
+    let output = Command::new(pki_binary())
+        .args(args)
+        .output()
+        .expect("failed to execute pki");
+    assert!(
+        output.status.success(),
+        "`pki {}` --help should exit 0, got: {:?}",
+        args.join(" "),
+        output
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout
+            .to_lowercase()
+            .contains(&expect_substr.to_lowercase()),
+        "`pki {}` help missing `{}` — got:\n{}",
+        args.join(" "),
+        expect_substr,
+        stdout
+    );
+}
+
+#[test]
+fn issue_12_chain_help_dispatches() {
+    assert_help_ok(&["chain", "--help"], "build");
+    assert_help_ok(&["chain", "build", "--help"], "chain");
+    assert_help_ok(&["chain", "show", "--help"], "verify");
+    assert_help_ok(&["chain", "verify", "--help"], "ca");
+}
+
+#[test]
+fn issue_12_crl_help_dispatches() {
+    assert_help_ok(&["crl", "--help"], "show");
+    assert_help_ok(&["crl", "show", "--help"], "file");
+    assert_help_ok(&["crl", "check", "--help"], "serial");
+}
+
+#[test]
+fn issue_12_revoke_help_dispatches() {
+    assert_help_ok(&["revoke", "--help"], "check");
+    assert_help_ok(&["revoke", "check", "--help"], "issuer");
+    assert_help_ok(&["revoke", "crl-show", "--help"], "file");
+}
+
+/// Missing-file paths must error cleanly (non-zero exit, no panic), not crash.
+#[test]
+fn issue_12_chain_show_missing_file_errors_cleanly() {
+    if !binary_exists() {
+        return;
+    }
+    let output = Command::new(pki_binary())
+        .args(["chain", "show", "/nonexistent/definitely/not/here.pem"])
+        .output()
+        .expect("failed to execute pki");
+    assert!(
+        !output.status.success(),
+        "missing chain file should exit non-zero"
+    );
+}
+
+#[test]
+fn issue_12_crl_show_missing_file_errors_cleanly() {
+    if !binary_exists() {
+        return;
+    }
+    let output = Command::new(pki_binary())
+        .args(["crl", "show", "/nonexistent/definitely/not/here.crl"])
+        .output()
+        .expect("failed to execute pki");
+    assert!(
+        !output.status.success(),
+        "missing CRL file should exit non-zero"
+    );
+}
+
+#[test]
+fn issue_12_revoke_crl_show_missing_file_errors_cleanly() {
+    if !binary_exists() {
+        return;
+    }
+    let output = Command::new(pki_binary())
+        .args(["revoke", "crl-show", "/nonexistent/definitely/not/here.crl"])
+        .output()
+        .expect("failed to execute pki");
+    assert!(
+        !output.status.success(),
+        "missing CRL file should exit non-zero"
+    );
+}
