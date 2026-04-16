@@ -1092,9 +1092,7 @@ impl CsrBuilder {
         }
 
         // extensionRequest (RFC 2985 §5.4.2) — SAN
-        if !self.san_dns_names.is_empty()
-            || !self.san_ips.is_empty()
-            || !self.san_emails.is_empty()
+        if !self.san_dns_names.is_empty() || !self.san_ips.is_empty() || !self.san_emails.is_empty()
         {
             let san_ext = self.build_san_extension()?;
             let ext_req = x509_cert::request::ExtensionReq(vec![san_ext]);

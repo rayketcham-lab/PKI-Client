@@ -75,7 +75,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 - **`pki compliance`** — validate against FIPS 140-3, NIST SP 800-57, and Federal Bridge policies
 - **`pki dane`** — generate and verify DANE/TLSA records (RFC 6698)
 
-All commands support five output formats: **text** (human), **json** (scripting), **compact** (dashboards), **forensic** (deep-dive with hex dumps and security grades), **openssl** (matches `openssl x509 -text` with colors and lifetime bars).
+Certificate inspection (`pki show`, `pki cert`) supports five output formats: **text** (human), **json** (scripting), **compact** (dashboards), **forensic** (deep-dive with hex dumps and security grades), **openssl** (matches `openssl x509 -text` with colors and lifetime bars). Network/protocol subcommands (`probe`, `acme`, `est`, `scep`) render text for all formats except `json`.
 
 ## Quick Start
 
@@ -165,7 +165,7 @@ pki
 - **Static binaries** — musl builds with zero runtime dependencies
 
 ### Developer Experience
-- **Five output formats** — text (human), JSON (scripting), compact (dashboards), forensic (deep-dive), openssl (familiar `x509 -text` layout with PKI extensions)
+- **Five output formats** on certificate inspection — text (human), JSON (scripting), compact (dashboards), forensic (deep-dive), openssl (familiar `x509 -text` layout with PKI extensions). Protocol/network subcommands use text or JSON.
 - **Interactive shell** — run `pki` with no arguments for a REPL session
 - **Shell completions** — bash, zsh, fish
 - **Man pages** — generated from CLI definitions
