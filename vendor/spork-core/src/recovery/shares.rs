@@ -7,7 +7,7 @@
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use sharks::{Share, Sharks};
 use std::collections::HashSet;
 use zeroize::{Zeroize, ZeroizeOnDrop};

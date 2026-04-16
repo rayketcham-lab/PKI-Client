@@ -1005,7 +1005,7 @@ mod tests {
         let password = b"test-password-12345";
         let doc = pkcs8::PrivateKeyInfo::try_from(der.as_ref()).unwrap();
         let encrypted_der = doc
-            .encrypt(rand::thread_rng(), password)
+            .encrypt(rand_core::OsRng, password)
             .expect("PBES2 encryption should succeed");
 
         // Decrypt and reload
@@ -1028,7 +1028,7 @@ mod tests {
         let password = b"correct-password";
         let doc = pkcs8::PrivateKeyInfo::try_from(der.as_ref()).unwrap();
         let encrypted_der = doc
-            .encrypt(rand::thread_rng(), password)
+            .encrypt(rand_core::OsRng, password)
             .expect("encryption should succeed");
 
         let result = KeyPair::from_encrypted_pkcs8_der(
@@ -1056,7 +1056,7 @@ mod tests {
         let password = b"rsa-test-pw";
         let doc = pkcs8::PrivateKeyInfo::try_from(der.as_ref()).unwrap();
         let encrypted_der = doc
-            .encrypt(rand::thread_rng(), password)
+            .encrypt(rand_core::OsRng, password)
             .expect("encryption should succeed");
 
         let kp2 = KeyPair::from_encrypted_pkcs8_der(

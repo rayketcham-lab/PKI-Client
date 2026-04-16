@@ -195,9 +195,9 @@ impl SerialNumber {
     /// least 64 bits of entropy. We use 159 bits (20 bytes, high bit cleared)
     /// which exceeds the minimum by 2.5x. Maximum encoding is 20 octets.
     pub fn random() -> Self {
-        use rand::RngCore;
+        use rand_core::RngCore;
         let mut bytes = vec![0u8; 20];
-        rand::rngs::OsRng.fill_bytes(&mut bytes);
+        rand_core::OsRng.fill_bytes(&mut bytes);
         // Ensure positive (clear high bit)
         bytes[0] &= 0x7F;
         // Ensure non-zero

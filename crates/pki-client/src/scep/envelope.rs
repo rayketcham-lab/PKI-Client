@@ -15,7 +15,7 @@
 //! ```
 
 use anyhow::{anyhow, Context, Result};
-use rand::RngCore;
+use rand_core::RngCore;
 use sha2::{Digest, Sha256};
 #[cfg(not(feature = "fips"))]
 use spork_core::algo::rsa_oaep;
@@ -145,7 +145,7 @@ pub fn build_message_material(
 
     // Sender nonce: 16 random bytes
     let mut sender_nonce = [0u8; 16];
-    rand::rngs::OsRng.fill_bytes(&mut sender_nonce);
+    rand_core::OsRng.fill_bytes(&mut sender_nonce);
 
     // Self-signed requester certificate (validity: 1 year)
     let requester_cert_der = build_self_signed_cert(subject_cn, &key_pair)?;
@@ -333,8 +333,8 @@ pub fn build_enveloped_data(plaintext: &[u8], ca_pub_key_der: &[u8]) -> Result<V
     // Generate AES-256 key and IV
     let mut aes_key = [0u8; 32];
     let mut iv = [0u8; 16];
-    rand::rngs::OsRng.fill_bytes(&mut aes_key);
-    rand::rngs::OsRng.fill_bytes(&mut iv);
+    rand_core::OsRng.fill_bytes(&mut aes_key);
+    rand_core::OsRng.fill_bytes(&mut iv);
 
     // Encrypt plaintext with AES-256-CBC
     let ciphertext = aes256_cbc_encrypt(&aes_key, &iv, plaintext)?;

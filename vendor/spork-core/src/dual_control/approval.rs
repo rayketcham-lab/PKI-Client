@@ -188,10 +188,10 @@ impl ApprovalRequest {
 
 /// Generate approval token (format: APRV-XXXX-XXXX)
 fn generate_approval_token() -> String {
-    use rand::RngCore;
+    use rand_core::RngCore;
 
     let mut bytes = [0u8; 8];
-    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    rand_core::OsRng.fill_bytes(&mut bytes);
 
     let mut token = String::with_capacity(14);
     token.push_str("APRV-");

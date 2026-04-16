@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use p256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey};
 use p256::SecretKey;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
