@@ -251,8 +251,11 @@ fn show(args: ShowArgs, config: &GlobalConfig) -> Result<CmdResult> {
     println!("{output}");
 
     // Show certificate chain tree (unless quiet, --no-chain, or showing single field)
+    // Only render chain in human-readable formats — Json/Compact/Openssl must stay
+    // machine-parseable, so trailing ASCII art would break downstream consumers.
     let showing_full_cert = !args.subject && !args.san && !args.issuer;
-    if showing_full_cert && !config.quiet && !args.no_chain {
+    let chain_format_ok = matches!(config.format, OutputFormat::Text | OutputFormat::Forensic);
+    if showing_full_cert && chain_format_ok && !config.quiet && !args.no_chain {
         let chain = build_chain_from_cert(&cert);
         display_chain_tree(&chain, config.colored);
     }
