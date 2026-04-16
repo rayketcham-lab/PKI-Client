@@ -149,16 +149,10 @@ fn main() -> anyhow::Result<()> {
             let pfx_data = build_pfx(&ee_cert_der, &ee_key_der, &ca_cert_der, &password, &cn)?;
 
             let pfx_path = output_dir.join(&filename);
-            std::fs::write(&pfx_path, &pfx_data)?;
-
-            // Set restrictive permissions
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut perms = std::fs::metadata(&pfx_path)?.permissions();
-                perms.set_mode(0o600);
-                std::fs::set_permissions(&pfx_path, perms)?;
-            }
+            // Atomic 0600 write — a PFX carries the private key, so avoid any
+            // window where the file exists at the default umask (TOCTOU). Mirrors
+            // write_sensitive_file in crates/pki-client/src/util.rs.
+            write_pfx_secure(&pfx_path, &pfx_data)?;
 
             println!("OK  ({})", cn);
             count += 1;
@@ -168,6 +162,31 @@ fn main() -> anyhow::Result<()> {
     println!();
     println!("Done: {} PFX files in {}", count, output_dir.display());
     Ok(())
+}
+
+/// Write PFX bytes with 0600 permissions set atomically at creation time.
+///
+/// `fs::write` followed by `set_permissions` leaves a race window where the
+/// file exists world-readable. PFX contains a private key — close the window.
+fn write_pfx_secure(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        f.write_all(data)?;
+        return Ok(());
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, data)
+    }
 }
 
 /// Build a PKCS#12/PFX container from cert + key + CA cert.
