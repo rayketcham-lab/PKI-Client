@@ -8,7 +8,7 @@
 
 use ed25519_dalek::{Signature as Ed25519Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use zeroize::Zeroizing;
 
 use super::oid;

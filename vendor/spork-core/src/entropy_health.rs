@@ -120,9 +120,9 @@ pub fn require_entropy_healthy(report: &EntropyHealthReport) -> Result<()> {
 
 /// Generate a random sample from the OS entropy source.
 fn generate_sample(size: usize) -> Vec<u8> {
-    use rand::RngCore;
+    use rand_core::RngCore;
     let mut buf = vec![0u8; size];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand_core::OsRng.fill_bytes(&mut buf);
     buf
 }
 

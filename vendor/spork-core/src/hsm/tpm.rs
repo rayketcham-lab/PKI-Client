@@ -1020,9 +1020,9 @@ impl TpmKeyStore {
 
     /// Generate a unique key ID
     fn generate_key_id(label: &str) -> KeyId {
-        use rand::RngCore;
+        use rand_core::RngCore;
         let mut bytes = [0u8; 8];
-        rand::rngs::OsRng.fill_bytes(&mut bytes);
+        rand_core::OsRng.fill_bytes(&mut bytes);
         KeyId::new(format!("{}-{}", label, hex::encode(bytes)))
     }
 

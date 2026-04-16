@@ -116,7 +116,7 @@ pub(super) fn default_account_key_path() -> Result<PathBuf> {
 pub(super) fn generate_domain_key() -> Result<String> {
     use p256::pkcs8::EncodePrivateKey;
     use p256::SecretKey;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let secret_key = SecretKey::random(&mut OsRng);
     // Use PKCS#8 format for OpenSSL 3.x compatibility (SEC1 deprecated)

@@ -2465,7 +2465,7 @@ mod verify_with_spki_tests {
     fn gen_p256_keypair() -> (Vec<u8>, p256::ecdsa::SigningKey) {
         use p256::ecdsa::SigningKey;
         use pkcs8::EncodePublicKey;
-        use rand::rngs::OsRng;
+        use rand_core::OsRng;
         let sk = SigningKey::random(&mut OsRng);
         let spki_der = sk
             .verifying_key()

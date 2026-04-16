@@ -26,7 +26,7 @@
 //! ```
 
 use pkcs8::{DecodePrivateKey, DecodePublicKey};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
 use zeroize::Zeroizing;
 

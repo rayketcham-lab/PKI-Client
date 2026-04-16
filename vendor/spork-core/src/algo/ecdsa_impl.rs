@@ -8,7 +8,7 @@ use p384::ecdsa::{
     Signature as P384Signature, SigningKey as P384SigningKey, VerifyingKey as P384VerifyingKey,
 };
 use pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use zeroize::Zeroizing;
 
 use super::{AlgorithmId, SigningAlgorithm};

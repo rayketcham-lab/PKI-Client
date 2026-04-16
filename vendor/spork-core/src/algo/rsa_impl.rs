@@ -1,7 +1,7 @@
 //! RSA implementation for 2048, 3072, and 4096 bit keys
 
 use pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use rsa::{
     pkcs1v15::{Signature, SigningKey, VerifyingKey},
     pss::{
