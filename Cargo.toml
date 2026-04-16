@@ -57,6 +57,9 @@ pem = "3"
 base64 = "0.22"
 der = { version = "0.7", features = ["std"] }
 
+# Platform
+libc = "0.2"
+
 # Testing
 assert_cmd = "2"
 predicates = "3"

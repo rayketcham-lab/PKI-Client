@@ -81,6 +81,10 @@ p12 = "0.6"
 # Logging
 tracing = "0.1"
 
+# POSIX constants (O_NOFOLLOW, ELOOP) for symlink-refusing file writes
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [dev-dependencies]
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
