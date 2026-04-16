@@ -293,7 +293,7 @@ fn show(args: ShowArgs, config: &GlobalConfig) -> Result<CmdResult> {
         if !csr.san.is_empty() {
             println!("\n{}", "Subject Alternative Names:".bold().cyan());
             for san in &csr.san {
-                println!("  - {}", san.blue());
+                println!("  - {}", san.to_string().blue());
             }
         }
 

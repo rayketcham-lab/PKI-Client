@@ -1502,7 +1502,7 @@ pub struct Csr {
     pub key_algorithm: String,
     pub key_size: Option<u32>,
     pub signature_algorithm: String,
-    pub san: Vec<String>,
+    pub san: Vec<pki_client_output::SanEntry>,
     pub pem: String,
     der: Vec<u8>,
 }
@@ -1537,23 +1537,23 @@ impl Csr {
 
         // Extract SAN entries from the extensionRequest attribute (PKCS#10, RFC 2986).
         // Without this, `pki csr show` silently omits SANs even when present.
-        let mut san = Vec::new();
+        let mut san: Vec<pki_client_output::SanEntry> = Vec::new();
         if let Some(extensions) = csr.requested_extensions() {
             for ext in extensions {
                 if let x509_parser::extensions::ParsedExtension::SubjectAlternativeName(alt) = ext {
                     for gn in &alt.general_names {
                         match gn {
                             x509_parser::prelude::GeneralName::DNSName(v) => {
-                                san.push(format!("DNS:{v}"));
+                                san.push(pki_client_output::SanEntry::Dns((*v).to_string()));
                             }
                             x509_parser::prelude::GeneralName::RFC822Name(v) => {
-                                san.push(format!("email:{v}"));
+                                san.push(pki_client_output::SanEntry::Email((*v).to_string()));
                             }
                             x509_parser::prelude::GeneralName::IPAddress(bytes) => {
-                                san.push(format!("IP:{}", format_ip_bytes(bytes)));
+                                san.push(pki_client_output::SanEntry::Ip(format_ip_bytes(bytes)));
                             }
                             x509_parser::prelude::GeneralName::URI(v) => {
-                                san.push(format!("URI:{v}"));
+                                san.push(pki_client_output::SanEntry::Uri((*v).to_string()));
                             }
                             _ => {}
                         }
@@ -1785,12 +1785,23 @@ impl CsrBuilder {
             _ => format!("{}", algorithm),
         };
 
+        let mut san: Vec<pki_client_output::SanEntry> = Vec::new();
+        for v in &self.san_dns {
+            san.push(pki_client_output::SanEntry::Dns(v.clone()));
+        }
+        for v in &self.san_ip {
+            san.push(pki_client_output::SanEntry::Ip(v.clone()));
+        }
+        for v in &self.san_email {
+            san.push(pki_client_output::SanEntry::Email(v.clone()));
+        }
+
         Ok(Csr {
             subject: subject_str,
             key_algorithm: format!("{}", algorithm),
             key_size: Some(key.bits),
             signature_algorithm: sig_algo,
-            san: self.san_dns.clone(),
+            san,
             pem,
             der,
         })
