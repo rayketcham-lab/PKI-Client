@@ -2,7 +2,7 @@
 
 Modern PKI CLI tool -- certificate inspection, key management, TLS probing, and enrollment protocols.
 
-**Version:** 0.7.0 | **Binary:** `pki` | **License:** Apache-2.0
+**Version:** 0.8.0 | **Binary:** `pki` | **License:** Apache-2.0
 
 ---
 
@@ -26,7 +26,7 @@ Modern PKI CLI tool -- certificate inspection, key management, TLS probing, and 
 
 ```
 crates/
-  pki-client/          # Binary: pki (19 subcommands + interactive shell)
+  pki-client/          # Binary: pki (20 subcommands incl. interactive `shell`)
   pki-client-output/   # Library: formatting, OID registry
   pki-probe/           # Library: TLS inspection + linting
   pki-hierarchy/       # Library: declarative PKI hierarchy builder

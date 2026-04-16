@@ -676,7 +676,7 @@ footer a:hover { color: var(--text); }
 <!-- Commands -->
 <section class="section fade-up" id="commands">
   <div class="section-label">Commands</div>
-  <h2>20 subcommands</h2>
+  <h2>19 subcommands + interactive <code>shell</code></h2>
   <p>From inspection to enrollment, every PKI operation in one tool.</p>
 
   <table class="command-table">
@@ -684,15 +684,16 @@ footer a:hover { color: var(--text); }
     <tbody>
       <tr><td>show</td><td>Auto-detect and display any PKI file (cert, key, CSR, CRL, PKCS#12)</td></tr>
       <tr><td>cert</td><td>Certificate operations &mdash; show, verify, fingerprint, expires</td></tr>
-      <tr><td>key</td><td>Key generation (RSA, EC, Ed25519) and inspection</td></tr>
+      <tr><td>key</td><td>Key generation (RSA, EC, Ed25519, ML-DSA, SLH-DSA) and inspection</td></tr>
       <tr><td>chain</td><td>Certificate chain building and verification</td></tr>
-      <tr><td>csr</td><td>CSR creation and inspection</td></tr>
+      <tr><td>csr</td><td>CSR creation and inspection (classical + PQC)</td></tr>
       <tr><td>crl</td><td>CRL viewing and revocation checking</td></tr>
       <tr><td>revoke</td><td>OCSP and CRL revocation status lookups</td></tr>
       <tr><td>probe</td><td>TLS server inspection with security linting</td></tr>
       <tr><td>acme</td><td>ACME / Let's Encrypt certificate enrollment</td></tr>
       <tr><td>est</td><td>EST protocol enrollment (RFC 7030)</td></tr>
       <tr><td>scep</td><td>SCEP enrollment (RFC 8894) &mdash; automated certificate issuance</td></tr>
+      <tr><td>pki</td><td>Declarative PKI hierarchy builder (TOML &rarr; cert tree)</td></tr>
       <tr><td>batch</td><td>Run commands from a script file (skip errors, comments)</td></tr>
       <tr><td>compliance</td><td>FIPS 140-3, NIST, and Federal Bridge validation</td></tr>
       <tr><td>dane</td><td>TLSA record generation (RFC 6698)</td></tr>
@@ -700,6 +701,7 @@ footer a:hover { color: var(--text); }
       <tr><td>convert</td><td>Format conversion (PEM / DER / PKCS#12)</td></tr>
       <tr><td>completions</td><td>Shell completion scripts (bash, zsh, fish)</td></tr>
       <tr><td>manpages</td><td>Generate man pages</td></tr>
+      <tr><td>shell</td><td>Interactive REPL session</td></tr>
     </tbody>
   </table>
 </section>
@@ -709,14 +711,14 @@ footer a:hover { color: var(--text); }
 <!-- Output Formats -->
 <section class="section fade-up" id="formats">
   <div class="section-label">Output Formats</div>
-  <h2>Four ways to see your data</h2>
-  <p>Every command supports four output modes via <code style="background:var(--indigo-glow);color:var(--accent);padding:2px 6px;border-radius:4px;font-size:0.9em;">--format</code>.</p>
+  <h2>Five ways to see your data</h2>
+  <p>Every command supports five output modes via <code style="background:var(--indigo-glow);color:var(--accent);padding:2px 6px;border-radius:4px;font-size:0.9em;">--format</code>.</p>
 
   <div class="format-grid">
     <div class="format-card">
       <div class="format-name">text</div>
       <div class="format-flag">-f text (default)</div>
-      <div class="format-desc">Human-readable with colors, OpenSSL-style layout</div>
+      <div class="format-desc">Human-readable with colors, concise layout</div>
     </div>
     <div class="format-card">
       <div class="format-name">json</div>
@@ -732,6 +734,11 @@ footer a:hover { color: var(--text); }
       <div class="format-name">forensic</div>
       <div class="format-flag">-f forensic</div>
       <div class="format-desc">Deep-dive &mdash; hex dumps, security grades, RFC refs</div>
+    </div>
+    <div class="format-card">
+      <div class="format-name">openssl</div>
+      <div class="format-flag">-f os</div>
+      <div class="format-desc">Matches <code>openssl x509 -text -noout</code> + lifetime/trust extensions</div>
     </div>
   </div>
 </section>
@@ -790,11 +797,11 @@ footer a:hover { color: var(--text); }
   <table class="command-table">
     <thead><tr><th>Crate</th><th>Role</th></tr></thead>
     <tbody>
-      <tr><td>pki-client</td><td>Binary &mdash; CLI entry point, 20 subcommands, interactive shell</td></tr>
+      <tr><td>pki-client</td><td>Binary &mdash; CLI entry point, 19 subcommands + interactive <code>shell</code></td></tr>
       <tr><td>pki-client-output</td><td>Library &mdash; certificate formatting, OID registry, display</td></tr>
       <tr><td>pki-probe</td><td>Library &mdash; TLS inspection, cipher analysis, security linting</td></tr>
       <tr><td>pki-hierarchy</td><td>Library &mdash; declarative PKI hierarchy builder</td></tr>
-      <tr><td>spork-core</td><td>External &mdash; CA crypto engine (git dependency)</td></tr>
+      <tr><td>spork-core</td><td>Vendored &mdash; CA crypto engine (path dep under <code>vendor/spork-core/</code>)</td></tr>
     </tbody>
   </table>
 </section>
@@ -820,14 +827,14 @@ footer a:hover { color: var(--text); }
 <!-- Command Status -->
 <section class="section fade-up" id="status">
   <div class="section-inner">
-  <span class="section-tag">v0.7.0 Command Status</span>
+  <span class="section-tag">v0.8.0 Command Status</span>
   <h2>What Works</h2>
   <table class="command-table">
     <thead><tr><th>Command</th><th>Status</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td>show</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Auto-detects cert, key, CSR, CRL, PKCS#7, PKCS#12</td></tr>
       <tr><td>cert (show, expires, fingerprint)</td><td style="color:#22c55e;">&#x2713; Stable</td><td></td></tr>
-      <tr><td>key (gen, show, match)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>RSA, EC P-256/P-384. Ed25519 keygen not yet supported.</td></tr>
+      <tr><td>key (gen, show, match)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>RSA, EC P-256/P-384, Ed25519. PQC (ML-DSA, SLH-DSA) behind <code>--features pqc</code>.</td></tr>
       <tr><td>csr (create, show)</td><td style="color:#22c55e;">&#x2713; Stable</td><td></td></tr>
       <tr><td>chain (build, show, verify)</td><td style="color:#22c55e;">&#x2713; Stable</td><td></td></tr>
       <tr><td>diff</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Compares any two certs or CSRs</td></tr>
@@ -837,7 +844,7 @@ footer a:hover { color: var(--text); }
       <tr><td>probe (server, check, lint, fetch)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>TLS inspection, certificate linting, chain fetch</td></tr>
       <tr><td>revoke (check, crl-show)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>OCSP + CRL checking</td></tr>
       <tr><td>pki (preview, build, export)</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Declarative PKI hierarchy from TOML</td></tr>
-      <tr><td>acme</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>20 subcommands. Directory fetch works. Full flow requires ACME server.</td></tr>
+      <tr><td>acme</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>17 sub-commands. Directory fetch works. Full flow requires ACME server.</td></tr>
       <tr><td>est</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>RFC 7030. Requires EST server for enrollment.</td></tr>
       <tr><td>scep</td><td style="color:#3b82f6;">&#x1F6A7; Beta</td><td>RFC 8894. Requires SCEP server for enrollment.</td></tr>
       <tr><td>batch</td><td style="color:#22c55e;">&#x2713; Stable</td><td>Run commands from script file</td></tr>

@@ -35,7 +35,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.7.0-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -75,13 +75,16 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 - **`pki compliance`** — validate against FIPS 140-3, NIST SP 800-57, and Federal Bridge policies
 - **`pki dane`** — generate and verify DANE/TLSA records (RFC 6698)
 
-All commands support four output formats: **text** (human), **json** (scripting), **compact** (dashboards), **forensic** (deep-dive with hex dumps and security grades).
+All commands support five output formats: **text** (human), **json** (scripting), **compact** (dashboards), **forensic** (deep-dive with hex dumps and security grades), **openssl** (matches `openssl x509 -text` with colors and lifetime bars).
 
 ## Quick Start
 
 ```bash
 # Inspect any PKI file (auto-detects type)
 pki show server.pem
+
+# OpenSSL-style output with colors and lifetime bars
+pki cert show server.pem --format openssl
 
 # Deep forensic analysis with hex dumps and security grades
 pki cert show server.pem --format forensic
@@ -97,7 +100,8 @@ pki key gen ec --curve p256 -o server.key
 pki csr create --key server.key --cn example.com --san dns:www.example.com -o server.csr
 
 # Get a Let's Encrypt certificate
-pki acme certonly -d example.com --email admin@example.com
+pki acme certonly -d example.com --email admin@example.com \
+    --server https://acme-v02.api.letsencrypt.org/directory
 
 # Build and verify a certificate chain
 pki chain build server.pem
@@ -156,31 +160,62 @@ pki
 
 ### Compliance & Security
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms with `--fips`
-- **Post-quantum cryptography** — ML-DSA (FIPS 204) and SLH-DSA (FIPS 205) key generation, CSR creation, and certificate inspection with `--features pqc`
+- **Post-quantum cryptography** — ML-DSA (FIPS 204 algorithm) and SLH-DSA (FIPS 205 algorithm) key generation, CSR creation, and certificate inspection with `--features pqc`. Uses RustCrypto pre-release crates (`ml-dsa`, `slh-dsa`); these are FIPS 204/205 _algorithm_ implementations, not FIPS 140-3 validated modules.
 - **Compliance validation** — check CA configurations against NIST, FIPS, and Federal Bridge policies
 - **Static binaries** — musl builds with zero runtime dependencies
 
 ### Developer Experience
-- **Four output formats** — text (human), JSON (scripting), compact (dashboards), forensic (deep-dive)
+- **Five output formats** — text (human), JSON (scripting), compact (dashboards), forensic (deep-dive), openssl (familiar `x509 -text` layout with PKI extensions)
 - **Interactive shell** — run `pki` with no arguments for a REPL session
 - **Shell completions** — bash, zsh, fish
 - **Man pages** — generated from CLI definitions
 
 ## Output Formats
 
-| Format | Flag | Use case |
-|---|---|---|
-| `text` | `--format text` (default) | Human-readable with colors |
-| `json` | `--format json` | Scripting and automation |
-| `compact` | `--format compact` | One-line-per-cert dashboards |
-| `forensic` | `--format forensic` | Deep-dive: every field, hex dumps, security grades |
+| Format | Flag | Alias | Use case |
+|---|---|---|---|
+| `text` | `--format text` (default) | `-f t` | Human-readable with colors and security grades |
+| `json` | `--format json` | `-f j` | Scripting and automation |
+| `compact` | `--format compact` | `-f c` | One-line-per-cert dashboards |
+| `forensic` | `--format forensic` | `-f f` | Deep-dive: every field, hex dumps, security grades |
+| `openssl` | `--format openssl` | `-f os` | Matches `openssl x509 -text -noout` with colors + lifetime/trust extensions |
+
+The **openssl** format reproduces the exact layout engineers expect from `openssl x509 -text -noout`, then adds PKI Client extensions:
+
+```
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            04:3A:2B:...
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C = US, O = Let's Encrypt, CN = R3
+        Validity
+            Not Before: Jan  1 00:00:00 2025 GMT
+            Not After : Apr  1 00:00:00 2025 GMT
+        Subject: CN = example.com
+        Subject Public Key Info:
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: (256 bit)
+                ASN1 OID: p-256
+        X509v3 extensions:
+            X509v3 Key Usage: critical
+                Digital Signature
+            ...
+    Signature Algorithm: sha256WithRSAEncryption
+         ab:cd:ef:...
+
+--- PKI Client Extensions ---
+    Lifetime:  [████████████░░░░░░░░] 60% (54/90 days)
+    Trust:     example.com <- R3
+```
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                     pki (binary)                          │
-│              20 subcommands + interactive shell            │
+│        20 subcommands incl. interactive `shell`            │
 ├───────────┬───────────────┬──────────────────────────────┤
 │           │               │                              │
 │ pki-client-output         │  pki-probe                   │
@@ -199,7 +234,7 @@ pki
 
 | Crate | Role |
 |---|---|
-| `pki-client` | Binary — CLI entry point, 20 subcommands + shell |
+| `pki-client` | Binary — CLI entry point, 20 subcommands incl. interactive `shell` |
 | `pki-client-output` | Library — formatting, OID registry |
 | `pki-probe` | Library — TLS inspection and linting |
 | `pki-hierarchy` | Library — declarative PKI hierarchy builder |
@@ -228,7 +263,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 
 **Pin to a specific version:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.7.0
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.8.0
 ```
 
 > **Note:** `sudo` must be on `bash`, not `curl`. To install without sudo, set a writable directory: `INSTALL_DIR=~/.local/bin ... | bash`
@@ -236,7 +271,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 Or download manually from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases):
 
 ```bash
-curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.7.0-x86_64-linux.tar.gz
+curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.0-x86_64-linux.tar.gz
 tar xzf pki.tar.gz
 sudo mv pki /usr/local/bin/
 ```
@@ -255,17 +290,17 @@ sha256sum -c SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-v0.7.0-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-v0.8.0-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore):**
 ```bash
-curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.7.0-x86_64-linux.tar.gz.bundle
+curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.0-x86_64-linux.tar.gz.bundle
 cosign verify-blob \
-  --bundle pki-v0.7.0-x86_64-linux.tar.gz.bundle \
+  --bundle pki-v0.8.0-x86_64-linux.tar.gz.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-v0.7.0-x86_64-linux.tar.gz
+  pki-v0.8.0-x86_64-linux.tar.gz
 ```
 
 ### Shell completions
