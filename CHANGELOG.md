@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-16
+
+### Added
+- Post-quantum key generation and CSR creation (FIPS 204 / FIPS 205 algorithms — ML-DSA-44/65/87, SLH-DSA-128s/192s/256s) via RustCrypto pre-release crates; gated behind `--features pqc` and `--algorithm` flag
+- `--format openssl` (`-f os`) output — reproduces `openssl x509 -text -noout` layout with PKI Client lifetime/trust extensions
+- FIPS gate in PR CI pipeline — clippy and test jobs for `--features fips` feature set
+- Cross-validation interop test suite — fingerprint, serial, validity, key size, PEM round-trip checks against a reference tool
+- Enterprise PKI, Tacoo Tuesday, Signing Service, Vision, and Quantum Ops asciinema demo casts
+
+### Changed
+- README hardened — dead demo links removed, demo tabs are clickable shareable URLs, version/count badges fixed, HSM roadmap noted, wild "zero C deps" claims toned down
+- All first-party crates enforce `#![forbid(unsafe_code)]` at source level
+- ML-DSA key display shows NIST Level instead of "0 bit"
+- `pki cert` text-mode output truncates RSA modulus; forensic mode still shows full hex
+
+### Fixed
+- **Security (TOCTOU)**: sensitive file writes now set 0600 permissions atomically via `OpenOptions::mode` (no `fs::write` + `set_permissions` race). Applies to private keys, passphrases, PFX buffers in ACME, EST, SCEP, and hierarchy export
+- Shell subcommand correctly parses flags before positional args ([#47](https://github.com/rayketcham-lab/PKI-Client/issues/47))
+- `pki convert` auto-detects DER-encoded private keys ([#59](https://github.com/rayketcham-lab/PKI-Client/issues/59))
+- `pki probe` respects `host:port` target string ([#50](https://github.com/rayketcham-lab/PKI-Client/issues/50))
+- SCEP RSA-2048 test guarded against runtime FIPS mode
+- Daily Health Check CI failures across feature combos resolved
+- Integration tests hardened against FIPS feature and remaining race guards
+- `unused_mut` clippy warning suppressed in `--no-default-features` build
+- Cross-repo-token plumbing removed from all CI workflows
+
+### Security
+- SecOps review findings addressed for v0.7.0 posture
+- `deny.toml` rejects all git sources (`allow-git = []`); advisory review cadence documented
+- API surface hardened around sensitive file I/O
+
+## [0.7.0] - 2026-04-01
+
 ### Added
 - Daily health checker workflow — feature matrix (6 permutations), MSRV check, security audit, doc build, binary size tracking, dependency freshness ([#6](https://github.com/rayketcham-lab/PKI-Client/issues/6))
 - Interop test suite — ACME vs Pebble, TLS probe against public endpoints, certificate round-trip tests (49 tests total) ([#7](https://github.com/rayketcham-lab/PKI-Client/issues/7))

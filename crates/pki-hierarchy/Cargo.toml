@@ -5,7 +5,7 @@ version.workspace = true
 edition = "2021"
 license.workspace = true
 repository.workspace = true
-publish = false  # depends on spork-core (git dep, not on crates.io)
+publish = false  # depends on vendored spork-core (path dep)
 
 [dependencies]
 spork-core = { workspace = true, features = ["ceremony"] }

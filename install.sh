@@ -7,7 +7,7 @@ set -euo pipefail
 # Install:    curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash
 # Upgrade:    curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- upgrade
 # Uninstall:  curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- uninstall
-# Pin version: curl -fsSL ... | bash -s -- v0.5.0-beta.4
+# Pin version: curl -fsSL ... | bash -s -- v0.8.0
 # ============================================================================
 
 REPO="rayketcham-lab/PKI-Client"

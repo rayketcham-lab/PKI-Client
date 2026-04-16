@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false  # depends on spork-core (git dep, not on crates.io); install via cargo install --git
+publish = false  # depends on vendored spork-core (path dep); distribute via GitHub Releases
 
 [[bin]]
 name = "pki"

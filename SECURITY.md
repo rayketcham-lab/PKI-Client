@@ -4,9 +4,9 @@
 
 | Version       | Supported |
 |---------------|-----------|
-| 0.7.x         | Yes       |
-| 0.6.x         | No        |
-| < 0.6         | No        |
+| 0.8.x         | Yes       |
+| 0.7.x         | No        |
+| < 0.7         | No        |
 
 ## Reporting a vulnerability
 
@@ -67,5 +67,5 @@ cosign verify-blob \
 
 - RSA: minimum 2048-bit keys enforced in FIPS mode
 - EC: P-256, P-384, P-521 (NIST curves)
-- Post-quantum: ML-DSA (FIPS 204), SLH-DSA (FIPS 205) behind `pqc` feature flag
+- Post-quantum: ML-DSA (FIPS 204 algorithm) and SLH-DSA (FIPS 205 algorithm) behind `pqc` feature flag via RustCrypto pre-release crates (`ml-dsa`, `slh-dsa`); not a FIPS-validated module
 - Hash algorithms: SHA-256 minimum; SHA-1 flagged as weak in output
