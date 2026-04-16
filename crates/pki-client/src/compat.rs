@@ -1481,6 +1481,21 @@ pub fn load_crl(path: &Path) -> Result<Crl> {
 // CSR handling
 // ============================================================================
 
+/// Format an iPAddress GeneralName octet string as a human-readable address.
+fn format_ip_bytes(ip: &[u8]) -> String {
+    match ip.len() {
+        4 => format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3]),
+        16 => {
+            let parts: Vec<String> = ip
+                .chunks(2)
+                .map(|c| format!("{:02x}{:02x}", c[0], c.get(1).copied().unwrap_or(0)))
+                .collect();
+            parts.join(":")
+        }
+        _ => hex::encode(ip),
+    }
+}
+
 /// CSR structure (stub)
 pub struct Csr {
     pub subject: String,
@@ -1520,6 +1535,33 @@ impl Csr {
 
         let sig_algo_oid = csr.signature_algorithm.algorithm.to_string();
 
+        // Extract SAN entries from the extensionRequest attribute (PKCS#10, RFC 2986).
+        // Without this, `pki csr show` silently omits SANs even when present.
+        let mut san = Vec::new();
+        if let Some(extensions) = csr.requested_extensions() {
+            for ext in extensions {
+                if let x509_parser::extensions::ParsedExtension::SubjectAlternativeName(alt) = ext {
+                    for gn in &alt.general_names {
+                        match gn {
+                            x509_parser::prelude::GeneralName::DNSName(v) => {
+                                san.push(format!("DNS:{v}"));
+                            }
+                            x509_parser::prelude::GeneralName::RFC822Name(v) => {
+                                san.push(format!("email:{v}"));
+                            }
+                            x509_parser::prelude::GeneralName::IPAddress(bytes) => {
+                                san.push(format!("IP:{}", format_ip_bytes(bytes)));
+                            }
+                            x509_parser::prelude::GeneralName::URI(v) => {
+                                san.push(format!("URI:{v}"));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(Csr {
             subject: csr.certification_request_info.subject.to_string(),
             // Resolve the key algorithm OID to a human-readable name.
@@ -1527,7 +1569,7 @@ impl Csr {
             key_size,
             // Resolve the signature algorithm OID to a human-readable name.
             signature_algorithm: pki_client_output::signature_name(&sig_algo_oid),
-            san: Vec::new(),
+            san,
             pem: String::new(),
             der: der.to_vec(),
         })
@@ -1714,8 +1756,16 @@ impl CsrBuilder {
 
         let subject = name_builder.build();
 
-        // Build and sign CSR using spork-core
+        // Forward collected SANs to spork-core's builder. Without this chain the
+        // --san flags on `pki csr create` are silently dropped (see #19).
+        let dns_refs: Vec<&str> = self.san_dns.iter().map(String::as_str).collect();
+        let ip_refs: Vec<&str> = self.san_ip.iter().map(String::as_str).collect();
+        let email_refs: Vec<&str> = self.san_email.iter().map(String::as_str).collect();
+
         let csr_request = spork_core::CsrBuilder::new(subject)
+            .with_san_dns_names(&dns_refs)
+            .with_san_ips(&ip_refs)
+            .with_san_emails(&email_refs)
             .build_and_sign(&key_pair)
             .with_context(|| "Failed to build and sign CSR")?;
 

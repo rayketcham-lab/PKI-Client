@@ -222,6 +222,87 @@ fn test_csr_create_with_san() {
 
     assert!(output.status.success());
     assert!(csr_path.exists());
+
+    // Regression for #19/#20: SANs must actually land in the CSR, not just
+    // silently collected and dropped. `pki csr show` parses the CSR and prints
+    // each SAN value; both --san flags must survive round-trip.
+    let show = Command::new(pki_binary())
+        .args(["csr", "show"])
+        .arg(&csr_path)
+        .output()
+        .expect("Failed to execute pki csr show");
+    assert!(show.status.success(), "pki csr show failed: {show:?}");
+    let stdout = String::from_utf8_lossy(&show.stdout);
+    assert!(
+        stdout.contains("www.example.com"),
+        "SAN dns:www.example.com missing from CSR (SAN drop regression): {stdout}"
+    );
+    assert!(
+        stdout.contains("api.example.com"),
+        "SAN dns:api.example.com missing from CSR (SAN drop regression): {stdout}"
+    );
+}
+
+#[test]
+fn test_csr_create_email_san_roundtrip() {
+    // Regression for S/MIME SAN bug: --san email:<addr> must emit an
+    // rfc822Name entry that pki csr show can read back. CN is a non-hostname
+    // (a person's name) so the auto-DNS-SAN heuristic must NOT inject
+    // "DNS:Ray Ketcham" — this is the S/MIME case that triggered the fix.
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("smime.key");
+    let csr_path = temp_dir.path().join("smime.csr");
+
+    let _ = Command::new(pki_binary())
+        .args(["key", "gen", "ec", "--curve", "p256", "-o"])
+        .arg(&key_path)
+        .output()
+        .unwrap();
+
+    let output = Command::new(pki_binary())
+        .args([
+            "csr",
+            "create",
+            "--key",
+            key_path.to_str().unwrap(),
+            "--cn",
+            "Ray Ketcham",
+            "--san",
+            "email:rayketcham@example.com",
+            "-o",
+        ])
+        .arg(&csr_path)
+        .output()
+        .expect("Failed to execute pki");
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not yet implemented") {
+            return;
+        }
+    }
+    assert!(output.status.success(), "CSR creation failed: {output:?}");
+
+    let show = Command::new(pki_binary())
+        .args(["csr", "show"])
+        .arg(&csr_path)
+        .output()
+        .expect("Failed to execute pki csr show");
+    assert!(show.status.success());
+    let stdout = String::from_utf8_lossy(&show.stdout);
+
+    assert!(
+        stdout.contains("rayketcham@example.com"),
+        "email SAN missing from S/MIME CSR: {stdout}"
+    );
+    assert!(
+        !stdout.contains("DNS:Ray Ketcham"),
+        "non-hostname CN must not be auto-injected as DNS SAN: {stdout}"
+    );
 }
 
 // ============================================================================
@@ -679,5 +760,158 @@ fn test_version() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("pki") || stdout.contains("0.3"));
+    assert!(stdout.to_lowercase().contains("pki"));
+    // Must report a semver-shaped version; currently 0.8.x.
+    assert!(
+        stdout.contains("0.8") || stdout.contains("0.9") || stdout.contains("1."),
+        "Unexpected --version output: {stdout}"
+    );
+}
+
+// ============================================================================
+// --format openssl (`-f os`) integration tests
+//
+// Regression coverage for the 0.8.0 addition: `pki cert show -f os <file>`
+// should produce output that tracks `openssl x509 -text -noout` layout
+// (literal "Certificate:" header, "Data:", "Serial Number:", "Issuer:",
+// "Validity", "Not Before:", "Not After :", "Subject:", "X509v3 extensions:").
+// ============================================================================
+
+/// Build a self-signed EC P-256 cert on disk and return its PEM path.
+///
+/// Uses `spork-core` directly so the test doesn't depend on the CLI being
+/// able to issue certs.
+fn write_selfsigned_ec_p256_cert(dir: &std::path::Path, cn: &str) -> PathBuf {
+    use spork_core::algo::{AlgorithmId, KeyPair};
+    use spork_core::cert::{
+        encode_certificate_pem,
+        extensions::{BasicConstraints, KeyUsage, KeyUsageFlags, SubjectAltName},
+        CertificateBuilder, NameBuilder, Validity,
+    };
+
+    let key = KeyPair::generate(AlgorithmId::EcdsaP256).expect("keygen");
+    let dn = NameBuilder::new(cn)
+        .organization("PKI Client Test")
+        .country("US")
+        .build();
+
+    let cert = CertificateBuilder::new(dn, key.public_key_der().unwrap(), key.algorithm_id())
+        .validity(Validity::years_from_now(1))
+        .basic_constraints(BasicConstraints::end_entity())
+        .key_usage(KeyUsage::new(KeyUsageFlags::new(
+            KeyUsageFlags::DIGITAL_SIGNATURE | KeyUsageFlags::KEY_ENCIPHERMENT,
+        )))
+        .subject_alt_name(SubjectAltName::new().dns(cn))
+        .include_authority_key_identifier(false)
+        .build_and_sign(&key)
+        .expect("build cert");
+
+    let pem = encode_certificate_pem(&cert).expect("encode PEM");
+    let path = dir.join("selfsigned.pem");
+    fs::write(&path, pem).expect("write cert");
+    path
+}
+
+#[test]
+fn cert_show_openssl_format_full_name() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let cert_path = write_selfsigned_ec_p256_cert(temp_dir.path(), "os-full.example.com");
+
+    let output = Command::new(pki_binary())
+        .args(["cert", "show", "-f", "openssl", "--no-chain"])
+        .arg(&cert_path)
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("failed to run pki cert show -f openssl");
+
+    assert!(
+        output.status.success(),
+        "cert show -f openssl failed: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Load-bearing openssl x509 -text landmarks.
+    for needle in [
+        "Certificate:",
+        "Data:",
+        "Version:",
+        "Serial Number:",
+        "Signature Algorithm:",
+        "Issuer:",
+        "Validity",
+        "Not Before:",
+        "Not After :",
+        "Subject:",
+        "Subject Public Key Info:",
+        "X509v3 extensions:",
+    ] {
+        assert!(
+            stdout.contains(needle),
+            "expected '{}' in -f openssl output, got:\n{}",
+            needle,
+            stdout
+        );
+    }
+    // And the CN should be somewhere in the Subject line.
+    assert!(
+        stdout.contains("os-full.example.com"),
+        "expected CN in output, got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn cert_show_openssl_format_short_alias() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let cert_path = write_selfsigned_ec_p256_cert(temp_dir.path(), "os-short.example.com");
+
+    let output = Command::new(pki_binary())
+        .args(["cert", "show", "-f", "os", "--no-chain"])
+        .arg(&cert_path)
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("failed to run pki cert show -f os");
+
+    assert!(
+        output.status.success(),
+        "cert show -f os failed: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.starts_with("Certificate:\n"),
+        "'-f os' must produce openssl-shaped output starting with 'Certificate:\\n', got:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn cert_show_openssl_format_rejects_unknown_format() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let cert_path = write_selfsigned_ec_p256_cert(temp_dir.path(), "os-bad.example.com");
+
+    let output = Command::new(pki_binary())
+        .args(["cert", "show", "-f", "definitely-not-a-format"])
+        .arg(&cert_path)
+        .output()
+        .expect("failed to run pki cert show");
+
+    assert!(
+        !output.status.success(),
+        "unknown format should exit non-zero"
+    );
 }

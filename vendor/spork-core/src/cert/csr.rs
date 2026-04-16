@@ -258,6 +258,72 @@ impl CertificateRequest {
         addrs
     }
 
+    /// Extract requested SAN email addresses (rfc822Name) from extensionRequest attribute.
+    ///
+    /// Parses the extensionRequest attribute (OID 1.2.840.113549.1.9.14) to find
+    /// the SAN extension (OID 2.5.29.17) and extracts rfc822Name [1] entries
+    /// (RFC 5280 §4.2.1.6). Required for S/MIME and client-auth identification.
+    pub fn requested_email_addresses(&self) -> Vec<String> {
+        // SAN OID 2.5.29.17 encoded as DER
+        const SAN_OID: &[u8] = &[0x55, 0x1D, 0x11];
+        let der = &self.der;
+        let mut emails = Vec::new();
+
+        let mut pos = 0;
+        while pos + SAN_OID.len() < der.len() {
+            if der[pos..].starts_with(SAN_OID) {
+                let search_start = pos + SAN_OID.len();
+                for scan in search_start..std::cmp::min(search_start + 20, der.len()) {
+                    if der[scan] == 0x30 {
+                        let seq_start = scan + 1;
+                        if seq_start >= der.len() {
+                            break;
+                        }
+                        let (seq_len, hdr_len) = if der[seq_start] < 0x80 {
+                            (der[seq_start] as usize, 1)
+                        } else {
+                            let nb = (der[seq_start] & 0x7F) as usize;
+                            if seq_start + 1 + nb > der.len() {
+                                break;
+                            }
+                            let mut l = 0usize;
+                            for i in 0..nb {
+                                l = (l << 8) | der[seq_start + 1 + i] as usize;
+                            }
+                            (l, 1 + nb)
+                        };
+                        let content_start = seq_start + hdr_len;
+                        let content_end = std::cmp::min(content_start + seq_len, der.len());
+                        let mut gn_pos = content_start;
+                        while gn_pos + 2 <= content_end {
+                            let tag = der[gn_pos];
+                            gn_pos += 1;
+                            if gn_pos >= content_end {
+                                break;
+                            }
+                            let len = der[gn_pos] as usize;
+                            gn_pos += 1;
+                            if gn_pos + len > content_end {
+                                break;
+                            }
+                            // Tag 0x81 = context [1] IMPLICIT = rfc822Name
+                            if tag == 0x81 {
+                                if let Ok(email) = std::str::from_utf8(&der[gn_pos..gn_pos + len]) {
+                                    emails.push(email.to_string());
+                                }
+                            }
+                            gn_pos += len;
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+            pos += 1;
+        }
+        emails
+    }
+
     /// Extract unstructuredName attribute from CSR (RFC 2985 §5.4.3).
     ///
     /// The unstructuredName (OID 1.2.840.113549.1.9.2) is an optional PKCS#9
@@ -899,6 +965,7 @@ pub struct CsrBuilder {
     unstructured_address: Option<String>,
     san_dns_names: Vec<String>,
     san_ips: Vec<String>,
+    san_emails: Vec<String>,
 }
 
 impl CsrBuilder {
@@ -911,6 +978,7 @@ impl CsrBuilder {
             unstructured_address: None,
             san_dns_names: Vec::new(),
             san_ips: Vec::new(),
+            san_emails: Vec::new(),
         }
     }
 
@@ -957,6 +1025,16 @@ impl CsrBuilder {
     /// Add IP addresses to the Subject Alternative Name extension request.
     pub fn with_san_ips(mut self, ips: &[&str]) -> Self {
         self.san_ips.extend(ips.iter().map(|s| s.to_string()));
+        self
+    }
+
+    /// Add email addresses to the Subject Alternative Name extension request.
+    ///
+    /// Emits `rfc822Name` GeneralName entries (RFC 5280 §4.2.1.6, context tag [1] IA5String).
+    /// Required for S/MIME and client-auth certificates where the email identity
+    /// is carried in SAN rather than the subject DN.
+    pub fn with_san_emails(mut self, emails: &[&str]) -> Self {
+        self.san_emails.extend(emails.iter().map(|s| s.to_string()));
         self
     }
 
@@ -1014,7 +1092,10 @@ impl CsrBuilder {
         }
 
         // extensionRequest (RFC 2985 §5.4.2) — SAN
-        if !self.san_dns_names.is_empty() || !self.san_ips.is_empty() {
+        if !self.san_dns_names.is_empty()
+            || !self.san_ips.is_empty()
+            || !self.san_emails.is_empty()
+        {
             let san_ext = self.build_san_extension()?;
             let ext_req = x509_cert::request::ExtensionReq(vec![san_ext]);
             let attr: x509_cert::attr::Attribute = ext_req
@@ -1028,10 +1109,17 @@ impl CsrBuilder {
         Ok(attrs)
     }
 
-    /// Build a SAN extension from the configured DNS names and IPs.
+    /// Build a SAN extension from the configured DNS names, IPs, and emails.
     fn build_san_extension(&self) -> Result<x509_cert::ext::Extension> {
         // Build GeneralNames DER manually (SEQUENCE OF GeneralName)
         let mut names_der = Vec::new();
+        for email in &self.san_emails {
+            // rfc822Name [1] IA5String (RFC 5280 §4.2.1.6)
+            let bytes = email.as_bytes();
+            names_der.push(0x81); // context [1]
+            names_der.extend(der_encode_length(bytes.len()));
+            names_der.extend_from_slice(bytes);
+        }
         for dns in &self.san_dns_names {
             // dNSName [2] IA5String
             let bytes = dns.as_bytes();
@@ -1816,6 +1904,64 @@ mod tests {
         assert_eq!(parsed.challenge_password(), Some("test123".to_string()));
         assert_eq!(parsed.requested_dns_names(), vec!["full.example.com"]);
         assert_eq!(parsed.requested_ip_addresses(), vec!["10.0.0.1"]);
+    }
+
+    #[test]
+    fn test_csr_builder_with_san_email() {
+        let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+        let subject = NameBuilder::new("Email SAN CSR").build();
+        let csr = CsrBuilder::new(subject)
+            .with_san_emails(&["user@example.com"])
+            .build_and_sign(&kp)
+            .unwrap();
+
+        let parsed = CertificateRequest::from_der(csr.to_der()).unwrap();
+        assert!(parsed.verify_signature().unwrap());
+        let emails = parsed.requested_email_addresses();
+        assert_eq!(emails.len(), 1, "Expected 1 SAN email, got: {emails:?}");
+        assert_eq!(emails[0], "user@example.com");
+        assert!(parsed.requested_dns_names().is_empty());
+        assert!(parsed.requested_ip_addresses().is_empty());
+    }
+
+    #[test]
+    fn test_csr_builder_with_san_mixed_types() {
+        // S/MIME-style CSR: DNS + IP + email together.
+        let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+        let subject = NameBuilder::new("Mixed SAN CSR").build();
+        let csr = CsrBuilder::new(subject)
+            .with_san_dns_names(&["example.com"])
+            .with_san_ips(&["192.0.2.1"])
+            .with_san_emails(&["admin@example.com", "noc@example.com"])
+            .build_and_sign(&kp)
+            .unwrap();
+
+        let parsed = CertificateRequest::from_der(csr.to_der()).unwrap();
+        assert!(parsed.verify_signature().unwrap());
+        assert_eq!(parsed.requested_dns_names(), vec!["example.com"]);
+        assert_eq!(parsed.requested_ip_addresses(), vec!["192.0.2.1"]);
+        let emails = parsed.requested_email_addresses();
+        assert_eq!(emails.len(), 2, "Expected 2 emails, got: {emails:?}");
+        assert!(emails.contains(&"admin@example.com".to_string()));
+        assert!(emails.contains(&"noc@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_csr_builder_email_only_no_dns() {
+        // S/MIME CSRs often carry only email SANs — no DNS, no IP.
+        let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+        let subject = NameBuilder::new("Ray Ketcham").build();
+        let csr = CsrBuilder::new(subject)
+            .with_san_emails(&["rayketcham@ogjos.com"])
+            .build_and_sign(&kp)
+            .unwrap();
+
+        let parsed = CertificateRequest::from_der(csr.to_der()).unwrap();
+        assert!(parsed.verify_signature().unwrap());
+        assert_eq!(
+            parsed.requested_email_addresses(),
+            vec!["rayketcham@ogjos.com"]
+        );
     }
 
     #[test]

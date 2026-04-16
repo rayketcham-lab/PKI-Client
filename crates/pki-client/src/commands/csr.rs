@@ -15,6 +15,20 @@ struct CsrOutput {
     pem: String,
 }
 
+/// Heuristic: does this CN string look like a DNS hostname?
+///
+/// A CN like "example.com" should be auto-added as a dNSName SAN for TLS
+/// ergonomics. A CN like "Ray Ketcham" (a person's name) or "Acme Corp. CA"
+/// must not be, because injecting "DNS:Ray Ketcham" into an S/MIME CSR
+/// corrupts the request.
+fn looks_like_hostname(cn: &str) -> bool {
+    !cn.is_empty()
+        && cn.contains('.')
+        && cn
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '*')
+}
+
 /// Map PQC algorithm name to spork-core AlgorithmId.
 /// Returns None for non-PQC algorithms (classical path handles those).
 fn pqc_algorithm_id(name: &str) -> Option<spork_core::AlgorithmId> {
@@ -197,8 +211,14 @@ fn create(args: CreateArgs, config: &GlobalConfig) -> Result<CmdResult> {
             builder = builder.locality(locality);
         }
 
-        // Add SANs
-        builder = builder.add_dns_san(&args.cn);
+        // Add SANs. Only auto-add the CN as a DNS SAN when the user did not pass
+        // --san explicitly AND the CN looks like a hostname. This keeps
+        // server-cert ergonomics ("--cn example.com" → dNSName SAN for modern TLS)
+        // without corrupting S/MIME or client-auth CSRs (e.g. "--cn Ray Ketcham"
+        // must not emit "DNS:Ray Ketcham").
+        if args.san.is_empty() && looks_like_hostname(&args.cn) {
+            builder = builder.add_dns_san(&args.cn);
+        }
 
         for san in &args.san {
             if let Some((san_type, san_value)) = san.split_once(':') {
