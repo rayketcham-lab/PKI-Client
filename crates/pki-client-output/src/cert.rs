@@ -2174,6 +2174,439 @@ impl CertFormatter {
         }
     }
 
+    // ── OpenSSL-compatible format ─────────────────────────────────────
+
+    /// Format a certificate in OpenSSL `x509 -text -noout` style with optional
+    /// colors and PKI Client extension sections (lifetime bar, trust chain).
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn format_openssl(cert: &Certificate, colored: bool) -> String {
+        let mut out = String::new();
+
+        // ── Certificate: / Data: ──────────────────────────────────────
+        out.push_str("Certificate:\n");
+        out.push_str("    Data:\n");
+
+        // Version
+        out.push_str(&format!(
+            "        Version: {} (0x{})\n",
+            cert.version,
+            cert.version - 1
+        ));
+
+        // Serial Number
+        out.push_str("        Serial Number:\n");
+        let serial_formatted = Self::os_format_serial(&cert.serial);
+        out.push_str(&format!("            {}\n", serial_formatted));
+
+        // Signature Algorithm (in Data section)
+        out.push_str(&format!(
+            "        Signature Algorithm: {}\n",
+            cert.signature_algorithm_name
+        ));
+
+        // Issuer
+        out.push_str(&format!("        Issuer: {}\n", cert.issuer));
+
+        // Validity (no colon — matches openssl)
+        out.push_str("        Validity\n");
+        out.push_str(&format!(
+            "            Not Before: {}\n",
+            cert.not_before.format("%b %e %H:%M:%S %Y GMT")
+        ));
+        out.push_str(&format!(
+            "            Not After : {}\n",
+            cert.not_after.format("%b %e %H:%M:%S %Y GMT")
+        ));
+
+        // Subject
+        out.push_str(&format!("        Subject: {}\n", cert.subject));
+
+        // Subject Public Key Info
+        out.push_str("        Subject Public Key Info:\n");
+        let algo_display = Self::os_key_algorithm_display(cert);
+        out.push_str(&format!(
+            "            Public Key Algorithm: {}\n",
+            algo_display
+        ));
+
+        if let Some(ref curve) = cert.ec_curve {
+            out.push_str(&format!(
+                "                Public-Key: ({} bit)\n",
+                cert.key_size
+            ));
+            out.push_str(&format!(
+                "                ASN1 OID: {}\n",
+                curve.to_lowercase()
+            ));
+        } else if cert.key_algorithm_name == "RSA" {
+            out.push_str(&format!(
+                "                Public-Key: ({} bit)\n",
+                cert.key_size
+            ));
+            if let Some(ref modulus) = cert.rsa_modulus {
+                out.push_str("                Modulus:\n");
+                let colon_hex = Self::os_format_hex_block(modulus);
+                for line in colon_hex.lines() {
+                    out.push_str(&format!("                    {}\n", line));
+                }
+            }
+            if let Some(exponent) = cert.rsa_exponent {
+                out.push_str(&format!(
+                    "                Exponent: {} (0x{:x})\n",
+                    exponent, exponent
+                ));
+            }
+        } else {
+            out.push_str(&format!(
+                "                Public-Key: ({} bit)\n",
+                cert.key_size
+            ));
+        }
+
+        // X509v3 extensions
+        out.push_str("        X509v3 extensions:\n");
+
+        // Basic Constraints
+        if cert.is_ca || cert.basic_constraints_critical {
+            let crit = if cert.basic_constraints_critical {
+                " critical"
+            } else {
+                ""
+            };
+            out.push_str(&format!("            X509v3 Basic Constraints:{}\n", crit));
+            let ca_str = if cert.is_ca { "TRUE" } else { "FALSE" };
+            if cert.path_length >= 0 {
+                out.push_str(&format!(
+                    "                CA:{}, pathlen:{}\n",
+                    ca_str, cert.path_length
+                ));
+            } else {
+                out.push_str(&format!("                CA:{}\n", ca_str));
+            }
+        }
+
+        // Key Usage
+        if !cert.key_usage.is_empty() {
+            let crit = if cert.key_usage_critical {
+                " critical"
+            } else {
+                ""
+            };
+            out.push_str(&format!("            X509v3 Key Usage:{}\n", crit));
+            out.push_str(&format!("                {}\n", cert.key_usage.join(", ")));
+        }
+
+        // Extended Key Usage
+        if !cert.extended_key_usage.is_empty() {
+            out.push_str("            X509v3 Extended Key Usage:\n");
+            out.push_str(&format!(
+                "                {}\n",
+                cert.extended_key_usage.join(", ")
+            ));
+        }
+
+        // SAN
+        if !cert.san.is_empty() {
+            out.push_str("            X509v3 Subject Alternative Name:\n");
+            let san_strs: Vec<String> = cert.san.iter().map(|s| s.to_string()).collect();
+            out.push_str(&format!("                {}\n", san_strs.join(", ")));
+        }
+
+        // Subject Key Identifier
+        if let Some(ref ski) = cert.subject_key_id {
+            out.push_str("            X509v3 Subject Key Identifier: \n");
+            out.push_str(&format!("                {}\n", Self::os_colonize_hex(ski)));
+        }
+
+        // Authority Key Identifier
+        if let Some(ref aki) = cert.authority_key_id {
+            out.push_str("            X509v3 Authority Key Identifier: \n");
+            out.push_str(&format!(
+                "                keyid:{}\n",
+                Self::os_colonize_hex(aki)
+            ));
+        }
+
+        // Authority Information Access
+        if !cert.ocsp_urls.is_empty() || !cert.ca_issuer_urls.is_empty() {
+            out.push_str("            Authority Information Access: \n");
+            for url in &cert.ocsp_urls {
+                out.push_str(&format!("                OCSP - URI:{}\n", url));
+            }
+            for url in &cert.ca_issuer_urls {
+                out.push_str(&format!("                CA Issuers - URI:{}\n", url));
+            }
+        }
+
+        // CRL Distribution Points
+        if !cert.crl_distribution_points.is_empty() {
+            out.push_str("            X509v3 CRL Distribution Points: \n");
+            out.push('\n');
+            out.push_str("                Full Name:\n");
+            for url in &cert.crl_distribution_points {
+                out.push_str(&format!("                  URI:{}\n", url));
+            }
+        }
+
+        // Certificate Policies
+        if !cert.certificate_policies.is_empty() {
+            out.push_str("            X509v3 Certificate Policies: \n");
+            for policy in &cert.certificate_policies {
+                out.push_str(&format!(
+                    "                Policy: {}\n",
+                    Self::policy_oid_to_name(policy)
+                ));
+            }
+        }
+
+        // CT SCTs
+        if !cert.ct_scts.is_empty() {
+            out.push_str(&format!(
+                "            CT Precertificate SCTs: {} embedded\n",
+                cert.ct_scts.len()
+            ));
+        }
+
+        // OCSP Must-Staple
+        if cert.ocsp_must_staple {
+            out.push_str("            TLS Feature: \n");
+            out.push_str("                status_request\n");
+        }
+
+        // ── Trailing Signature Algorithm + Value ──────────────────────
+        out.push_str(&format!(
+            "    Signature Algorithm: {}\n",
+            cert.signature_algorithm_name
+        ));
+
+        if !cert.signature_bytes.is_empty() {
+            let sig_hex = Self::os_format_signature(&cert.signature_bytes);
+            for line in sig_hex.lines() {
+                out.push_str(&format!("         {}\n", line));
+            }
+        }
+
+        // ── Fingerprints (bonus — openssl shows with -fingerprint) ───
+        out.push_str(&format!(
+            "SHA-256 Fingerprint={}\n",
+            Self::os_colonize_hex(&cert.fingerprint_sha256)
+        ));
+        out.push_str(&format!(
+            "SHA-1 Fingerprint={}\n",
+            Self::os_colonize_hex(&cert.fingerprint_sha1)
+        ));
+
+        // ── PKI Client Extensions (our custom additions) ─────────────
+        out.push_str("\n--- PKI Client Extensions ---\n");
+
+        // Lifetime bar
+        let pct = cert.lifetime_used_percent();
+        let days_left = cert.days_until_expiry();
+        let total_days = (cert.not_after - cert.not_before).num_days();
+        let elapsed_days = total_days - days_left;
+        let bar = Self::os_lifetime_bar(pct, colored);
+        out.push_str(&format!(
+            "    Lifetime:  {} {:.0}% ({}/{} days)\n",
+            bar,
+            pct.min(100.0),
+            elapsed_days.max(0),
+            total_days.max(0)
+        ));
+
+        // Trust chain
+        let cn = cert.common_name().unwrap_or(&cert.subject);
+        let issuer_cn = cert
+            .issuer
+            .split(", ")
+            .find(|p| p.starts_with("CN="))
+            .map(|p| &p[3..])
+            .unwrap_or(&cert.issuer);
+        if cert.is_self_signed() {
+            out.push_str(&format!("    Trust:     {} (self-signed)\n", cn));
+        } else {
+            out.push_str(&format!("    Trust:     {} \u{2190} {}\n", cn, issuer_cn));
+        }
+
+        // Apply colors if requested
+        if colored {
+            Self::os_colorize(&out)
+        } else {
+            out
+        }
+    }
+
+    // ── OpenSSL format helpers ────────────────────────────────────────
+
+    /// Format serial as colon-separated uppercase hex (OpenSSL style).
+    fn os_format_serial(serial: &str) -> String {
+        // serial is already hex; insert colons every 2 chars
+        let upper = serial.to_uppercase();
+        // Pad to even length
+        let padded = if !upper.len().is_multiple_of(2) {
+            format!("0{}", upper)
+        } else {
+            upper
+        };
+        padded
+            .as_bytes()
+            .chunks(2)
+            .map(|c| std::str::from_utf8(c).unwrap_or("??"))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    /// Map key algorithm to OpenSSL display name.
+    fn os_key_algorithm_display(cert: &Certificate) -> String {
+        match cert.key_algorithm_name.as_str() {
+            "RSA" => "rsaEncryption".to_string(),
+            "EC" => "id-ecPublicKey".to_string(),
+            "Ed25519" => "ED25519".to_string(),
+            "Ed448" => "ED448".to_string(),
+            other => other.to_string(),
+        }
+    }
+
+    /// Colonize a plain hex string: "aabb" → "AA:BB".
+    fn os_colonize_hex(hex: &str) -> String {
+        // If already colonized, uppercase it
+        if hex.contains(':') {
+            return hex.to_uppercase();
+        }
+        let upper = hex.to_uppercase();
+        let padded = if !upper.len().is_multiple_of(2) {
+            format!("0{}", upper)
+        } else {
+            upper
+        };
+        padded
+            .as_bytes()
+            .chunks(2)
+            .map(|c| std::str::from_utf8(c).unwrap_or("??"))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    /// Format a hex string as OpenSSL modulus block (colon-separated, 15 pairs per line).
+    fn os_format_hex_block(hex: &str) -> String {
+        let colonized = Self::os_colonize_hex(hex);
+        let pairs: Vec<&str> = colonized.split(':').collect();
+        let mut lines = Vec::new();
+        for chunk in pairs.chunks(15) {
+            let mut line = chunk.join(":");
+            // Add trailing colon if not the last chunk
+            line.push(':');
+            lines.push(line);
+        }
+        // Remove trailing colon from last line
+        if let Some(last) = lines.last_mut() {
+            if last.ends_with(':') {
+                last.pop();
+            }
+        }
+        lines.join("\n")
+    }
+
+    /// Format signature bytes as colon-separated hex, 18 pairs per line.
+    fn os_format_signature(bytes: &[u8]) -> String {
+        let pairs: Vec<String> = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        let mut lines = Vec::new();
+        for chunk in pairs.chunks(18) {
+            let mut line = chunk.join(":");
+            // Check if this is NOT the last chunk
+            if chunk.len() == 18 {
+                line.push(':');
+            }
+            lines.push(line);
+        }
+        lines.join("\n         ")
+    }
+
+    /// Build lifetime progress bar.
+    fn os_lifetime_bar(pct: f64, _colored: bool) -> String {
+        let width: usize = 20;
+        let filled = ((pct / 100.0) * width as f64).round() as usize;
+        let empty = width.saturating_sub(filled);
+        format!(
+            "[{}{}]",
+            "\u{2588}".repeat(filled),
+            "\u{2591}".repeat(empty)
+        )
+    }
+
+    /// Apply ANSI colors to the full OpenSSL output.
+    fn os_colorize(plain: &str) -> String {
+        let mut out = String::with_capacity(plain.len() * 2);
+        for line in plain.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("Certificate:")
+                || trimmed.starts_with("Data:")
+                || trimmed == "--- PKI Client Extensions ---"
+            {
+                out.push_str(&format!("{}\n", line.cyan().bold()));
+            } else if trimmed.starts_with("Version:")
+                || trimmed.starts_with("Serial Number:")
+                || trimmed.starts_with("Signature Algorithm:")
+                || trimmed.starts_with("Issuer:")
+                || trimmed.starts_with("Validity")
+                || trimmed.starts_with("Subject:")
+                || trimmed.starts_with("Subject Public Key Info:")
+                || trimmed.starts_with("Public Key Algorithm:")
+                || trimmed.starts_with("X509v3 extensions:")
+            {
+                out.push_str(&format!("{}\n", line.white().bold()));
+            } else if trimmed.starts_with("Not Before:") || trimmed.starts_with("Not After :") {
+                out.push_str(&format!("{}\n", line.yellow()));
+            } else if trimmed.starts_with("X509v3 ")
+                || trimmed.starts_with("Authority Information")
+                || trimmed.starts_with("TLS Feature")
+                || trimmed.starts_with("CT Precertificate")
+            {
+                out.push_str(&format!("{}\n", line.green()));
+            } else if trimmed.starts_with("SHA-256 Fingerprint")
+                || trimmed.starts_with("SHA-1 Fingerprint")
+            {
+                out.push_str(&format!("{}\n", line.dimmed()));
+            } else if trimmed.starts_with("Lifetime:") {
+                // Color the lifetime bar based on percentage
+                out.push_str(&Self::os_colorize_lifetime(line));
+                out.push('\n');
+            } else if trimmed.starts_with("Trust:") {
+                out.push_str(&format!("{}\n", line.cyan()));
+            } else {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+        // Remove trailing newline to match original
+        if out.ends_with('\n') {
+            out.pop();
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Colorize the lifetime line based on the percentage value.
+    fn os_colorize_lifetime(line: &str) -> String {
+        // Parse percentage from the line
+        if let Some(pct_str) = line
+            .split('%')
+            .next()
+            .and_then(|s| s.rsplit_once(' ').map(|(_, n)| n))
+        {
+            if let Ok(pct) = pct_str.parse::<f64>() {
+                return if pct >= 100.0 {
+                    line.red().bold().to_string()
+                } else if pct >= 70.0 {
+                    line.yellow().bold().to_string()
+                } else {
+                    line.green().to_string()
+                };
+            }
+        }
+        line.to_string()
+    }
+
     /// Format a certificate without colors (plain text, OpenSSL-style).
     #[must_use]
     pub fn format_plain(cert: &Certificate) -> String {
@@ -2417,6 +2850,10 @@ impl Formatter for Certificate {
 
     fn to_forensic(&self, colored: bool) -> String {
         CertFormatter::format_forensic(self, colored)
+    }
+
+    fn to_openssl(&self, colored: bool) -> String {
+        CertFormatter::format_openssl(self, colored)
     }
 }
 
@@ -3016,5 +3453,229 @@ mod tests {
             !output.contains("more lines"),
             "Short modulus should not be truncated"
         );
+    }
+
+    // ========== OpenSSL format tests ==========
+
+    #[test]
+    fn test_openssl_format_starts_with_certificate() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.starts_with("Certificate:\n"),
+            "OpenSSL format must start with 'Certificate:\\n'"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_data_section() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("    Data:\n"),
+            "OpenSSL format must have '    Data:' section"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_version() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Version: 3 (0x2)\n"),
+            "OpenSSL format must show 'Version: 3 (0x2)'"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_serial_number() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Serial Number:\n"),
+            "OpenSSL format must have Serial Number header"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_signature_algorithm() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Signature Algorithm:"),
+            "OpenSSL format must have Signature Algorithm in Data section"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_issuer() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Issuer:"),
+            "OpenSSL format must have Issuer field"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_validity_section() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Validity\n"),
+            "OpenSSL format must have 'Validity' section (no colon, matching openssl)"
+        );
+        assert!(
+            output.contains("            Not Before:"),
+            "Must have Not Before"
+        );
+        assert!(
+            output.contains("            Not After :"),
+            "Must have Not After (with space before colon, matching openssl)"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_subject() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Subject:"),
+            "OpenSSL format must have Subject field"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_public_key_info() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        Subject Public Key Info:\n"),
+            "OpenSSL format must have Subject Public Key Info section"
+        );
+        assert!(
+            output.contains("            Public Key Algorithm:"),
+            "Must have Public Key Algorithm"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_extensions() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("        X509v3 extensions:\n"),
+            "OpenSSL format must have X509v3 extensions section"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_key_usage() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("            X509v3 Key Usage:"),
+            "Must show X509v3 Key Usage"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_trailing_signature() {
+        let mut cert = make_cert();
+        cert.signature_bytes = vec![0xde, 0xad, 0xbe, 0xef];
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("    Signature Algorithm:"),
+            "OpenSSL format must have trailing Signature Algorithm"
+        );
+        assert!(
+            output.contains("         de:ad:be:ef"),
+            "OpenSSL format must have hex signature value"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_fingerprints() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("SHA-256 Fingerprint="),
+            "OpenSSL format must show SHA-256 fingerprint"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_has_pki_extensions() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("--- PKI Client Extensions ---"),
+            "Must have PKI Client Extensions separator"
+        );
+        assert!(output.contains("    Lifetime:"), "Must have Lifetime bar");
+        assert!(output.contains("    Trust:"), "Must have Trust chain info");
+    }
+
+    #[test]
+    fn test_openssl_format_lifetime_bar_shows_progress() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        // The lifetime bar should contain block characters
+        let lifetime_line = output.lines().find(|l| l.contains("Lifetime:")).unwrap();
+        assert!(
+            lifetime_line.contains('[') && lifetime_line.contains(']'),
+            "Lifetime bar must use [brackets]: {lifetime_line}"
+        );
+        assert!(
+            lifetime_line.contains('%'),
+            "Lifetime bar must show percentage: {lifetime_line}"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_colored_has_ansi() {
+        colored::control::set_override(true);
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, true);
+        colored::control::unset_override();
+        assert!(
+            output.contains('\x1b'),
+            "Colored OpenSSL format must contain ANSI escape codes"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_plain_has_no_ansi() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            !output.contains('\x1b'),
+            "Plain OpenSSL format must NOT contain ANSI escape codes"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_san_entries() {
+        let cert = make_cert();
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(
+            output.contains("X509v3 Subject Alternative Name:"),
+            "Must show SAN section"
+        );
+        assert!(
+            output.contains("DNS:test.example.com"),
+            "Must show DNS SAN entries"
+        );
+    }
+
+    #[test]
+    fn test_openssl_format_ca_cert() {
+        let mut cert = make_cert();
+        cert.is_ca = true;
+        cert.basic_constraints_critical = true;
+        cert.path_length = 0;
+        cert.key_usage = vec!["Certificate Sign".to_string(), "CRL Sign".to_string()];
+        let output = CertFormatter::format_openssl(&cert, false);
+        assert!(output.contains("CA:TRUE"), "CA cert must show CA:TRUE");
     }
 }

@@ -259,7 +259,10 @@ fn get_cacaps(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             println!("{}", "CA Capabilities:".bold());
             for cap in &caps.capabilities {
                 println!("  - {}", cap);
@@ -303,7 +306,10 @@ fn get_cacert(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             if let Some(out_path) = output {
                 std::fs::write(out_path, &cert_pem)
                     .with_context(|| format!("Failed to write: {}", out_path.display()))?;
@@ -340,7 +346,10 @@ fn get_nextcacert(
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
             }
-            OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+            OutputFormat::Text
+            | OutputFormat::Forensic
+            | OutputFormat::Compact
+            | OutputFormat::Openssl => {
                 if let Some(out_path) = output {
                     std::fs::write(out_path, &pem)
                         .with_context(|| format!("Failed to write: {}", out_path.display()))?;
@@ -357,7 +366,10 @@ fn get_nextcacert(
                 });
                 println!("{}", serde_json::to_string_pretty(&json)?);
             }
-            OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+            OutputFormat::Text
+            | OutputFormat::Forensic
+            | OutputFormat::Compact
+            | OutputFormat::Openssl => {
                 println!("No next CA certificate available (no rollover in progress).");
             }
         },
@@ -402,7 +414,10 @@ fn pki_operation(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             if let Some(out_path) = output {
                 ScepClient::save_response(out_path, &response)?;
                 if !config.quiet {
@@ -465,7 +480,10 @@ fn enroll(
             let json = enrollment_to_json(&response);
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             println!("{} SCEP enrollment succeeded!", "Success!".green().bold());
             println!("  Transaction ID: {}", response.transaction_id);
 

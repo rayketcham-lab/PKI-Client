@@ -121,7 +121,10 @@ pub(super) fn cmd_backups(backup_dir: Option<&Path>, config: &GlobalConfig) -> R
                 .collect();
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             println!();
             println!("{}", "Available Backups".bold());
             println!();

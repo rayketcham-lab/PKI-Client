@@ -81,6 +81,9 @@ pub enum OutputFormat {
     Compact,
     /// Forensic deep-dive — every field, hex dumps, security notes
     Forensic,
+    /// OpenSSL-compatible output (matches `openssl x509 -text -noout`)
+    #[value(alias = "os")]
+    Openssl,
 }
 
 impl From<OutputFormat> for pki_client_output::OutputFormat {
@@ -90,6 +93,7 @@ impl From<OutputFormat> for pki_client_output::OutputFormat {
             OutputFormat::Json => Self::Json,
             OutputFormat::Compact => Self::Compact,
             OutputFormat::Forensic => Self::Forensic,
+            OutputFormat::Openssl => Self::Openssl,
         }
     }
 }

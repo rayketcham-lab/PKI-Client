@@ -52,7 +52,10 @@ pub(super) fn register_account(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             if !config.quiet {
                 println!();
                 println!("{}", "ACME Account".bold());
@@ -100,7 +103,10 @@ pub(super) fn create_order(
             });
             println!("{}", serde_json::to_string_pretty(&json)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             if !config.quiet {
                 println!();
                 println!("{}", "ACME Order".bold());
@@ -150,7 +156,10 @@ pub(super) fn show_challenges(
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&authz)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             if !config.quiet {
                 println!();
                 println!("{}", "Authorization".bold());
@@ -272,7 +281,10 @@ pub(super) fn respond_to_challenge(
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&challenge)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             println!();
             println!("Challenge Status: {:?}", challenge.status);
             if challenge.status == crate::acme::ChallengeStatus::Valid {
@@ -321,7 +333,10 @@ pub(super) fn finalize_order(
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&order)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             println!();
             println!("Order Status: {:?}", order.status);
             if let Some(cert_url) = &order.certificate {
@@ -425,7 +440,10 @@ pub(super) fn show_directory(
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(directory)?);
         }
-        OutputFormat::Text | OutputFormat::Forensic | OutputFormat::Compact => {
+        OutputFormat::Text
+        | OutputFormat::Forensic
+        | OutputFormat::Compact
+        | OutputFormat::Openssl => {
             if !config.quiet {
                 println!();
                 println!("{}", "ACME Directory".bold());

@@ -15,6 +15,8 @@ pub enum OutputFormat {
     Compact,
     /// Forensic deep-dive — every field, hex dumps, security assessments
     Forensic,
+    /// OpenSSL-compatible output (matches `openssl x509 -text -noout`)
+    Openssl,
 }
 
 impl FromStr for OutputFormat {
@@ -26,8 +28,9 @@ impl FromStr for OutputFormat {
             "json" | "j" => Ok(Self::Json),
             "compact" | "c" => Ok(Self::Compact),
             "forensic" | "f" | "deep" | "verbose" => Ok(Self::Forensic),
+            "openssl" | "os" => Ok(Self::Openssl),
             _ => Err(format!(
-                "Unknown format '{s}'. Valid options: text, json, compact, forensic"
+                "Unknown format '{s}'. Valid options: text, json, compact, forensic, openssl"
             )),
         }
     }
@@ -40,6 +43,7 @@ impl std::fmt::Display for OutputFormat {
             Self::Json => write!(f, "json"),
             Self::Compact => write!(f, "compact"),
             Self::Forensic => write!(f, "forensic"),
+            Self::Openssl => write!(f, "openssl"),
         }
     }
 }
@@ -58,6 +62,9 @@ pub trait Formatter {
     /// Format in forensic deep-dive mode.
     fn to_forensic(&self, colored: bool) -> String;
 
+    /// Format in OpenSSL-compatible style (`openssl x509 -text -noout`).
+    fn to_openssl(&self, colored: bool) -> String;
+
     /// Format according to the specified output format.
     fn format(&self, format: OutputFormat, colored: bool) -> String {
         match format {
@@ -65,6 +72,7 @@ pub trait Formatter {
             OutputFormat::Json => self.to_json(),
             OutputFormat::Compact => self.to_compact(),
             OutputFormat::Forensic => self.to_forensic(colored),
+            OutputFormat::Openssl => self.to_openssl(colored),
         }
     }
 }
@@ -85,6 +93,10 @@ mod tests {
             "forensic".parse::<OutputFormat>().unwrap(),
             OutputFormat::Forensic
         );
+        assert_eq!(
+            "openssl".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Openssl
+        );
     }
 
     #[test]
@@ -93,6 +105,7 @@ mod tests {
         assert_eq!("j".parse::<OutputFormat>().unwrap(), OutputFormat::Json);
         assert_eq!("c".parse::<OutputFormat>().unwrap(), OutputFormat::Compact);
         assert_eq!("f".parse::<OutputFormat>().unwrap(), OutputFormat::Forensic);
+        assert_eq!("os".parse::<OutputFormat>().unwrap(), OutputFormat::Openssl);
     }
 
     #[test]
@@ -115,6 +128,11 @@ mod tests {
             "Forensic".parse::<OutputFormat>().unwrap(),
             OutputFormat::Forensic
         );
+        assert_eq!(
+            "OPENSSL".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Openssl
+        );
+        assert_eq!("OS".parse::<OutputFormat>().unwrap(), OutputFormat::Openssl);
     }
 
     #[test]
@@ -125,12 +143,22 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_invalid_error_lists_openssl() {
+        let err = "bogus".parse::<OutputFormat>().unwrap_err();
+        assert!(
+            err.contains("openssl"),
+            "Error message should list openssl as valid option: {err}"
+        );
+    }
+
+    #[test]
     fn test_display_roundtrip() {
         for fmt in [
             OutputFormat::Text,
             OutputFormat::Json,
             OutputFormat::Compact,
             OutputFormat::Forensic,
+            OutputFormat::Openssl,
         ] {
             let s = fmt.to_string();
             assert_eq!(s.parse::<OutputFormat>().unwrap(), fmt);
@@ -140,5 +168,18 @@ mod tests {
     #[test]
     fn test_default_is_text() {
         assert_eq!(OutputFormat::default(), OutputFormat::Text);
+    }
+
+    #[test]
+    fn test_openssl_format_dispatch() {
+        // Verify the format() dispatcher routes Openssl correctly
+        use crate::Certificate;
+        let cert = Certificate::test_stub("CN=test.example.com");
+        let output = cert.format(OutputFormat::Openssl, false);
+        assert!(
+            output.starts_with("Certificate:\n"),
+            "Openssl format must start with 'Certificate:\\n', got: {}",
+            output.lines().next().unwrap_or("")
+        );
     }
 }
