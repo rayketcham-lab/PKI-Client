@@ -371,7 +371,7 @@ impl PolicyEngine {
     /// Create a new policy engine with the given policies.
     pub fn new(mut policies: Vec<CaPolicy>) -> Self {
         // Sort by priority (higher first)
-        policies.sort_by(|a, b| b.priority.cmp(&a.priority));
+        policies.sort_by_key(|p| std::cmp::Reverse(p.priority));
         Self {
             policies,
             fail_fast: false,
