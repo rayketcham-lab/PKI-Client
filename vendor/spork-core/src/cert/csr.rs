@@ -1110,42 +1110,43 @@ impl CsrBuilder {
     }
 
     /// Build a SAN extension from the configured DNS names, IPs, and emails.
+    ///
+    /// Builds via `x509_cert::ext::pkix::SubjectAltName` (a typed newtype over
+    /// `GeneralNames`) so the DER encoding comes from the `der` crate rather
+    /// than hand-rolled tag/length/value bytes.
     fn build_san_extension(&self) -> Result<x509_cert::ext::Extension> {
-        // Build GeneralNames DER manually (SEQUENCE OF GeneralName)
-        let mut names_der = Vec::new();
+        use der::asn1::{Ia5String, OctetString};
+        use x509_cert::ext::pkix::name::{GeneralName, GeneralNames};
+        use x509_cert::ext::pkix::SubjectAltName;
+
+        let mut names: GeneralNames = Vec::new();
+
+        // rfc822Name [1] IA5String — RFC 5280 §4.2.1.6
         for email in &self.san_emails {
-            // rfc822Name [1] IA5String (RFC 5280 §4.2.1.6)
-            let bytes = email.as_bytes();
-            names_der.push(0x81); // context [1]
-            names_der.extend(der_encode_length(bytes.len()));
-            names_der.extend_from_slice(bytes);
-        }
-        for dns in &self.san_dns_names {
-            // dNSName [2] IA5String
-            let bytes = dns.as_bytes();
-            names_der.push(0x82); // context [2]
-            names_der.extend(der_encode_length(bytes.len()));
-            names_der.extend_from_slice(bytes);
-        }
-        for ip in &self.san_ips {
-            // iPAddress [7] OCTET STRING
-            if let Ok(addr) = ip.parse::<std::net::Ipv4Addr>() {
-                let octets = addr.octets();
-                names_der.push(0x87); // context [7]
-                names_der.push(4);
-                names_der.extend_from_slice(&octets);
-            } else if let Ok(addr) = ip.parse::<std::net::Ipv6Addr>() {
-                let octets = addr.octets();
-                names_der.push(0x87);
-                names_der.push(16);
-                names_der.extend_from_slice(&octets);
-            }
+            let ia5 = Ia5String::new(email)
+                .map_err(|e| Error::Encoding(format!("rfc822Name '{email}': {e}")))?;
+            names.push(GeneralName::Rfc822Name(ia5));
         }
 
-        // Wrap in SEQUENCE
-        let mut san_seq = vec![0x30]; // SEQUENCE tag
-        san_seq.extend(der_encode_length(names_der.len()));
-        san_seq.extend(names_der);
+        // dNSName [2] IA5String
+        for dns in &self.san_dns_names {
+            let ia5 = Ia5String::new(dns)
+                .map_err(|e| Error::Encoding(format!("dNSName '{dns}': {e}")))?;
+            names.push(GeneralName::DnsName(ia5));
+        }
+
+        // iPAddress [7] OCTET STRING — 4 bytes for v4, 16 bytes for v6
+        for ip in &self.san_ips {
+            let parsed: std::net::IpAddr = ip.parse().map_err(|_| {
+                Error::Encoding(format!("iPAddress '{ip}' is not a valid IPv4/IPv6 literal"))
+            })?;
+            names.push(GeneralName::from(parsed));
+        }
+
+        let san = SubjectAltName(names);
+        let san_der = san
+            .to_der()
+            .map_err(|e| Error::Encoding(format!("SAN encode: {e}")))?;
 
         // OID 2.5.29.17 — id-ce-subjectAltName
         let san_oid = const_oid::ObjectIdentifier::new_unwrap("2.5.29.17");
@@ -1153,7 +1154,7 @@ impl CsrBuilder {
         Ok(x509_cert::ext::Extension {
             extn_id: san_oid,
             critical: false,
-            extn_value: der::asn1::OctetString::new(san_seq)
+            extn_value: OctetString::new(san_der)
                 .map_err(|e| Error::Encoding(format!("SAN octet string: {e}")))?,
         })
     }
@@ -1197,17 +1198,6 @@ impl CsrBuilder {
         let der = csr.to_der().map_err(|e| Error::Encoding(e.to_string()))?;
 
         Ok(CertificateRequest { der, inner: csr })
-    }
-}
-
-/// Encode a DER length field (short or long form).
-fn der_encode_length(len: usize) -> Vec<u8> {
-    if len < 0x80 {
-        vec![len as u8]
-    } else if len < 0x100 {
-        vec![0x81, len as u8]
-    } else {
-        vec![0x82, (len >> 8) as u8, len as u8]
     }
 }
 
