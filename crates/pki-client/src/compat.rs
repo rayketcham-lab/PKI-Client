@@ -2058,6 +2058,8 @@ pub fn generate_ed25519() -> Result<GeneratedKey> {
 pub fn generate_rsa(bits: u32) -> Result<GeneratedKey> {
     let algo_id = if bits >= 4096 {
         spork_core::AlgorithmId::Rsa4096
+    } else if bits >= 3072 {
+        spork_core::AlgorithmId::Rsa3072
     } else {
         spork_core::AlgorithmId::Rsa2048
     };
