@@ -57,33 +57,14 @@ rand = { workspace = true }
 rand_core = { workspace = true }
 der = { workspace = true }
 
-# AES encryption for SCEP EnvelopedData
-aes = "0.8"
-cbc = { version = "0.1", features = ["alloc"] }
-
-# Crypto for ACME (JWS signing)
-p256 = { version = "0.13", features = ["ecdsa", "pem"] }
-
 # HTTP client
 reqwest = { workspace = true }
-
-# Internationalized domain name validation (IDNA 2008 / RFC 5891)
-idna = "1.1"
 
 # URL parsing (for SSRF validation)
 url = "2.5"
 
 # Config directory detection
 dirs = "5"
-
-# PKCS#12/PFX creation (Windows IIS cert deployment)
-p12 = "0.6"
-
-# Logging
-tracing = "0.1"
-
-# Zeroize secret material on drop (private keys, challenge passwords)
-zeroize = { version = "1.8", features = ["derive"] }
 
 # POSIX constants (O_NOFOLLOW, ELOOP) for symlink-refusing file writes
 [target.'cfg(unix)'.dependencies]

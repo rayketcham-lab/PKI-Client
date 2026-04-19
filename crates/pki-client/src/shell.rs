@@ -51,11 +51,6 @@ Commands:
   probe server <host:port>      Probe TLS server
   probe check <host:port>       Quick TLS connectivity check
 
-  scep cacaps <url>             SCEP: CA capabilities
-  scep enroll <url> -s <cn>     SCEP: automated enrollment
-  acme certonly <domain>        ACME: get certificate
-  est enroll <url>              EST: simple enrollment
-
 Shell commands:
   help, ?                       Show this help
   version                       Show version
@@ -98,9 +93,6 @@ fn looks_like_new_command(line: &str) -> bool {
         "convert",
         "diff",
         "probe",
-        "scep",
-        "acme",
-        "est",
         "pki",
         "dane",
         "crl",
@@ -131,9 +123,6 @@ const TOP_COMMANDS: &[&str] = &[
     "convert",
     "diff",
     "probe",
-    "scep",
-    "acme",
-    "est",
     "pki",
     "dane",
     "crl",
@@ -156,9 +145,6 @@ fn get_subcommands(cmd: &str) -> &'static [&'static str] {
         "key" => &["gen", "show", "match"],
         "chain" => &["build", "show", "verify"],
         "probe" => &["check", "server"],
-        "scep" => &["cacaps", "cacert", "enroll", "pkiop"],
-        "acme" => &["certonly", "directory", "register"],
-        "est" => &["cacerts", "enroll", "reenroll"],
         "pki" => &["build", "preview", "validate", "export"],
         "dane" => &["generate", "verify"],
         "compliance" => &["check", "levels", "bridge"],
@@ -1184,9 +1170,6 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
                 "probe",
                 "diff",
                 "convert",
-                "scep",
-                "acme",
-                "est",
                 "pki",
                 "dane",
                 "crl",
@@ -1207,7 +1190,7 @@ fn run_cli_command(args: &[String], config: &GlobalConfig) -> Result<()> {
 }
 
 /// Passthrough commands to the full CLI dispatcher for commands not
-/// explicitly handled in the shell (probe, diff, convert, scep, acme, est, etc.)
+/// explicitly handled in the shell (probe, diff, convert, pki, dane, etc.)
 /// Show inline PEM content — auto-detects type (cert, CSR, key, CRL, PKCS#7).
 fn show_inline_pem(pem_text: &str, config: &GlobalConfig) -> Result<()> {
     use std::io::Write;

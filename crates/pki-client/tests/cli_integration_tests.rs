@@ -662,57 +662,6 @@ fn test_help_command() {
     assert!(stdout.contains("key"));
 }
 
-#[test]
-fn test_acme_help() {
-    if !binary_exists() {
-        return;
-    }
-
-    let output = Command::new(pki_binary())
-        .args(["acme", "--help"])
-        .output()
-        .expect("Failed to execute pki");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("ACME") || stdout.contains("acme"));
-    assert!(stdout.contains("register"));
-}
-
-#[test]
-fn test_est_help() {
-    if !binary_exists() {
-        return;
-    }
-
-    let output = Command::new(pki_binary())
-        .args(["est", "--help"])
-        .output()
-        .expect("Failed to execute pki");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("EST") || stdout.contains("est"));
-    assert!(stdout.contains("cacerts"));
-}
-
-#[test]
-fn test_scep_help() {
-    if !binary_exists() {
-        return;
-    }
-
-    let output = Command::new(pki_binary())
-        .args(["scep", "--help"])
-        .output()
-        .expect("Failed to execute pki");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("SCEP") || stdout.contains("scep"));
-    assert!(stdout.contains("cacaps"));
-}
-
 // ============================================================================
 // Bug #32: RSA key gen size validation
 // ============================================================================

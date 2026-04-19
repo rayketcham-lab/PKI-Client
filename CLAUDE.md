@@ -1,8 +1,8 @@
 # PKI Client
 
-Modern PKI CLI tool -- certificate inspection, key management, TLS probing, and enrollment protocols.
+Modern PKI CLI tool -- certificate inspection, key management, TLS probing, compliance validation, DANE, chain building.
 
-**Version:** 0.8.1 | **Binary:** `pki` | **License:** Apache-2.0
+**Version:** 0.9.0 | **Binary:** `pki` | **License:** Apache-2.0
 
 ---
 
@@ -26,7 +26,7 @@ Modern PKI CLI tool -- certificate inspection, key management, TLS probing, and 
 
 ```
 crates/
-  pki-client/          # Binary: pki (20 subcommands incl. interactive `shell`)
+  pki-client/          # Binary: pki (17 subcommands incl. interactive `shell`)
   pki-client-output/   # Library: formatting, OID registry
   pki-probe/           # Library: TLS inspection + linting
   pki-hierarchy/       # Library: declarative PKI hierarchy builder
@@ -38,7 +38,7 @@ tools/
   gen-signing-certs/   # Test cert generator (PQC + classical -> PFX)
 
 tests/
-  interop/             # Interop test scripts (ACME/Pebble, TLS probe, cert round-trip)
+  interop/             # Interop test scripts (TLS probe, cert round-trip, openssl parity)
 ```
 
 ## Dependencies

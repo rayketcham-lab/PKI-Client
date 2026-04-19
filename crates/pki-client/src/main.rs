@@ -11,21 +11,16 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 
-mod acme;
 mod commands;
 mod compat;
 mod config;
-mod deployer;
-mod est;
-mod scep;
 mod shell;
-mod standalone;
 mod util;
 
 use clap_complete::Shell;
 use commands::{
-    acme as acme_cmd, cert, chain, completions, compliance, convert, crl, csr, dane, diff,
-    est as est_cmd, key, pki, probe, revoke, scep as scep_cmd, show, CmdResult,
+    cert, chain, completions, compliance, convert, crl, csr, dane, diff, key, pki, probe, revoke,
+    show, CmdResult,
 };
 use config::GlobalConfig;
 use std::path::PathBuf;
@@ -188,42 +183,6 @@ Examples:
     /// Server probing - TLS inspection and certificate linting
     #[command(subcommand)]
     Probe(probe::ProbeCommands),
-
-    /// ACME client - automatic certificate issuance (Let's Encrypt compatible)
-    #[command(
-        subcommand,
-        after_help = "Examples:
-  pki acme register --email admin@example.com    Register account
-  pki acme order example.com www.example.com     Create certificate order
-  pki acme challenges ORDER_URL                  List pending challenges
-  pki acme http-token TOKEN                      Get HTTP-01 response
-  pki acme respond CHALLENGE_URL                 Respond to challenge
-  pki acme finalize FINALIZE_URL CSR_FILE        Finalize with CSR
-  pki acme download CERT_URL -o cert.pem         Download certificate"
-    )]
-    Acme(acme_cmd::AcmeCommands),
-
-    /// EST client - certificate enrollment over secure transport (RFC 7030)
-    #[command(
-        subcommand,
-        after_help = "Examples:
-  pki est cacerts https://est.example.com            Get CA certificates
-  pki est enroll https://est.example.com -c req.csr  Enroll with CSR
-  pki est reenroll https://est.example.com -c req.csr  Renew certificate
-  pki est serverkeygen https://est.example.com -c template.csr  Server keygen
-  pki est csrattrs https://est.example.com           Get CSR requirements"
-    )]
-    Est(est_cmd::EstCommands),
-
-    /// SCEP client - simple certificate enrollment protocol (RFC 8894)
-    #[command(
-        subcommand,
-        after_help = "Examples:
-  pki scep cacaps https://scep.example.com/scep     Get CA capabilities
-  pki scep cacert https://scep.example.com/scep     Get CA certificate
-  pki scep pkiop https://scep.example.com -m req.p7 Send enrollment request"
-    )]
-    Scep(scep_cmd::ScepCommands),
 
     /// PKI hierarchy operations — build CA hierarchies from TOML config
     #[command(
@@ -399,9 +358,6 @@ fn main() -> Result<()> {
         Some(Commands::Crl(cmd)) => crl::run(cmd, &config),
         Some(Commands::Revoke(cmd)) => revoke::run(cmd, &config),
         Some(Commands::Probe(cmd)) => probe::run(cmd, &config),
-        Some(Commands::Acme(cmd)) => acme_cmd::run(cmd, &config),
-        Some(Commands::Est(cmd)) => est_cmd::run(cmd, &config),
-        Some(Commands::Scep(cmd)) => scep_cmd::run(cmd, &config),
         Some(Commands::Pki(cmd)) => pki::run(cmd, &config),
         Some(Commands::Compliance(cmd)) => {
             compliance::execute(cmd)?;
@@ -490,9 +446,6 @@ pub fn run_from_args(args: &[String], config: &GlobalConfig) -> Result<()> {
         Some(Commands::Crl(cmd)) => crl::run(cmd, config),
         Some(Commands::Revoke(cmd)) => revoke::run(cmd, config),
         Some(Commands::Probe(cmd)) => probe::run(cmd, config),
-        Some(Commands::Acme(cmd)) => acme_cmd::run(cmd, config),
-        Some(Commands::Est(cmd)) => est_cmd::run(cmd, config),
-        Some(Commands::Scep(cmd)) => scep_cmd::run(cmd, config),
         Some(Commands::Pki(cmd)) => pki::run(cmd, config),
         Some(Commands::Compliance(cmd)) => {
             compliance::execute(cmd)?;
