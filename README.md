@@ -1,8 +1,8 @@
 # PKI-Client
 
-**Modern PKI CLI tool** — certificate inspection, key management, TLS probing, and enrollment protocols.
+**Modern PKI CLI tool** — certificate inspection, key management, TLS probing, compliance validation, DANE, chain building.
 
-Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero dependencies.
+Pure Rust. No OpenSSL dependency. Human-friendly output. One static binary (musl build). Default build has only a `libc` dependency — no OpenSSL, no system crypto libs.
 
 [![Watch Demo](https://img.shields.io/badge/▶_Watch_Demo-in_browser-d40000?style=for-the-badge&logo=asciinema)](https://rayketcham-lab.github.io/PKI-Client/demo.html)
 
@@ -25,7 +25,6 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 [![Daily Health Check](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/daily-check.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/daily-check.yml)
 [![Interop Tests](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/interop.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/interop.yml)
 [![Crypto Validation](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/crypto-validation.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/crypto-validation.yml)
-[![SCEP Interop](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/scep-interop.yml/badge.svg)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/scep-interop.yml)
 
 <!-- Security & Compliance -->
 [![Security Audit](https://img.shields.io/badge/cargo--audit-passing-brightgreen?logo=hackthebox&logoColor=white)](https://rustsec.org/)
@@ -35,7 +34,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.8.1-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -66,16 +65,17 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 
 ## Overview
 
-`pki` is a single binary that replaces a scattered toolbox of `openssl`, `certutil`, `step`, and custom scripts for PKI operations. It provides:
+`pki` is a single binary that replaces a scattered toolbox of `openssl`, `certutil`, and custom scripts for PKI operations. It provides:
 
 - **`pki show`** — auto-detect and display any PKI file (cert, key, CSR, CRL, PKCS#12)
 - **`pki probe`** — inspect any TLS server's handshake, cipher suite, chain, and security posture
-- **`pki acme`** — full ACME client (Let's Encrypt) with certbot-like `certonly` workflow
-- **`pki est`** / **`pki scep`** — enterprise CA enrollment protocols (RFC 7030, RFC 8894)
 - **`pki compliance`** — validate against FIPS 140-3, NIST SP 800-57, and Federal Bridge policies
 - **`pki dane`** — generate and verify DANE/TLSA records (RFC 6698)
+- **`pki pki`** — declarative PKI hierarchy builder
 
-Certificate inspection (`pki show`, `pki cert`) supports five output formats: **text** (human), **json** (scripting), **compact** (dashboards), **forensic** (deep-dive with hex dumps and security grades), **openssl** (matches `openssl x509 -text` with colors and lifetime bars). Network/protocol subcommands (`probe`, `acme`, `est`, `scep`) render text for all formats except `json`.
+Certificate inspection (`pki show`, `pki cert`) supports five output formats: **text** (human), **json** (scripting), **compact** (dashboards), **forensic** (deep-dive with hex dumps and security grades), **openssl** (matches `openssl x509 -text` with colors and lifetime bars).
+
+> **Enrollment protocols removed in v0.9.0.** ACME (RFC 8555), EST (RFC 7030), and SCEP (RFC 8894) are out of scope for this tool, which focuses on local PKI primitives as an openssl replacement. Pin to v0.8.1 if you need enrollment. Enrollment will live in a separate `pki-enroll` tool.
 
 ## Quick Start
 
@@ -99,9 +99,11 @@ pki probe server example.com:443
 pki key gen ec --curve p256 -o server.key
 pki csr create --key server.key --cn example.com --san dns:www.example.com -o server.csr
 
-# Get a Let's Encrypt certificate
-pki acme certonly -d example.com --email admin@example.com \
-    --server https://acme-v02.api.letsencrypt.org/directory
+# Validate against FIPS 140-3 / NIST compliance policies
+pki compliance check --level 2 --algo ecdsa-p384 --ocsp --auto-crl
+
+# Generate DANE/TLSA record for a certificate
+pki dane generate --cert server.pem
 
 # Build and verify a certificate chain
 pki chain build server.pem
@@ -125,9 +127,6 @@ pki
 | **`crl`** | CRL viewing and revocation checking | RFC 5280 |
 | **`revoke`** | OCSP and CRL revocation status | OCSP (RFC 6960) |
 | **`probe`** | TLS server inspection and security linting | TLS 1.3 (RFC 8446) |
-| **`acme`** | Let's Encrypt / ACME certificate enrollment | RFC 8555 |
-| **`est`** | Enrollment over Secure Transport | RFC 7030 |
-| **`scep`** | SCEP enrollment, CA discovery and capabilities | RFC 8894 |
 | **`compliance`** | FIPS 140-3, NIST, Federal Bridge validation | NIST SP 800-57 |
 | **`dane`** | TLSA record generation and verification | RFC 6698 |
 | **`diff`** | Side-by-side certificate comparison | — |
@@ -152,11 +151,6 @@ pki
 - Certificate chain linting with security grades
 - Certificate chain building with AIA chasing
 - DANE/TLSA record generation and verification
-
-### Enrollment Protocols
-- **ACME** — full RFC 8555 client with HTTP-01 and DNS-01 challenges, auto-renewal, server deployment
-- **EST** — RFC 7030 enrollment, re-enrollment, server keygen, CSR attributes
-- **SCEP** — RFC 8894 enrollment, CA capabilities, and certificate discovery
 
 ### Compliance & Security
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms with `--fips`
@@ -215,7 +209,7 @@ Certificate:
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                     pki (binary)                          │
-│        20 subcommands incl. interactive `shell`            │
+│        17 subcommands incl. interactive `shell`            │
 ├───────────┬───────────────┬──────────────────────────────┤
 │           │               │                              │
 │ pki-client-output         │  pki-probe                   │
@@ -234,7 +228,7 @@ Certificate:
 
 | Crate | Role |
 |---|---|
-| `pki-client` | Binary — CLI entry point, 20 subcommands incl. interactive `shell` |
+| `pki-client` | Binary — CLI entry point, 17 subcommands incl. interactive `shell` |
 | `pki-client-output` | Library — formatting, OID registry |
 | `pki-probe` | Library — TLS inspection and linting |
 | `pki-hierarchy` | Library — declarative PKI hierarchy builder |
@@ -263,7 +257,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 
 **Pin to a specific version:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.8.1
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.9.0
 ```
 
 > **Note:** `sudo` must be on `bash`, not `curl`. To install without sudo, set a writable directory: `INSTALL_DIR=~/.local/bin ... | bash`
@@ -271,7 +265,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 Or download manually from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases):
 
 ```bash
-curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.1-x86_64-linux.tar.gz
+curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.9.0-x86_64-linux.tar.gz
 tar xzf pki.tar.gz
 sudo mv pki /usr/local/bin/
 ```
@@ -290,17 +284,17 @@ sha256sum -c SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-v0.8.1-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-v0.9.0-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore):**
 ```bash
-curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.1-x86_64-linux.tar.gz.bundle
+curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.9.0-x86_64-linux.tar.gz.bundle
 cosign verify-blob \
-  --bundle pki-v0.8.1-x86_64-linux.tar.gz.bundle \
+  --bundle pki-v0.9.0-x86_64-linux.tar.gz.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-v0.8.1-x86_64-linux.tar.gz
+  pki-v0.9.0-x86_64-linux.tar.gz
 ```
 
 ### Shell completions
@@ -369,12 +363,10 @@ PKI-Client runs automated interop tests against real protocol implementations:
 
 | Test Suite | Target | What It Validates |
 |---|---|---|
-| **ACME vs Pebble** | [Pebble](https://github.com/letsencrypt/pebble) (Let's Encrypt test CA) | Account registration, order creation, certificate issuance |
 | **TLS Probe** | google.com, cloudflare.com, github.com | TLS version detection, chain fetch, certificate inspection |
 | **Cert Round-Trip** | Local key/CSR generation | Key gen, CSR creation, PEM/DER conversion, format consistency |
 | **Cross-Validate** | Reference tools (GnuTLS, etc.) | DANE TLSA output matches reference implementations byte-for-byte |
 | **Crypto Validation** | Key gen + signature algorithms | Algorithm correctness across RSA, EC, Ed25519, and PQC |
-| **SCEP Enrollment** | SCEP CA server | SCEP enrollment, CA discovery, certificate retrieval |
 | **OpenSSL Parity** | OpenSSL 3.x as ground truth | Cert/CSR/CRL/key/PKCS#12 field coverage and JSON schema alignment |
 
 Interop tests run daily and on PRs that touch protocol code. Run locally:
@@ -388,13 +380,16 @@ bash tests/interop/openssl_parity.sh   # requires openssl 3.x + jq
 
 ### Scope boundary
 
-`pki` is a PKI client: certificates, keys, enrollment, chain validation, revocation. It deliberately does **not** replicate the non-PKI surface of `openssl`:
+`pki` is an openssl-replacement PKI tool: certificate inspection, key management, TLS probing, compliance validation, DANE, and chain building. It deliberately excludes:
 
+- **`acme`** — RFC 8555 ACME client (enrollment; belongs in `pki-enroll`)
+- **`est`** — RFC 7030 EST client (enrollment; belongs in `pki-enroll`)
+- **`scep`** — RFC 8894 SCEP client (enrollment; belongs in `pki-enroll`)
 - **`dgst`** — arbitrary file signing/verification (use a general-purpose signing tool)
 - **`cms` / `smime`** — S/MIME message envelopes (belongs in the signing service)
 - **`ts`** — RFC 3161 timestamping (belongs in the signing service)
 
-CMS/PKCS#7 primitives are used *internally* where protocols require them (SCEP, EST), but are not exposed as top-level subcommands.
+To use enrollment protocols (ACME/EST/SCEP), pin to v0.8.1 or wait for the standalone `pki-enroll` tool.
 
 ## Security
 

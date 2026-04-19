@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-19
+
+### BREAKING CHANGES
+
+- **Removed `pki acme` subcommand** (RFC 8555 ACME client) — enrollment is out of scope for this tool
+- **Removed `pki est` subcommand** (RFC 7030 EST client) — enrollment is out of scope for this tool
+- **Removed `pki scep` subcommand** (RFC 8894 SCEP client) — enrollment is out of scope for this tool
+
+`pki` v0.9.0 is repositioned as an **openssl-replacement** for local PKI primitives: certificate inspection, key management, TLS probing, compliance validation, DANE, and chain building. Enrollment protocols will live in a separate `pki-enroll` tool. To continue using enrollment functionality, pin to v0.8.1.
+
+**Full rebuild required.** The subcommand surface, shell completions, man pages, and install scripts have all changed. Regenerate completions after upgrading:
+
+```bash
+pki completions bash > /etc/bash_completion.d/pki
+pki completions zsh > ~/.zfunc/_pki
+pki completions fish > ~/.config/fish/completions/pki.fish
+```
+
+### Removed
+
+- `crates/pki-client/src/acme/` — ACME client module (JWS, account management, order/challenge flows)
+- `crates/pki-client/src/commands/acme/` — `pki acme` subcommand implementation
+- `crates/pki-client/src/commands/est.rs` — `pki est` subcommand implementation
+- `crates/pki-client/src/commands/scep.rs` — `pki scep` subcommand implementation
+- `crates/pki-client/src/deployer/` — Web server deployer (Apache, Nginx, IIS) used exclusively by `pki acme install`
+- `crates/pki-client/src/standalone.rs` — ACME HTTP-01 standalone challenge server
+- `tests/interop/acme_pebble.sh` — ACME vs Pebble interop test
+- `tests/interop/scep_enroll.sh` — SCEP enrollment interop test
+- `.github/workflows/scep-interop.yml` — SCEP interop CI workflow
+- `ACME vs Pebble` job from `.github/workflows/interop.yml`
+- Enrollment-only crate dependencies: `aes`, `cbc`, `p256` (JWS signing), `p12` (IIS deployment), `tracing`, `zeroize`, `idna`
+
+### Changed
+
+- Version bumped to 0.9.0
+- Subcommand count: 20 → 17
+- `pki --help` no longer lists `acme`, `est`, or `scep`
+- Interactive shell help text updated — enrollment command examples removed
+- Shell tab-completion no longer suggests `acme`, `est`, `scep` subcommands
+- README rewritten: tagline, Quick Start, Commands table, Features section, Interop table, and Scope boundary all updated for v0.9.0 scope
+- CLAUDE.md updated to v0.9.0
+
 ## [0.8.0] - 2026-04-16
 
 ### Added

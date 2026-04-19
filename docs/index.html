@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>pki — Modern PKI operations, made human</title>
-<meta name="description" content="Modern PKI CLI tool — certificate inspection, key management, TLS probing, and enrollment protocols. Pure Rust. No OpenSSL.">
+<meta name="description" content="Modern PKI CLI tool — certificate inspection, key management, TLS probing, compliance validation, DANE, chain building. Pure Rust. No OpenSSL.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1f510;</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -465,7 +465,7 @@ footer a:hover { color: var(--text); }
   </h1>
 
   <p class="hero-sub">
-    Certificate inspection, key management, TLS probing, and enrollment protocols &mdash; no OpenSSL required. Single static binary.
+    Certificate inspection, key management, TLS probing, compliance validation, DANE, chain building &mdash; no OpenSSL required. Single static binary.
   </p>
 
   <div class="hero-actions">
@@ -484,7 +484,7 @@ footer a:hover { color: var(--text); }
 <div class="stats fade-up">
   <div class="stats-inner">
     <div class="stat">
-      <div class="stat-value">20</div>
+      <div class="stat-value">17</div>
       <div class="stat-label">Subcommands</div>
     </div>
     <div class="stat">
@@ -536,8 +536,8 @@ footer a:hover { color: var(--text); }
       <div class="feature-icon cyan">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M4 4h12v12H4z"/><path d="M4 4l6 6m0-6l6 6"/></svg>
       </div>
-      <h3>Enrollment Protocols</h3>
-      <p>ACME (Let's Encrypt), EST (RFC 7030), and SCEP (RFC 8894) built in. No external tools needed.</p>
+      <h3>DANE &amp; Compliance</h3>
+      <p>TLSA record generation and verification (RFC 6698). Validate against FIPS 140-3, NIST, and Federal Bridge policies.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon indigo">
@@ -631,8 +631,8 @@ footer a:hover { color: var(--text); }
 <span class="t-comment"># Run a batch of commands from file</span>
 <span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">batch</span> <span class="t-string">commands.txt</span>
 
-<span class="t-comment"># SCEP automated enrollment</span>
-<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">scep enroll</span> <span class="t-string">https://scep.corp/scep</span> <span class="t-flag">-s</span> <span class="t-string">device01</span>
+<span class="t-comment"># Generate DANE/TLSA record for a certificate</span>
+<span class="t-prompt">$</span> <span class="t-cmd">pki</span> <span class="t-flag">dane generate</span> <span class="t-flag">--cert</span> <span class="t-string">server.pem</span>
       </div>
     </div>
 
@@ -676,8 +676,8 @@ footer a:hover { color: var(--text); }
 <!-- Commands -->
 <section class="section fade-up" id="commands">
   <div class="section-label">Commands</div>
-  <h2>19 subcommands + interactive <code>shell</code></h2>
-  <p>From inspection to enrollment, every PKI operation in one tool.</p>
+  <h2>16 subcommands + interactive <code>shell</code></h2>
+  <p>Every local PKI operation in one tool — certificate inspection, key management, TLS probing, compliance, DANE, and chain building.</p>
 
   <table class="command-table">
     <thead><tr><th>Command</th><th>Description</th></tr></thead>
