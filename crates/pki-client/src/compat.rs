@@ -1716,6 +1716,7 @@ impl CsrBuilder {
             KeyAlgorithm::EcP256 => spork_core::AlgorithmId::EcdsaP256,
             KeyAlgorithm::EcP384 => spork_core::AlgorithmId::EcdsaP384,
             KeyAlgorithm::Rsa(bits) if bits >= 4096 => spork_core::AlgorithmId::Rsa4096,
+            KeyAlgorithm::Rsa(bits) if bits >= 3072 => spork_core::AlgorithmId::Rsa3072,
             KeyAlgorithm::Rsa(_) => spork_core::AlgorithmId::Rsa2048,
             KeyAlgorithm::Ed25519 | KeyAlgorithm::Ed448 => {
                 return Err(anyhow!(
@@ -1778,9 +1779,9 @@ impl CsrBuilder {
         let sig_algo = match algorithm {
             spork_core::AlgorithmId::EcdsaP256 => "ecdsa-with-SHA256".to_string(),
             spork_core::AlgorithmId::EcdsaP384 => "ecdsa-with-SHA384".to_string(),
-            spork_core::AlgorithmId::Rsa2048 | spork_core::AlgorithmId::Rsa4096 => {
-                "sha256WithRSAEncryption".to_string()
-            }
+            spork_core::AlgorithmId::Rsa2048
+            | spork_core::AlgorithmId::Rsa3072
+            | spork_core::AlgorithmId::Rsa4096 => "sha256WithRSAEncryption".to_string(),
             #[allow(unreachable_patterns)]
             _ => format!("{}", algorithm),
         };
@@ -1948,9 +1949,11 @@ pub fn load_private_key(path: &Path) -> Result<PrivateKey> {
     // - P-384: contains "BgUrgQQAIg" (OID 1.3.132.0.34 = secp384r1)
     // - EC public key: contains "BgcqhkjOPQIB" (OID 1.2.840.10045.2.1 = ecPublicKey)
     let (algorithm, bits) = if data.contains("RSA PRIVATE KEY") {
-        // Traditional RSA key format
+        // Traditional RSA key format. PEM sizes: 2048≈1700B, 3072≈2500B, 4096≈3300B.
         let estimated_bits = if data.len() > 3000 {
             4096
+        } else if data.len() > 2200 {
+            3072
         } else if data.len() > 1700 {
             2048
         } else {
@@ -1987,11 +1990,16 @@ pub fn load_private_key(path: &Path) -> Result<PrivateKey> {
         // Ed448 (OID 1.3.101.113 or base64 marker)
         (KeyAlgorithm::Ed448, 456)
     } else if data.contains("PRIVATE KEY") {
-        // Generic PKCS#8 - try to detect from key length
-        // RSA keys are much larger than EC keys in PKCS#8 format
+        // Generic PKCS#8 - try to detect from key length.
+        // PKCS#8 PEM sizes: 2048≈1700B, 3072≈2500B, 4096≈3250B.
         if data.len() > 1500 {
-            // Likely RSA
-            let estimated_bits = if data.len() > 3000 { 4096 } else { 2048 };
+            let estimated_bits = if data.len() > 3000 {
+                4096
+            } else if data.len() > 2200 {
+                3072
+            } else {
+                2048
+            };
             (KeyAlgorithm::Rsa(estimated_bits), estimated_bits)
         } else {
             // Small key - likely EC P-256
