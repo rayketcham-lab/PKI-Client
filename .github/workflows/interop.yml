@@ -34,7 +34,7 @@ jobs:
   build:
     name: Build
     # Pin to ubuntu3-runner: binary must match GLIBC of consuming jobs
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -60,7 +60,7 @@ jobs:
     name: ACME vs Pebble
     if: ${{ vars.HAS_DOCKER == 'true' }}
     needs: [build]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     services:
       pebble:
@@ -97,7 +97,7 @@ jobs:
   tls-probe:
     name: TLS Probe
     needs: [build]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -119,7 +119,7 @@ jobs:
   cert-roundtrip:
     name: Certificate Round-Trip
     needs: [build]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   self-contained:
     name: Self-Contained Check
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -59,7 +59,7 @@ jobs:
 
   vendor-check:
     name: Vendor Freshness
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -86,7 +86,7 @@ jobs:
   offline-build:
     name: Offline Build
     needs: [vendor-check]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     env:
       CARGO_NET_OFFLINE: "true"
@@ -110,7 +110,7 @@ jobs:
   fmt:
     name: Format
     needs: [self-contained]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -125,7 +125,7 @@ jobs:
   clippy:
     name: Clippy
     needs: [fmt, offline-build]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -142,7 +142,7 @@ jobs:
   clippy-pqc:
     name: Clippy (PQC)
     needs: [fmt]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -159,7 +159,7 @@ jobs:
   clippy-fips:
     name: Clippy (FIPS)
     needs: [fmt]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     # Static check — no entropy, no runtime FIPS init. Must gate merges.
     steps:
@@ -177,7 +177,7 @@ jobs:
   test:
     name: Test
     needs: [fmt, clippy]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -193,7 +193,7 @@ jobs:
   test-pqc:
     name: Test (PQC)
     needs: [fmt, clippy-pqc]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -209,7 +209,7 @@ jobs:
   test-fips:
     name: Test (FIPS)
     needs: [fmt, clippy-fips]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     continue-on-error: true  # FIPS entropy health check can be non-deterministic
     steps:
@@ -226,7 +226,7 @@ jobs:
   build:
     name: Build
     needs: [fmt, clippy]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -250,7 +250,7 @@ jobs:
     name: Build (musl static)
     needs: [fmt, clippy]
     # Pinned to ubuntu3-runner: musl-tools not available on Rocky Linux
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -280,7 +280,7 @@ jobs:
   binary-output-validation:
     name: Binary Output Validation
     needs: [build]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -470,7 +470,7 @@ jobs:
   binary-validation:
     name: Binary Validation
     needs: [fmt, clippy]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -534,7 +534,7 @@ jobs:
 
   links:
     name: Link Check
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -554,7 +554,7 @@ jobs:
   audit:
     name: Security Audit
     needs: [self-contained]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -596,7 +596,7 @@ jobs:
   cargo-deny:
     name: Dependency Audit (cargo-deny)
     needs: [self-contained]
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
