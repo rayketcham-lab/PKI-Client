@@ -416,27 +416,26 @@ fn test_show_human_readable_algo_names_rsa() {
     let show_output = pki_show(&csr);
     let csr_show_output = pki_csr_show(&csr);
 
-    // `pki show` must mention RSA and the SHA-256/RSA signature algorithm name
+    // Under FIPS mode, RSA-2048 is below the minimum key size so the keygen is
+    // transparently promoted to RSA-3072, which correctly uses SHA-384 instead
+    // of SHA-256. Accept either hash here.
+    let lower = show_output.to_lowercase();
+    let csr_lower = csr_show_output.to_lowercase();
     assert!(
         show_output.contains("RSA"),
         "`pki show` output missing 'RSA':\n{show_output}"
     );
     assert!(
-        show_output.contains("sha256WithRSAEncryption")
-            || show_output.contains("SHA256withRSA")
-            || show_output.to_lowercase().contains("sha256"),
-        "`pki show` output missing SHA-256/RSA algorithm name:\n{show_output}"
+        lower.contains("sha256") || lower.contains("sha384"),
+        "`pki show` output missing SHA-256/384 RSA algorithm name:\n{show_output}"
     );
 
-    // `pki csr show` must mention RSA
     assert!(
         csr_show_output.contains("RSA"),
         "`pki csr show` output missing 'RSA':\n{csr_show_output}"
     );
     assert!(
-        csr_show_output.contains("sha256WithRSAEncryption")
-            || csr_show_output.contains("SHA256withRSA")
-            || csr_show_output.to_lowercase().contains("sha256"),
+        csr_lower.contains("sha256") || csr_lower.contains("sha384"),
         "`pki csr show` output missing SHA-256/RSA algorithm name:\n{csr_show_output}"
     );
 }
