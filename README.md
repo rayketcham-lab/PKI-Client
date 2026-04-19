@@ -35,7 +35,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One binary, zero depend
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.8.0-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.8.1-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -263,7 +263,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 
 **Pin to a specific version:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.8.0
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash -s -- v0.8.1
 ```
 
 > **Note:** `sudo` must be on `bash`, not `curl`. To install without sudo, set a writable directory: `INSTALL_DIR=~/.local/bin ... | bash`
@@ -271,7 +271,7 @@ curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/inst
 Or download manually from [GitHub Releases](https://github.com/rayketcham-lab/PKI-Client/releases):
 
 ```bash
-curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.0-x86_64-linux.tar.gz
+curl -fSL -o pki.tar.gz https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.1-x86_64-linux.tar.gz
 tar xzf pki.tar.gz
 sudo mv pki /usr/local/bin/
 ```
@@ -290,17 +290,17 @@ sha256sum -c SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-v0.8.0-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-v0.8.1-x86_64-linux.tar.gz --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore):**
 ```bash
-curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.0-x86_64-linux.tar.gz.bundle
+curl -fSL -o pki.tar.gz.bundle https://github.com/rayketcham-lab/PKI-Client/releases/latest/download/pki-v0.8.1-x86_64-linux.tar.gz.bundle
 cosign verify-blob \
-  --bundle pki-v0.8.0-x86_64-linux.tar.gz.bundle \
+  --bundle pki-v0.8.1-x86_64-linux.tar.gz.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-v0.8.0-x86_64-linux.tar.gz
+  pki-v0.8.1-x86_64-linux.tar.gz
 ```
 
 ### Shell completions
