@@ -33,14 +33,33 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/rust-setup
         with:
-          cache-prefix: interop
-      - name: Build release binary
-        run: cargo build --release
+          targets: x86_64-unknown-linux-musl
+          cache-prefix: interop-musl
+      - name: Install musl toolchain
+        run: |
+          if ! command -v musl-gcc &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y musl-tools
+          fi
+      # Build musl-static so the artifact runs on any downstream runner regardless
+      # of glibc version. Previously shipped a glibc-dynamic binary that failed on
+      # Rocky runners with older libc (`GLIBC_2.38 not found`) — issue #68.
+      - name: Build release binary (musl static)
+        run: cargo build --release --target x86_64-unknown-linux-musl -p pki-client
+      - name: Verify static linking
+        run: |
+          if ldd target/x86_64-unknown-linux-musl/release/pki 2>&1 | grep -q "not a dynamic"; then
+            echo "OK: statically linked"
+          else
+            echo "ERROR: binary is not fully static"
+            ldd target/x86_64-unknown-linux-musl/release/pki
+            exit 1
+          fi
       - name: Upload binary
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7
         with:
           name: pki-binary
-          path: target/release/pki
+          path: target/x86_64-unknown-linux-musl/release/pki
           retention-days: 1
 
   tls-probe:
