@@ -13,6 +13,10 @@ ignore = [
     # Review by 2026-09-01: proc-macro-error is unmaintained but compile-time only.
     # Track tabled crate for migration away from proc-macro-error.
     { id = "RUSTSEC-2024-0370", reason = "transitive via tabled_derive, compile-time only (review by 2026-09-01)" },
+    # Review by 2026-07-01: rand 0.9.2 unsound with custom logger via `rand::rng()`.
+    # pki-client does not install a custom global logger, so the unsound path is not reachable.
+    # Drop this ignore once rand >= 0.9.3 is in our lockfile or we move to rand 0.10.
+    { id = "RUSTSEC-2026-0097", reason = "rand 0.9.2 unsound path (custom logger) unreachable; awaiting rand 0.9.3+ (review by 2026-07-01)" },
 ]
 yanked = "warn"  # digest 0.11.1 yanked, transitive via spork-core PQC deps
 
