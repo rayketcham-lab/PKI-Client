@@ -2,7 +2,7 @@
 
 Modern PKI CLI tool -- certificate inspection, key management, TLS probing, compliance validation, DANE, chain building.
 
-**Version:** 0.9.0 | **Binary:** `pki` | **License:** Apache-2.0
+**Version:** 0.9.1 | **Binary:** `pki` | **License:** Apache-2.0
 
 ---
 
