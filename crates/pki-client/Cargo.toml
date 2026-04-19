@@ -97,7 +97,7 @@ section = "utils"
 priority = "optional"
 depends = ""
 assets = [
-    ["target/x86_64-unknown-linux-musl/release/pki", "usr/bin/", "755"],
+    ["../../target/x86_64-unknown-linux-musl/release/pki", "usr/bin/", "755"],
     ["../../README.md", "usr/share/doc/pki-client/README.md", "644"],
     ["../../LICENSE", "usr/share/doc/pki-client/LICENSE", "644"],
 ]
@@ -107,7 +107,7 @@ name = "pki-client"
 summary = "Modern PKI CLI — cert inspection, key management, TLS probing"
 license = "Apache-2.0"
 assets = [
-    { source = "target/x86_64-unknown-linux-musl/release/pki", dest = "/usr/bin/pki", mode = "755" },
-    { source = "README.md", dest = "/usr/share/doc/pki-client/README.md", mode = "644", doc = true },
-    { source = "LICENSE", dest = "/usr/share/doc/pki-client/LICENSE", mode = "644", doc = true },
+    { source = "../../target/x86_64-unknown-linux-musl/release/pki", dest = "/usr/bin/pki", mode = "755" },
+    { source = "../../README.md", dest = "/usr/share/doc/pki-client/README.md", mode = "644", doc = true },
+    { source = "../../LICENSE", dest = "/usr/share/doc/pki-client/LICENSE", mode = "644", doc = true },
 ]
