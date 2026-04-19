@@ -14,7 +14,7 @@ concurrency:
 jobs:
   check-release-freshness:
     name: Release Freshness
-    runs-on: [self-hosted, Linux, ubuntu3-runner]
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 5
     permissions:
       contents: read
