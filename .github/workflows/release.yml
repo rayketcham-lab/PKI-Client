@@ -44,11 +44,12 @@ jobs:
         run: strip target/x86_64-unknown-linux-musl/release/pki
       - name: Verify static linking
         run: |
-          if ldd target/x86_64-unknown-linux-musl/release/pki 2>&1 | grep -q "not a dynamic"; then
+          ldd_out=$(ldd target/x86_64-unknown-linux-musl/release/pki 2>&1 || true)
+          if echo "$ldd_out" | grep -Eq "statically linked|not a dynamic"; then
             echo "OK: statically linked"
           else
             echo "ERROR: binary is not fully static"
-            ldd target/x86_64-unknown-linux-musl/release/pki
+            echo "$ldd_out"
             exit 1
           fi
           ls -lh target/x86_64-unknown-linux-musl/release/pki
