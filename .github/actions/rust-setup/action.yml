@@ -63,6 +63,18 @@ runs:
         cargo --version
         echo "::endgroup::"
 
+    - name: Detect runner glibc
+      id: glibc
+      shell: bash
+      run: |
+        # Scope the cargo cache per-glibc so a newer-glibc runner's target/
+        # (e.g. Ubuntu 24.04 w/ GLIBC 2.39) does not restore onto an older
+        # runner (Rocky 9 w/ GLIBC 2.34) where pre-linked test binaries fail
+        # with "GLIBC_2.39 not found".
+        v="$(ldd --version 2>&1 | head -n1 | awk '{print $NF}')"
+        echo "version=$v" >> "$GITHUB_OUTPUT"
+        echo "runner glibc: $v"
+
     - name: Cache cargo registry + build artifacts
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
       with:
@@ -72,15 +84,15 @@ runs:
           ~/.cargo/registry/cache
           ~/.cargo/git/db
           target
-        key: ${{ runner.os }}-cargo-${{ inputs.cache-prefix }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-glibc${{ steps.glibc.outputs.version }}-cargo-${{ inputs.cache-prefix }}-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-${{ inputs.cache-prefix }}-
+          ${{ runner.os }}-glibc${{ steps.glibc.outputs.version }}-cargo-${{ inputs.cache-prefix }}-
 
     - name: Clean stale aws-lc-sys build scripts
       shell: bash
       run: |
-        # aws-lc-sys build scripts cached from a runner with newer glibc (2.39)
-        # fail on Rocky Linux runners with GLIBC_2.39 not found. Force recompile.
+        # Belt-and-suspenders: even with glibc-scoped cache keys, nuke any
+        # aws-lc-sys build artifacts that might have slipped through.
         rm -rf target/debug/build/aws-lc-sys-* target/release/build/aws-lc-sys-* 2>/dev/null || true
 
     - name: Prune stale cargo caches
