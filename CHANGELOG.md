@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-04-19
+
+### Changed
+
+- **Release artifacts are now native Linux installers (`.deb` + `.rpm`)** instead of raw `tar.gz` tarballs. Installers ship the statically-linked musl binary, register with the host package manager (`dpkg`/`rpm`), and install `pki` to `/usr/bin/pki`. `apt remove pki-client` / `dnf remove pki-client` now work cleanly.
+- `install.sh` detects the host package format (`dpkg` or `rpm`) and installs the matching installer via the native package manager.
+- `README.md` install section rewritten to document the new `.deb`/`.rpm` flow.
+- `.github/workflows/release.yml` rewritten to build both installers via `cargo-deb` and `cargo-generate-rpm`, smoke-test them with `dpkg-deb`/`rpm -qip`, and sign each package artifact with Sigstore cosign + SLSA provenance.
+
+### Added
+
+- `[package.metadata.deb]` and `[package.metadata.generate-rpm]` sections on `crates/pki-client/Cargo.toml` — drive installer generation with full license-file, extended-description, and doc-file packaging.
+
+### Notes
+
+- v0.9.1 is a **packaging-only** release on top of v0.9.0. No code changes; the binary inside the installer is byte-identical to the `v0.9.0` musl build.
+- If you prefer a raw static binary, extract it from the installer: `dpkg-deb -x pki-client_0.9.1_amd64.deb out/` or `rpm2cpio pki-client-0.9.1-1.x86_64.rpm | cpio -idmv`.
+
 ## [0.9.0] - 2026-04-19
 
 ### BREAKING CHANGES

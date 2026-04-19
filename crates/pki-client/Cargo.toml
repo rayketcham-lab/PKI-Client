@@ -78,18 +78,36 @@ const-oid = "0.9"
 der = { workspace = true }
 
 # ── Linux package metadata ──────────────────────────────────────────
+# Both packages ship the statically-linked musl binary — zero runtime deps.
+# Build with: cargo build --release --features pqc --target x86_64-unknown-linux-musl
+# Package with:
+#   cargo deb --no-build --target x86_64-unknown-linux-musl -p pki-client
+#   cargo generate-rpm --target x86_64-unknown-linux-musl -p crates/pki-client
 
 [package.metadata.deb]
 name = "pki-client"
-maintainer = "Ray Ketcham <ray@rayketcham.com>"
+maintainer = "Ray Ketcham <rayketcham@ogjos.com>"
+copyright = "2026, Ray Ketcham <rayketcham@ogjos.com>"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+Modern PKI CLI tool — certificate inspection, key management, TLS probing, \
+compliance validation, DANE, and chain building. Pure Rust, no OpenSSL \
+dependency. Statically linked with musl — zero runtime dependencies."""
 section = "utils"
 priority = "optional"
-depends = "libc6"
+depends = ""
 assets = [
-    ["target/release/pki", "usr/bin/", "755"],
+    ["target/x86_64-unknown-linux-musl/release/pki", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/pki-client/README.md", "644"],
+    ["../../LICENSE", "usr/share/doc/pki-client/LICENSE", "644"],
 ]
 
 [package.metadata.generate-rpm]
+name = "pki-client"
+summary = "Modern PKI CLI — cert inspection, key management, TLS probing"
+license = "Apache-2.0"
 assets = [
     { source = "target/x86_64-unknown-linux-musl/release/pki", dest = "/usr/bin/pki", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/pki-client/README.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/doc/pki-client/LICENSE", mode = "644", doc = true },
 ]

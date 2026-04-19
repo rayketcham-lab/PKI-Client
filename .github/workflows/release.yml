@@ -12,10 +12,10 @@ env:
 
 jobs:
   build-linux:
-    name: Build Linux (static musl)
+    name: Build Linux installers (.deb + .rpm)
     # Pinned to ubuntu3-runner: musl-tools not available on Rocky Linux
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -30,8 +30,16 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y musl-tools
           fi
+      - name: Install cargo-deb and cargo-generate-rpm
+        run: |
+          if ! command -v cargo-deb &> /dev/null; then
+            cargo install --locked cargo-deb@2.7.0
+          fi
+          if ! command -v cargo-generate-rpm &> /dev/null; then
+            cargo install --locked cargo-generate-rpm@0.14.1
+          fi
       - name: Build static binary (with PQC support)
-        run: cargo build --release --features pqc --target x86_64-unknown-linux-musl
+        run: cargo build --release --features pqc --target x86_64-unknown-linux-musl -p pki-client
       - name: Strip binary
         run: strip target/x86_64-unknown-linux-musl/release/pki
       - name: Verify static linking
@@ -39,19 +47,56 @@ jobs:
           if ldd target/x86_64-unknown-linux-musl/release/pki 2>&1 | grep -q "not a dynamic"; then
             echo "OK: statically linked"
           else
-            echo "WARN: may not be fully static"
+            echo "ERROR: binary is not fully static"
+            ldd target/x86_64-unknown-linux-musl/release/pki
+            exit 1
           fi
           ls -lh target/x86_64-unknown-linux-musl/release/pki
-      - name: Package
+
+      # ── Build .deb installer ──────────────────────────────────────
+      - name: Build .deb installer
         env:
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          cd target/x86_64-unknown-linux-musl/release
-          tar czf "../../../pki-${TAG_NAME}-x86_64-linux.tar.gz" pki
+          VERSION="${TAG_NAME#v}"
+          cargo deb --no-build --no-strip \
+            --target x86_64-unknown-linux-musl \
+            -p pki-client \
+            --output "pki-client_${VERSION}_amd64.deb"
+          ls -lh pki-client_*.deb
+
+      # ── Build .rpm installer ──────────────────────────────────────
+      - name: Build .rpm installer
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          cargo generate-rpm \
+            --target x86_64-unknown-linux-musl \
+            -p crates/pki-client \
+            --output "pki-client-${VERSION}-1.x86_64.rpm"
+          ls -lh pki-client-*.rpm
+
+      # ── Smoke-test installers ─────────────────────────────────────
+      - name: Smoke-test .deb (dpkg-deb inspection)
+        run: |
+          dpkg-deb --info pki-client_*.deb
+          dpkg-deb --contents pki-client_*.deb
+      - name: Smoke-test .rpm (rpm inspection)
+        run: |
+          if command -v rpm &> /dev/null; then
+            rpm -qip pki-client-*.rpm
+            rpm -qlp pki-client-*.rpm
+          else
+            echo "rpm not installed on runner — skipping inspection"
+          fi
+
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7
         with:
-          name: pki-linux
-          path: pki-*.tar.gz
+          name: pki-linux-installers
+          path: |
+            pki-client_*.deb
+            pki-client-*.rpm
 
   sign-and-release:
     name: Sign and Release
@@ -87,13 +132,17 @@ jobs:
             fi
           fi
       - name: Generate checksums
-        run: sha256sum pki-*.tar.gz > SHA256SUMS.txt
+        run: sha256sum pki-client_*.deb pki-client-*.rpm > SHA256SUMS.txt
 
       # --- Supply chain security: SLSA provenance ---
-      - name: Attest build provenance (tarball)
+      - name: Attest build provenance (.deb)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
-          subject-path: pki-*.tar.gz
+          subject-path: pki-client_*.deb
+      - name: Attest build provenance (.rpm)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
+        with:
+          subject-path: pki-client-*.rpm
       - name: Attest build provenance (checksums)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
@@ -102,9 +151,9 @@ jobs:
       # --- Supply chain security: Sigstore cosign signing ---
       - name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac  # v3
-      - name: Sign artifacts with cosign (keyless)
+      - name: Sign installers with cosign (keyless)
         run: |
-          for f in pki-*.tar.gz SHA256SUMS.txt; do
+          for f in pki-client_*.deb pki-client-*.rpm SHA256SUMS.txt; do
             cosign sign-blob --yes --bundle "${f}.bundle" "$f"
           done
 
@@ -116,4 +165,4 @@ jobs:
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
             --generate-notes \
-            pki-*.tar.gz SHA256SUMS.txt *.bundle
+            pki-client_*.deb pki-client-*.rpm SHA256SUMS.txt *.bundle

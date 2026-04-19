@@ -4,15 +4,32 @@ set -euo pipefail
 # ============================================================================
 # PKI-Client Installer / Upgrader / Uninstaller
 #
-# Install:    curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash
-# Upgrade:    curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- upgrade
-# Uninstall:  curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | bash -s -- uninstall
-# Pin version: curl -fsSL ... | bash -s -- v0.8.0
+# Detects the host distro and installs the appropriate native package:
+#   Debian/Ubuntu  -> .deb  (installed with dpkg)
+#   RHEL/Fedora/etc -> .rpm (installed with dnf/yum)
+#
+# Install:     curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash
+# Upgrade:     curl -fsSL .../install.sh | sudo bash -s -- upgrade
+# Uninstall:   curl -fsSL .../install.sh | sudo bash -s -- uninstall
+# Pin version: curl -fsSL .../install.sh | sudo bash -s -- v0.9.1
 # ============================================================================
 
 REPO="rayketcham-lab/PKI-Client"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 ACTION="${1:-install}"
+
+# ── Detect package format ────────────────────────────────────────────────────
+
+detect_pkg_format() {
+    if command -v dpkg >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
+        echo "deb"
+    elif command -v rpm >/dev/null 2>&1 && (command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1); then
+        echo "rpm"
+    else
+        echo "unsupported"
+    fi
+}
+
+PKG_FORMAT="$(detect_pkg_format)"
 
 # ── Uninstall ────────────────────────────────────────────────────────────────
 
@@ -20,112 +37,101 @@ if [[ "$ACTION" == "uninstall" ]]; then
     echo "PKI-Client Uninstaller"
     echo "======================"
 
-    if [[ ! -f "$INSTALL_DIR/pki" ]]; then
-        echo "pki is not installed at $INSTALL_DIR/pki"
-        exit 0
-    fi
-
-    CURRENT=$("$INSTALL_DIR/pki" --version 2>/dev/null || echo "unknown")
-    echo "Removing: $CURRENT"
-    echo "Location: $INSTALL_DIR/pki"
-
-    if rm -f "$INSTALL_DIR/pki" 2>/dev/null; then
-        true
-    elif sudo rm -f "$INSTALL_DIR/pki" 2>/dev/null; then
-        true
-    else
-        echo "ERROR: Cannot remove $INSTALL_DIR/pki — try: sudo bash -s -- uninstall"
-        exit 1
-    fi
+    case "$PKG_FORMAT" in
+        deb)
+            if dpkg -s pki-client >/dev/null 2>&1; then
+                apt-get remove -y pki-client
+            else
+                echo "pki-client is not installed (dpkg)."
+            fi
+            ;;
+        rpm)
+            if rpm -q pki-client >/dev/null 2>&1; then
+                if command -v dnf >/dev/null 2>&1; then
+                    dnf remove -y pki-client
+                else
+                    yum remove -y pki-client
+                fi
+            else
+                echo "pki-client is not installed (rpm)."
+            fi
+            ;;
+        *)
+            echo "ERROR: Unsupported distro — no dpkg or rpm detected."
+            exit 1
+            ;;
+    esac
 
     echo ""
-    echo "Done! pki has been uninstalled."
+    echo "Done! pki-client has been uninstalled."
     exit 0
 fi
 
-# ── Upgrade detection ────────────────────────────────────────────────────────
+# ── Install / Upgrade ────────────────────────────────────────────────────────
 
 echo "PKI-Client Installer"
 echo "===================="
 
-# Detect platform
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
+# Platform check
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
 
-case "$OS" in
-    linux)  PLATFORM="x86_64-linux" ;;
-    *)
-        echo "ERROR: Unsupported OS: $OS"
-        echo "Pre-built binaries are available for Linux x86_64 only."
-        exit 1
-        ;;
-esac
+if [[ "$OS" != "linux" ]]; then
+    echo "ERROR: Unsupported OS: $OS (Linux only for pre-built installers)"
+    exit 1
+fi
 
 case "$ARCH" in
-    x86_64|amd64) ;; # supported
+    x86_64|amd64) ;;
     *)
-        echo "ERROR: Unsupported architecture: $ARCH"
-        echo "Pre-built binaries are available for x86_64 only."
+        echo "ERROR: Unsupported architecture: $ARCH (x86_64 only)"
         exit 1
         ;;
 esac
 
+if [[ "$PKG_FORMAT" == "unsupported" ]]; then
+    echo "ERROR: No supported package manager found."
+    echo "Supported: dpkg+apt (Debian/Ubuntu) or rpm+dnf/yum (RHEL/Fedora/Rocky/Alma)."
+    echo "Download assets manually from: https://github.com/$REPO/releases"
+    exit 1
+fi
+
 # Resolve version
-if [[ "$ACTION" == "upgrade" ]] || [[ "$ACTION" == "install" ]]; then
+if [[ "$ACTION" == "upgrade" || "$ACTION" == "install" ]]; then
     VERSION="latest"
-elif [[ "$ACTION" == v* ]]; then
-    # User passed a version tag directly (e.g., v0.5.0-beta.4)
-    VERSION="$ACTION"
 else
     VERSION="$ACTION"
 fi
 
 if [[ "$VERSION" == "latest" ]]; then
-    echo "Fetching latest release..."
-    VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+    echo "Fetching latest release tag..."
+    VERSION="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)"
     if [[ -z "$VERSION" ]]; then
         echo "ERROR: Could not determine latest version."
-        echo "Download manually from: https://github.com/$REPO/releases"
         exit 1
     fi
 fi
 
-# Check if already installed and up to date
-CURRENT_VERSION=""
-if [[ -f "$INSTALL_DIR/pki" ]]; then
-    CURRENT_VERSION=$("$INSTALL_DIR/pki" --version 2>/dev/null | awk '{print $2}' || echo "")
-    LATEST_CLEAN="${VERSION#v}"  # strip leading 'v'
+VERSION_NUM="${VERSION#v}"
 
-    if [[ "$CURRENT_VERSION" == "$LATEST_CLEAN" ]]; then
-        echo "Already up to date: pki $CURRENT_VERSION"
-        exit 0
-    fi
+case "$PKG_FORMAT" in
+    deb) FILENAME="pki-client_${VERSION_NUM}_amd64.deb" ;;
+    rpm) FILENAME="pki-client-${VERSION_NUM}-1.x86_64.rpm" ;;
+esac
 
-    if [[ -n "$CURRENT_VERSION" ]]; then
-        echo "Upgrade:  $CURRENT_VERSION -> $LATEST_CLEAN"
-    fi
-else
-    echo "Fresh install"
-fi
+URL="https://github.com/$REPO/releases/download/${VERSION}/${FILENAME}"
+CHECKSUM_URL="https://github.com/$REPO/releases/download/${VERSION}/SHA256SUMS.txt"
 
 echo "Version:  $VERSION"
-echo "Platform: $PLATFORM"
-echo "Install:  $INSTALL_DIR/pki"
+echo "Package:  $FILENAME ($PKG_FORMAT)"
 echo ""
 
-# ── Download ─────────────────────────────────────────────────────────────────
-
-FILENAME="pki-${VERSION}-${PLATFORM}.tar.gz"
-URL="https://github.com/$REPO/releases/download/$VERSION/$FILENAME"
-CHECKSUM_URL="https://github.com/$REPO/releases/download/$VERSION/SHA256SUMS.txt"
-
-TMPDIR=$(mktemp -d)
+TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "Downloading $FILENAME..."
 if ! curl -fSL -o "$TMPDIR/$FILENAME" "$URL"; then
-    echo "ERROR: Download failed."
-    echo "Check available releases: https://github.com/$REPO/releases"
+    echo "ERROR: Download failed from $URL"
     exit 1
 fi
 
@@ -134,8 +140,8 @@ fi
 echo "Verifying checksum..."
 curl -fsSL -o "$TMPDIR/SHA256SUMS.txt" "$CHECKSUM_URL" 2>/dev/null || true
 if [[ -f "$TMPDIR/SHA256SUMS.txt" ]]; then
-    EXPECTED=$(grep "$FILENAME" "$TMPDIR/SHA256SUMS.txt" | cut -d' ' -f1)
-    ACTUAL=$(sha256sum "$TMPDIR/$FILENAME" | cut -d' ' -f1)
+    EXPECTED="$(grep "$FILENAME" "$TMPDIR/SHA256SUMS.txt" | cut -d' ' -f1)"
+    ACTUAL="$(sha256sum "$TMPDIR/$FILENAME" | cut -d' ' -f1)"
     if [[ "$EXPECTED" == "$ACTUAL" ]]; then
         echo "Checksum: OK"
     else
@@ -148,26 +154,25 @@ else
     echo "Checksum: skipped (no SHA256SUMS.txt)"
 fi
 
-# ── Extract and install ──────────────────────────────────────────────────────
+# ── Install ──────────────────────────────────────────────────────────────────
 
-echo "Installing to $INSTALL_DIR..."
-tar xzf "$TMPDIR/$FILENAME" -C "$TMPDIR"
-
-if mv "$TMPDIR/pki" "$INSTALL_DIR/pki" 2>/dev/null; then
-    true
-elif sudo mv "$TMPDIR/pki" "$INSTALL_DIR/pki" 2>/dev/null; then
-    true
-else
-    echo "ERROR: Cannot install to $INSTALL_DIR — try: sudo bash"
-    exit 1
-fi
-chmod +x "$INSTALL_DIR/pki" 2>/dev/null || sudo chmod +x "$INSTALL_DIR/pki"
+echo "Installing $FILENAME..."
+case "$PKG_FORMAT" in
+    deb)
+        dpkg -i "$TMPDIR/$FILENAME" || {
+            echo "dpkg reported unmet deps — attempting apt-get -f install"
+            apt-get install -f -y
+        }
+        ;;
+    rpm)
+        if command -v dnf >/dev/null 2>&1; then
+            dnf install -y "$TMPDIR/$FILENAME"
+        else
+            yum install -y "$TMPDIR/$FILENAME"
+        fi
+        ;;
+esac
 
 echo ""
-if [[ -n "$CURRENT_VERSION" ]]; then
-    echo "Done! Upgraded pki $CURRENT_VERSION -> $VERSION at $INSTALL_DIR/pki"
-else
-    echo "Done! Installed pki $VERSION to $INSTALL_DIR/pki"
-fi
-echo ""
-"$INSTALL_DIR/pki" --version 2>/dev/null || true
+echo "Done! Installed pki-client $VERSION"
+pki --version 2>/dev/null || echo "(pki binary not yet on PATH in this shell; open a new shell or check /usr/bin/pki)"
