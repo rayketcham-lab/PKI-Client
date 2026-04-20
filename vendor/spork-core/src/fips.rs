@@ -591,6 +591,7 @@ mod tests {
 
     #[test]
     fn test_non_fips_allows_everything() {
+        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         // Only run this test when the fips feature is not compiled in
         #[cfg(not(feature = "fips"))]
@@ -759,13 +760,14 @@ mod tests {
 
     #[test]
     fn test_self_tests_passed_initially_false() {
-        // Reset state
+        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         SELF_TESTS_PASSED.store(false, Ordering::SeqCst);
         assert!(!self_tests_passed());
     }
 
     #[test]
     fn test_entropy_validated_initially_false() {
+        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         ENTROPY_VALIDATED.store(false, Ordering::SeqCst);
         assert!(!entropy_validated());
     }
@@ -921,6 +923,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))]
     fn test_keygen_preflight_non_fips_allows_all() {
+        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         // Non-FIPS mode should allow everything
         assert!(keygen_preflight(AlgorithmId::EcdsaP256).is_ok());
