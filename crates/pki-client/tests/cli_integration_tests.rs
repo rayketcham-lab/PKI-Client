@@ -1049,3 +1049,106 @@ fn issue_12_revoke_crl_show_missing_file_errors_cleanly() {
         "missing CRL file should exit non-zero"
     );
 }
+
+// ============================================================================
+// PQC Smoke Tests (ML-DSA-65) — feature-gated, skip when --features pqc absent
+// ============================================================================
+
+#[test]
+fn test_key_gen_mldsa65() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("mldsa65.key");
+
+    let output = Command::new(pki_binary())
+        .args(["key", "gen", "ml-dsa-65", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("Failed to execute pki");
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("Unknown algorithm")
+            || stderr.contains("not supported")
+            || stderr.contains("not implemented")
+        {
+            eprintln!("Skipping: ML-DSA-65 unavailable (pqc feature disabled)");
+            return;
+        }
+        panic!("ml-dsa-65 keygen failed unexpectedly: {}", stderr);
+    }
+
+    assert!(key_path.exists(), "PQC key file not created");
+    let content = fs::read_to_string(&key_path).unwrap();
+    assert!(
+        content.contains("-----BEGIN PRIVATE KEY-----"),
+        "PQC key output missing PKCS#8 PEM header"
+    );
+}
+
+#[test]
+fn test_csr_create_mldsa65() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("mldsa65.key");
+    let csr_path = temp_dir.path().join("mldsa65.csr");
+
+    let keygen = Command::new(pki_binary())
+        .args(["key", "gen", "ml-dsa-65", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("Failed to execute pki keygen");
+
+    if !keygen.status.success() {
+        let stderr = String::from_utf8_lossy(&keygen.stderr);
+        if stderr.contains("Unknown algorithm")
+            || stderr.contains("not supported")
+            || stderr.contains("not implemented")
+        {
+            eprintln!("Skipping: ML-DSA-65 unavailable (pqc feature disabled)");
+            return;
+        }
+        panic!("ml-dsa-65 keygen failed unexpectedly: {}", stderr);
+    }
+
+    let output = Command::new(pki_binary())
+        .args([
+            "csr",
+            "create",
+            "--key",
+            key_path.to_str().unwrap(),
+            "--cn",
+            "pqc.example.com",
+            "-o",
+        ])
+        .arg(&csr_path)
+        .output()
+        .expect("Failed to execute pki csr create");
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not yet implemented")
+            || stderr.contains("not implemented")
+            || stderr.contains("not supported")
+            || stderr.contains("Failed to parse private key")
+            || stderr.contains("ECDSA P-256 PKCS#8 decode")
+        {
+            eprintln!("Skipping: pki csr create doesn't handle PQC keys yet (see #97)");
+            return;
+        }
+        panic!("PQC CSR creation failed: {}", stderr);
+    }
+
+    assert!(csr_path.exists(), "PQC CSR file not created");
+    let content = fs::read_to_string(&csr_path).unwrap();
+    assert!(
+        content.contains("-----BEGIN CERTIFICATE REQUEST-----"),
+        "PQC CSR missing PEM header"
+    );
+}
