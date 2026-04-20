@@ -105,12 +105,12 @@
 <div class="hero">
   <div class="hero-badge">Post-Quantum Ready</div>
   <h1><span>PKI</span> Client</h1>
-  <p>Modern certificate operations in one binary. Inspect, lint, diff, probe, enroll &mdash; from RSA to ML-DSA-87.</p>
+  <p>Modern certificate operations in one binary. Inspect, lint, diff, probe, hierarchy &mdash; from RSA to ML-DSA-87.</p>
   <div class="hero-stats">
-    <div class="stat"><div class="stat-value">19</div><div class="stat-label">Commands</div></div>
+    <div class="stat"><div class="stat-value">17</div><div class="stat-label">Commands</div></div>
     <div class="stat"><div class="stat-value">0</div><div class="stat-label">Git Dependencies</div></div>
     <div class="stat"><div class="stat-value">6</div><div class="stat-label">PQC Algorithms</div></div>
-    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Protocols</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Output Formats</div></div>
   </div>
 </div>
 
@@ -118,7 +118,7 @@
   <div class="section-title">Choose a Scenario</div>
   <div class="demo-tabs" id="tabs"></div>
   <div class="demo-info">
-    <h2 id="demo-title">Tacoo Tuesday</h2>
+    <h2 id="demo-title">Cert Inspect</h2>
     <p id="demo-desc"></p>
   </div>
   <div class="player-wrapper">
@@ -134,11 +134,11 @@
   <div class="suite-grid">
     <div class="suite-card">
       <h3>PKI-Client</h3>
-      <div class="desc">Certificate inspection, TLS probing, key management, and enrollment protocols in a single static binary.</div>
+      <div class="desc">Certificate inspection, TLS probing, key management, and CA hierarchy building in a single static binary.</div>
       <div class="tags">
-        <span class="tag">19 Commands</span>
+        <span class="tag">17 Commands</span>
         <span class="tag">Pure Rust</span>
-        <span class="tag">ACME / EST / SCEP</span>
+        <span class="tag">forbid(unsafe_code)</span>
         <span class="tag">ML-DSA</span>
         <span class="tag">SLH-DSA</span>
       </div>
@@ -184,24 +184,21 @@
 <script src="https://unpkg.com/asciinema-player@3.7.1/dist/bundle/asciinema-player.min.js"></script>
 <script>
 var demos = [
-  { key: 'taco-tuesday', icon: '\uD83C\uDF2E', label: 'Tacoo Tuesday',
-    file: 'demos/tacoo-tuesday.cast',
-    desc: 'A taco shop in McKinney TX goes full post-quantum. 3-tier all-PQC hierarchy — ML-DSA-87/65/44. No RSA. No EC. Pure lattice.' },
-  { key: 'enterprise', icon: '\uD83C\uDFE2', label: 'Enterprise PKI',
-    file: 'demos/pki-enterprise-demo.cast',
-    desc: '3-tier corporate PKI (RSA-4096) vs QuantumNexum PQC (ML-DSA-87) — build, inspect, diff, verify.' },
-  { key: 'vision', icon: '\uD83D\uDE80', label: 'The Vision',
-    file: 'demos/story-f-vision.cast',
-    desc: 'From MD5 to ML-DSA-87 to 2050: the past, present, and future of PKI.' },
-  { key: 'signing', icon: '\u270D\uFE0F', label: 'PKI Signing Service',
-    file: 'demos/signing-service.cast',
-    desc: 'Enterprise PKI Signing Service — PE/Authenticode, detached CMS, PowerShell, RFC 3161 TSA, audit trails. Note: HSM integration shown is a roadmap feature.' },
-  { key: 'quantum-ops', icon: '\u269B\uFE0F', label: 'Quantum Ops',
-    file: 'demos/pki-flex-demo.cast',
-    desc: 'End-to-end PKI operations: enterprise cert inspection, key generation, CSR, and ML-DSA-87 post-quantum hierarchy.' }
+  { key: 'cert-inspect', icon: '\uD83D\uDD0D', label: 'Cert Inspect',
+    file: 'demos/cert-inspect.cast',
+    desc: 'Fetch and inspect a live TLS certificate chain. Text, OpenSSL-compatible, and forensic output modes.' },
+  { key: 'key-csr', icon: '\uD83D\uDD11', label: 'Keys & CSRs',
+    file: 'demos/key-csr.cast',
+    desc: 'Generate EC, Ed25519, RSA, or ML-DSA post-quantum keys; build a CSR with SANs in seconds.' },
+  { key: 'tls-probe', icon: '\uD83D\uDCE1', label: 'TLS Probe',
+    file: 'demos/tls-probe.cast',
+    desc: 'Probe a server — protocol, cipher, full chain, PQC-hybrid key exchange, and certificate linting.' },
+  { key: 'hierarchy', icon: '\uD83C\uDFDB\uFE0F', label: 'PKI Hierarchy',
+    file: 'demos/hierarchy.cast',
+    desc: 'Declarative CA hierarchy from TOML — validate, preview, then build root + intermediate with one command.' }
 ];
 
-var currentKey = 'taco-tuesday';
+var currentKey = 'cert-inspect';
 
 var tabsEl = document.getElementById('tabs');
 demos.forEach(function(d, i) {
@@ -245,14 +242,14 @@ window.addEventListener('popstate', function() {
   var params = new URLSearchParams(window.location.search);
   var requested = params.get('demo');
   var valid = demos.some(function(d) { return d.key === requested; });
-  loadDemo(valid ? requested : 'taco-tuesday');
+  loadDemo(valid ? requested : 'cert-inspect');
 });
 
 window.addEventListener('DOMContentLoaded', function() {
   var params = new URLSearchParams(window.location.search);
   var requested = params.get('demo');
   var valid = demos.some(function(d) { return d.key === requested; });
-  loadDemo(valid ? requested : 'taco-tuesday');
+  loadDemo(valid ? requested : 'cert-inspect');
 });
 </script>
 </body>
