@@ -485,12 +485,11 @@ pub fn keygen_preflight(algorithm: AlgorithmId) -> Result<()> {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
-    #[cfg(not(feature = "fips"))]
     use std::sync::Mutex;
 
-    /// Mutex to serialize tests that toggle the global FIPS_MODE atomic.
-    /// Without this, parallel tests race on the shared flag.
-    #[cfg(not(feature = "fips"))]
+    /// Mutex to serialize tests that toggle shared atomics (FIPS_MODE,
+    /// SELF_TESTS_PASSED, ENTROPY_VALIDATED). Without this, parallel tests
+    /// race on the process-wide flags.
     static FIPS_LOCK: Mutex<()> = Mutex::new(());
 
     // Temporarily enable/disable FIPS mode for a test closure.
