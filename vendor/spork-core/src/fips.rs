@@ -43,6 +43,15 @@ pub enum FipsModuleState {
 /// Global FIPS mode flag (runtime).
 static FIPS_MODE: AtomicBool = AtomicBool::new(false);
 
+/// Crate-wide serialization lock for tests that observe or toggle process-wide
+/// FIPS atomics (FIPS_MODE, SELF_TESTS_PASSED, ENTROPY_VALIDATED). Any test in
+/// any module that depends on FIPS_MODE staying stable during execution MUST
+/// acquire this lock — otherwise a parallel test in `fips::tests` can flip
+/// FIPS_MODE mid-run and cause spurious failures (e.g. ML-DSA rejected under
+/// FIPS, producing malformed DER downstream).
+#[cfg(test)]
+pub(crate) static TEST_FIPS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Tracks whether power-up self-tests have been run and passed.
 static SELF_TESTS_PASSED: AtomicBool = AtomicBool::new(false);
 
@@ -485,20 +494,15 @@ pub fn keygen_preflight(algorithm: AlgorithmId) -> Result<()> {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
-    #[cfg(not(feature = "fips"))]
-    use std::sync::Mutex;
-
-    /// Mutex to serialize tests that toggle the global FIPS_MODE atomic.
-    /// Without this, parallel tests race on the shared flag.
-    #[cfg(not(feature = "fips"))]
-    static FIPS_LOCK: Mutex<()> = Mutex::new(());
 
     // Temporarily enable/disable FIPS mode for a test closure.
     // Only valid in non-fips-feature builds (feature flag makes it permanent).
     // Uses unwrap_or_else to recover from poisoned mutex (prior test panic).
     #[cfg(not(feature = "fips"))]
     fn with_fips_mode<F: FnOnce()>(f: F) {
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(true, Ordering::SeqCst);
         f();
         FIPS_MODE.store(false, Ordering::SeqCst);
@@ -591,6 +595,9 @@ mod tests {
 
     #[test]
     fn test_non_fips_allows_everything() {
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         // Only run this test when the fips feature is not compiled in
         #[cfg(not(feature = "fips"))]
@@ -696,7 +703,9 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))]
     fn test_enable_fips_mode_runtime() {
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         assert!(!is_fips_mode());
         enable_fips_mode();
@@ -737,7 +746,9 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))]
     fn test_enable_fips_mode_with_self_tests() {
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         SELF_TESTS_PASSED.store(false, Ordering::SeqCst);
         ENTROPY_VALIDATED.store(false, Ordering::SeqCst);
@@ -759,13 +770,18 @@ mod tests {
 
     #[test]
     fn test_self_tests_passed_initially_false() {
-        // Reset state
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         SELF_TESTS_PASSED.store(false, Ordering::SeqCst);
         assert!(!self_tests_passed());
     }
 
     #[test]
     fn test_entropy_validated_initially_false() {
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         ENTROPY_VALIDATED.store(false, Ordering::SeqCst);
         assert!(!entropy_validated());
     }
@@ -906,7 +922,9 @@ mod tests {
         use crate::algo::KeyPair;
         // Hold FIPS lock to prevent race with tests that temporarily enable FIPS mode,
         // which would cause KeyPair::generate(Ed25519) to be rejected.
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         let key = KeyPair::generate(AlgorithmId::Ed25519).unwrap();
         let result = pairwise_consistency_test(&key);
@@ -921,6 +939,9 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))]
     fn test_keygen_preflight_non_fips_allows_all() {
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         // Non-FIPS mode should allow everything
         assert!(keygen_preflight(AlgorithmId::EcdsaP256).is_ok());
@@ -1040,7 +1061,9 @@ mod tests {
     #[cfg(not(feature = "fips"))] // Ed25519 rejected by FIPS algorithm validation
     fn test_key_import_self_test_ed25519() {
         // Guard against runtime FIPS mode set by parallel tests
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         FIPS_MODE.store(false, Ordering::SeqCst);
         let key = crate::algo::KeyPair::generate(AlgorithmId::Ed25519)
             .expect("Ed25519 keygen should work");
@@ -1063,7 +1086,9 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))]
     fn test_fips_module_activated_after_self_tests() {
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Reset state
         FIPS_MODULE_STATE.store(FipsModuleState::PowerOff as u8, Ordering::SeqCst);
         FIPS_MODE.store(false, Ordering::SeqCst);
@@ -1087,7 +1112,9 @@ mod tests {
     #[test]
     #[cfg(not(feature = "fips"))]
     fn test_fips_module_deactivation() {
-        let _guard = FIPS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Activate first
         FIPS_MODE.store(true, Ordering::SeqCst);
         FIPS_MODULE_STATE.store(FipsModuleState::Activated as u8, Ordering::SeqCst);

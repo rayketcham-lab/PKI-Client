@@ -343,7 +343,7 @@ The TLS stack (`rustls` + `aws-lc-rs`) compiles native crypto from C source. You
 | CMake | aws-lc-sys | `sudo apt install cmake` |
 | Perl | aws-lc-sys build scripts | Usually pre-installed |
 
-Most users should use the [pre-built binary](#pre-built-binaries-recommended) instead of building from source.
+Most users should use the [pre-built binary](#install) instead of building from source.
 
 ### Build
 
@@ -421,7 +421,7 @@ To use enrollment protocols (ACME/EST/SCEP), pin to v0.8.1 or wait for the stand
 - **Static binaries** — musl builds eliminate shared-library supply-chain risk
 - **FIPS 140-3 mode** — restrict all operations to approved algorithms
 - **Input validation** — all file parsing uses safe, bounds-checked Rust decoders
-- **Dependency auditing** — `cargo audit` and `cargo deny` run in CI with zero-tolerance policy
+- **Dependency auditing** — `cargo audit` and `cargo deny` run in CI; every ignored advisory is documented in [`deny.toml`](deny.toml) with justification and review date
 - **Signed releases** — every binary is signed with [Sigstore cosign](https://www.sigstore.dev/) (keyless) and includes [SLSA provenance](https://slsa.dev/) attestations via GitHub Actions
 - **Vendored dependencies** — all crate dependencies are vendored and verified against `Cargo.lock` in CI; no git dependencies allowed
 

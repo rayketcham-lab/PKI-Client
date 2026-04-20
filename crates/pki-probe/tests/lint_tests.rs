@@ -275,3 +275,106 @@ fn issue_34_lint_does_not_flag_ca_cert_missing_san() {
         offending
     );
 }
+
+// ============================================================================
+// Lint positive-case tests — assert rules actually fire on violating certs
+// ============================================================================
+
+/// Leaf cert with validity > 398 days (triggers VALIDITY_TOO_LONG).
+fn generate_long_validity_leaf() -> Vec<u8> {
+    use spork_core::algo::{AlgorithmId, KeyPair};
+    use spork_core::cert::{
+        extensions::{BasicConstraints, ExtendedKeyUsage, KeyUsage, KeyUsageFlags, SubjectAltName},
+        CertificateBuilder, NameBuilder, Validity,
+    };
+
+    let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+    let subject = NameBuilder::new("longvalid.example.com")
+        .organization("Test Org")
+        .country("US")
+        .build();
+
+    let cert = CertificateBuilder::new(
+        subject,
+        kp.public_key_der().unwrap(),
+        AlgorithmId::EcdsaP256,
+    )
+    .validity(Validity::days_from_now(500))
+    .basic_constraints(BasicConstraints::end_entity())
+    .key_usage(KeyUsage::new(KeyUsageFlags::tls_server()))
+    .extended_key_usage(ExtendedKeyUsage::tls_server())
+    .subject_alt_name(SubjectAltName::new().dns("longvalid.example.com"))
+    .build_and_sign(&kp)
+    .unwrap();
+
+    use der::Encode;
+    cert.to_der().unwrap()
+}
+
+/// Leaf cert with no SAN extension (triggers MISSING_SAN).
+fn generate_leaf_without_san() -> Vec<u8> {
+    use spork_core::algo::{AlgorithmId, KeyPair};
+    use spork_core::cert::{
+        extensions::{BasicConstraints, ExtendedKeyUsage, KeyUsage, KeyUsageFlags},
+        CertificateBuilder, NameBuilder, Validity,
+    };
+
+    let kp = KeyPair::generate(AlgorithmId::EcdsaP256).unwrap();
+    let subject = NameBuilder::new("nosan.example.com")
+        .organization("Test Org")
+        .country("US")
+        .build();
+
+    let cert = CertificateBuilder::new(
+        subject,
+        kp.public_key_der().unwrap(),
+        AlgorithmId::EcdsaP256,
+    )
+    .validity(Validity::days_from_now(90))
+    .basic_constraints(BasicConstraints::end_entity())
+    .key_usage(KeyUsage::new(KeyUsageFlags::tls_server()))
+    .extended_key_usage(ExtendedKeyUsage::tls_server())
+    .build_and_sign(&kp)
+    .unwrap();
+
+    use der::Encode;
+    cert.to_der().unwrap()
+}
+
+#[test]
+fn test_lint_validity_too_long_fires_on_500_day_leaf() {
+    let linter = CertLinter::new();
+    let cert = generate_long_validity_leaf();
+
+    let results = linter.lint_chain(&[cert]);
+
+    let hits: Vec<_> = results
+        .iter()
+        .filter(|r| r.rule_id == "VALIDITY_TOO_LONG")
+        .collect();
+
+    assert!(
+        !hits.is_empty(),
+        "500-day leaf should trigger VALIDITY_TOO_LONG, got rules: {:?}",
+        results.iter().map(|r| &r.rule_id).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_lint_missing_san_fires_on_leaf_without_san() {
+    let linter = CertLinter::new();
+    let cert = generate_leaf_without_san();
+
+    let results = linter.lint_chain(&[cert]);
+
+    let hits: Vec<_> = results
+        .iter()
+        .filter(|r| r.rule_id == "MISSING_SAN")
+        .collect();
+
+    assert!(
+        !hits.is_empty(),
+        "Leaf without SAN should trigger MISSING_SAN, got rules: {:?}",
+        results.iter().map(|r| &r.rule_id).collect::<Vec<_>>()
+    );
+}
