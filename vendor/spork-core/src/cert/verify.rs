@@ -3221,6 +3221,9 @@ mod tests {
     #[test]
     #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_valid_chain_mldsa65() {
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if crate::fips::is_fips_mode() {
             return;
         }
@@ -3511,6 +3514,12 @@ mod tests {
     fn test_pqc_cross_algorithm_chain() {
         // ML-DSA-65 root signs P-256 intermediate signs P-256 end-entity
         // Tests PQC→classical migration scenario
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if crate::fips::is_fips_mode() {
+            return;
+        }
         let (root_cert, mut root_ca) = create_root_ca("PQC-Cross Root", AlgorithmId::MlDsa65);
         let (_int_cert, mut int_ca) =
             create_intermediate_ca("PQC-Cross Int", AlgorithmId::EcdsaP256, &mut root_ca);
@@ -3531,6 +3540,9 @@ mod tests {
     #[test]
     #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_valid_chain_mldsa44() {
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if crate::fips::is_fips_mode() {
             return;
         }
@@ -3550,6 +3562,9 @@ mod tests {
     #[test]
     #[cfg(all(feature = "pqc", not(feature = "fips")))] // ML-DSA not yet FIPS 140-3 validated
     fn test_valid_chain_mldsa87() {
+        let _guard = crate::fips::TEST_FIPS_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if crate::fips::is_fips_mode() {
             return;
         }
