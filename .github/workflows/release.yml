@@ -11,8 +11,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Preflight: require the tagged commit to have a green CI run before anything
+  # else starts. This closes the gap that let the first v0.9.1 release attempt
+  # (run 24641035038) reach Sign-and-Release despite a failing commit.
+  verify-ci:
+    name: Verify CI passed on tagged commit
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 5
+    steps:
+      - name: Require latest CI run on this SHA to be success
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "Checking CI status for $REPO @ $SHA"
+          # Take the most recent completed CI.yml run on the exact commit SHA.
+          status=$(gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" \
+            --jq '.workflow_runs[0] | {status: .status, conclusion: .conclusion, html_url: .html_url}')
+          echo "$status"
+          conclusion=$(echo "$status" | jq -r '.conclusion // "missing"')
+          if [[ "$conclusion" != "success" ]]; then
+            echo "::error::CI has not passed on ${SHA}: conclusion=${conclusion}. Aborting release."
+            exit 1
+          fi
+          echo "CI is green for this SHA."
+
   build-linux:
     name: Build Linux installers (.deb + .rpm)
+    needs: [verify-ci]
     # Pinned to ubuntu3-runner: musl-tools not available on Rocky Linux
     runs-on: [self-hosted, Linux]
     timeout-minutes: 45
@@ -101,7 +129,7 @@ jobs:
 
   sign-and-release:
     name: Sign and Release
-    needs: [build-linux]
+    needs: [verify-ci, build-linux]
     runs-on: [self-hosted, Linux]
     permissions:
       contents: write
@@ -132,10 +160,34 @@ jobs:
               exit 1
             fi
           fi
-      - name: Generate checksums
-        run: sha256sum pki-client_*.deb pki-client-*.rpm > SHA256SUMS.txt
+      # --- Supply chain security: Sigstore cosign signing ---
+      # Signing order matters for checksum coverage:
+      #   1. Sign .deb and .rpm first, producing .bundle files.
+      #   2. Generate SHA256SUMS.txt over every deliverable (installers + bundles).
+      #   3. Sign SHA256SUMS.txt itself, producing SHA256SUMS.txt.bundle.
+      # This way users who download SHA256SUMS.txt can sha256sum-verify every
+      # other asset; SHA256SUMS.txt.bundle is the Sigstore root of trust for it.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac  # v3
+      - name: Sign installers with cosign (keyless)
+        run: |
+          set -euo pipefail
+          for f in pki-client_*.deb pki-client-*.rpm; do
+            cosign sign-blob --yes --bundle "${f}.bundle" "$f"
+          done
+      - name: Generate checksums (installers + bundles)
+        run: |
+          set -euo pipefail
+          sha256sum pki-client_*.deb pki-client-*.rpm \
+            pki-client_*.deb.bundle pki-client-*.rpm.bundle \
+            > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Verify checksums round-trip
+        run: sha256sum -c SHA256SUMS.txt
+      - name: Sign SHA256SUMS.txt with cosign (keyless)
+        run: cosign sign-blob --yes --bundle SHA256SUMS.txt.bundle SHA256SUMS.txt
 
-      # --- Supply chain security: SLSA provenance ---
+      # --- Supply chain security: SLSA provenance (signed assets only) ---
       - name: Attest build provenance (.deb)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
@@ -148,15 +200,6 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
           subject-path: SHA256SUMS.txt
-
-      # --- Supply chain security: Sigstore cosign signing ---
-      - name: Install cosign
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac  # v3
-      - name: Sign installers with cosign (keyless)
-        run: |
-          for f in pki-client_*.deb pki-client-*.rpm SHA256SUMS.txt; do
-            cosign sign-blob --yes --bundle "${f}.bundle" "$f"
-          done
 
       - name: Create GitHub Release
         env:
