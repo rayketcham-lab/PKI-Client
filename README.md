@@ -10,11 +10,10 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One static binary (musl
 
 | Scenario | Description |
 |----------|-------------|
-| [Tacoo Tuesday](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=taco-tuesday) | A taco shop goes full post-quantum — 3-tier all-PQC hierarchy with ML-DSA |
-| [Enterprise PKI](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=enterprise) | 3-tier corporate PKI (RSA-4096) vs PQC (ML-DSA-87) — build, inspect, diff, verify |
-| [The Vision](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=vision) | From MD5 to ML-DSA-87 to 2050 — the past, present, and future of PKI |
-| [Signing Service](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=signing) | Enterprise signing — PE/Authenticode, detached CMS, PowerShell, RFC 3161 TSA |
-| [Quantum Ops](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=quantum-ops) | End-to-end PKI operations: cert inspection, key gen, CSR, and ML-DSA-87 hierarchy |
+| [Cert Inspect](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=cert-inspect) | Fetch + inspect a live TLS chain — text, OpenSSL-compatible, and forensic modes |
+| [Keys & CSRs](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=key-csr) | Generate EC / Ed25519 / RSA / ML-DSA keys and build a CSR with SANs in seconds |
+| [TLS Probe](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=tls-probe) | Protocol, cipher, full chain, PQC-hybrid key exchange, and certificate linting |
+| [PKI Hierarchy](https://rayketcham-lab.github.io/PKI-Client/demo.html?demo=hierarchy) | Declarative CA hierarchy from TOML — validate, preview, build root + intermediate |
 
 ---
 
