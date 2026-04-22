@@ -9,6 +9,10 @@ on:
     - cron: '0 6 * * 0'  # 06:00 UTC every Sunday
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
