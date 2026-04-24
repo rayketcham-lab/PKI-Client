@@ -28,6 +28,8 @@ mod awslc_rsa;
 #[cfg(feature = "pqc")]
 mod mldsa_impl;
 pub mod oid;
+#[cfg(feature = "pqc")]
+mod pqc_pkcs8;
 #[cfg(not(feature = "fips"))]
 pub mod rsa_oaep;
 #[cfg(feature = "pqc")]

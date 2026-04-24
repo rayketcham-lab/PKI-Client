@@ -7,11 +7,13 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'crates/pki-client/src/commands/probe.rs'
+      - 'crates/pki-client/**'
+      - 'crates/pki-client-output/**'
       - 'crates/pki-probe/**'
       - 'vendor/spork-core/**'
       - 'tests/interop/**'
       - '**/Cargo.toml'
+      - '.github/workflows/interop.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -100,3 +102,28 @@ jobs:
         env:
           PKI_BIN: ./pki
         run: bash tests/interop/cert_roundtrip.sh
+
+  openssl-parity:
+    name: OpenSSL Parity
+    needs: [build]
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: pki-binary
+      - name: Prepare binary
+        run: chmod +x pki
+      - name: Install openssl + jq
+        run: |
+          if ! command -v jq >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y jq openssl
+          fi
+      - name: Run openssl ↔ pki parity tests
+        env:
+          PKI_BIN: ./pki
+        run: bash tests/interop/openssl_parity.sh

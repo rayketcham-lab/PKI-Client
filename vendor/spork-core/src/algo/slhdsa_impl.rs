@@ -14,19 +14,7 @@ use slh_dsa::{
 };
 use zeroize::Zeroizing;
 
-/// Try to extract raw key bytes from a PKCS#8 OneAsymmetricKey envelope.
-/// PKCS#8: SEQUENCE { INTEGER 0, AlgorithmIdentifier, OCTET STRING { raw_key } }
-/// If the input looks like PKCS#8 (starts with SEQUENCE tag 0x30), attempt extraction.
-/// Returns None if the input isn't valid PKCS#8 — caller should use input as raw bytes.
-fn try_extract_pkcs8_payload(der: &[u8]) -> Option<&[u8]> {
-    // PKCS#8 starts with SEQUENCE (0x30), raw SLH-DSA keys don't
-    if der.first()? != &0x30 {
-        return None;
-    }
-    let pki = pkcs8::PrivateKeyInfo::try_from(der).ok()?;
-    Some(pki.private_key)
-}
-
+use super::pqc_pkcs8::{try_extract_pkcs8_payload, wrap_in_pkcs8};
 use super::{AlgorithmId, SigningAlgorithm};
 use crate::error::{Error, Result};
 
@@ -107,7 +95,11 @@ impl SigningAlgorithm for SlhDsaSha2_128s {
     }
 
     fn private_key_der(&self) -> Result<Zeroizing<Vec<u8>>> {
-        Ok(Zeroizing::new(self.signing_key.to_bytes().to_vec()))
+        let raw = self.signing_key.to_bytes();
+        Ok(Zeroizing::new(wrap_in_pkcs8(
+            raw.as_ref(),
+            &oid::SLH_DSA_SHA2_128S,
+        )))
     }
 
     fn private_key_pem(&self) -> Result<Zeroizing<String>> {
@@ -186,7 +178,11 @@ impl SigningAlgorithm for SlhDsaSha2_192s {
     }
 
     fn private_key_der(&self) -> Result<Zeroizing<Vec<u8>>> {
-        Ok(Zeroizing::new(self.signing_key.to_bytes().to_vec()))
+        let raw = self.signing_key.to_bytes();
+        Ok(Zeroizing::new(wrap_in_pkcs8(
+            raw.as_ref(),
+            &oid::SLH_DSA_SHA2_192S,
+        )))
     }
 
     fn private_key_pem(&self) -> Result<Zeroizing<String>> {
@@ -265,7 +261,11 @@ impl SigningAlgorithm for SlhDsaSha2_256s {
     }
 
     fn private_key_der(&self) -> Result<Zeroizing<Vec<u8>>> {
-        Ok(Zeroizing::new(self.signing_key.to_bytes().to_vec()))
+        let raw = self.signing_key.to_bytes();
+        Ok(Zeroizing::new(wrap_in_pkcs8(
+            raw.as_ref(),
+            &oid::SLH_DSA_SHA2_256S,
+        )))
     }
 
     fn private_key_pem(&self) -> Result<Zeroizing<String>> {

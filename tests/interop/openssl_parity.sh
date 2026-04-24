@@ -145,16 +145,23 @@ assert_eq "cert/signature_algorithm_name" "sha256WithRSAEncryption" "$PKI_SIGALG
 # SAN: openssl decodes 4 entries (2 DNS, 1 IP, 1 email)
 PKI_SAN_COUNT=$(echo "$PKI_CERT_JSON" | jq -r '.san | length')
 assert_eq "cert/SAN count" "4" "$PKI_SAN_COUNT"
-PKI_SAN_ALL=$(echo "$PKI_CERT_JSON" | jq -r '.san[]' | tr '\n' ',' | sed 's/,$//')
+# SAN is serialized as a tagged enum: [{"Dns":"x"}, {"Ip":"y"}, …]. Flatten to
+# "TAG:value" strings (Dns→DNS, Ip→IP) so assertions stay algorithm-readable.
+PKI_SAN_ALL=$(echo "$PKI_CERT_JSON" | jq -r '
+    .san[] | to_entries[]
+    | ((.key | ascii_upcase | sub("EMAIL"; "email")) + ":" + .value)
+' | tr '\n' ',' | sed 's/,$//')
 assert_contains "cert/SAN DNS:ee.parity.test" "DNS:ee.parity.test" "$PKI_SAN_ALL"
 assert_contains "cert/SAN DNS:alt.parity.test" "DNS:alt.parity.test" "$PKI_SAN_ALL"
 assert_contains "cert/SAN IP:10.0.0.1" "IP:10.0.0.1" "$PKI_SAN_ALL"
 assert_contains "cert/SAN email:admin@parity.test" "admin@parity.test" "$PKI_SAN_ALL"
 
-# EKU
+# EKU — pki emits RFC 5280 long-form labels ("TLS Web Server Authentication");
+# openssl's short names are a display quirk, not a canonical format. Assert on
+# the long form here.
 PKI_EKU=$(echo "$PKI_CERT_JSON" | jq -r '.extended_key_usage[]' | tr '\n' ',' | sed 's/,$//')
-assert_contains "cert/EKU serverAuth" "serverAuth" "$PKI_EKU"
-assert_contains "cert/EKU clientAuth" "clientAuth" "$PKI_EKU"
+assert_contains "cert/EKU serverAuth" "TLS Web Server Authentication" "$PKI_EKU"
+assert_contains "cert/EKU clientAuth" "TLS Web Client Authentication" "$PKI_EKU"
 
 echo ""
 
@@ -177,7 +184,10 @@ assert_eq "csr/key_size" "2048" "$PKI_CSR_KEYSIZE"
 PKI_CSR_SAN_COUNT=$(echo "$PKI_CSR_JSON" | jq -r '.san | length')
 assert_eq "csr/SAN count" "4" "$PKI_CSR_SAN_COUNT"
 
-PKI_CSR_SAN_ALL=$(echo "$PKI_CSR_JSON" | jq -r '.san[]' | tr '\n' ',' | sed 's/,$//')
+PKI_CSR_SAN_ALL=$(echo "$PKI_CSR_JSON" | jq -r '
+    .san[] | to_entries[]
+    | ((.key | ascii_upcase | sub("EMAIL"; "email")) + ":" + .value)
+' | tr '\n' ',' | sed 's/,$//')
 assert_contains "csr/SAN DNS:ee.parity.test" "DNS:ee.parity.test" "$PKI_CSR_SAN_ALL"
 assert_contains "csr/SAN IP:10.0.0.1" "IP:10.0.0.1" "$PKI_CSR_SAN_ALL"
 assert_contains "csr/SAN email:admin@parity.test" "admin@parity.test" "$PKI_CSR_SAN_ALL"
@@ -288,9 +298,11 @@ $PKI csr create --key "$WORK/pki-rsa.key" --cn "pki.parity.test" \
     --san "dns:pki.parity.test,dns:alt.pki.parity.test,ip:10.0.0.2,email:pki@parity.test" \
     -o "$WORK/pki.csr" -q
 
-# openssl must parse pki's CSR
-OSL_CSR_TEXT=$(openssl req -in "$WORK/pki.csr" -noout -text 2>&1)
-assert_contains "reverse/openssl parses pki CSR" "CN = pki.parity.test" "$OSL_CSR_TEXT"
+# openssl must parse pki's CSR — normalize DN spacing: openssl ≤3.4 emits
+# "CN = X" (spaces) while 3.5+ emits "CN=X". Collapse so the assertion works
+# on either.
+OSL_CSR_TEXT=$(openssl req -in "$WORK/pki.csr" -noout -text 2>&1 | sed 's/ = /=/g')
+assert_contains "reverse/openssl parses pki CSR" "CN=pki.parity.test" "$OSL_CSR_TEXT"
 assert_contains "reverse/openssl sees pki DNS SAN" "pki.parity.test" "$OSL_CSR_TEXT"
 assert_contains "reverse/openssl sees pki IP SAN" "10.0.0.2" "$OSL_CSR_TEXT"
 assert_contains "reverse/openssl sees pki email SAN" "pki@parity.test" "$OSL_CSR_TEXT"
