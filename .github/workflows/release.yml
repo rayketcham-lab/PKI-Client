@@ -27,11 +27,17 @@ jobs:
         run: |
           set -euo pipefail
           echo "Checking CI status for $REPO @ $SHA"
-          # Take the most recent completed CI.yml run on the exact commit SHA.
-          status=$(gh api "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" \
-            --jq '.workflow_runs[0] | {status: .status, conclusion: .conclusion, html_url: .html_url}')
-          echo "$status"
-          conclusion=$(echo "$status" | jq -r '.conclusion // "missing"')
+          # Use curl + jq (always present on self-hosted runners) — avoids
+          # a hard dep on the gh CLI, which is not installed on every
+          # [self-hosted, Linux] label in our fleet (see release run
+          # 24915505204 where the gate died with `gh: command not found`).
+          response=$(curl -fsS \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1")
+          echo "$response" | jq '.workflow_runs[0] | {status, conclusion, html_url}'
+          conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion // "missing"')
           if [[ "$conclusion" != "success" ]]; then
             echo "::error::CI has not passed on ${SHA}: conclusion=${conclusion}. Aborting release."
             exit 1
