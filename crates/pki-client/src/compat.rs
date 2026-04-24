@@ -351,13 +351,21 @@ fn detect_pkcs8_algorithm(pem_or_der: &str) -> Option<(KeyAlgorithm, u32)> {
         #[cfg(feature = "pqc")]
         "2.16.840.1.101.3.4.3.19" => Some((KeyAlgorithm::MlDsa(87), 256)),
 
-        // PQC — SLH-DSA (FIPS 205)
+        // PQC — SLH-DSA (FIPS 205). Fast (`f`) variants are reported for
+        // display parity with imported keys even though CSR creation currently
+        // only supports the slow (`s`) variants via spork-core.
         #[cfg(feature = "pqc")]
         "2.16.840.1.101.3.4.3.20" => Some((KeyAlgorithm::SlhDsa("SHA2-128s".to_string()), 128)),
         #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.21" => Some((KeyAlgorithm::SlhDsa("SHA2-128f".to_string()), 128)),
+        #[cfg(feature = "pqc")]
         "2.16.840.1.101.3.4.3.22" => Some((KeyAlgorithm::SlhDsa("SHA2-192s".to_string()), 192)),
         #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.23" => Some((KeyAlgorithm::SlhDsa("SHA2-192f".to_string()), 192)),
+        #[cfg(feature = "pqc")]
         "2.16.840.1.101.3.4.3.24" => Some((KeyAlgorithm::SlhDsa("SHA2-256s".to_string()), 256)),
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.25" => Some((KeyAlgorithm::SlhDsa("SHA2-256f".to_string()), 256)),
 
         _ => None,
     }

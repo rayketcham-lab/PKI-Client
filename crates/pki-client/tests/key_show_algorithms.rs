@@ -35,8 +35,11 @@ fn gen_and_show(alg: &str) -> Option<(String, String)> {
         .ok()?;
     if !keygen.status.success() {
         let stderr = String::from_utf8_lossy(&keygen.stderr);
-        if stderr.contains("Unknown algorithm") || stderr.contains("not supported") {
-            return None; // pqc feature off → skip
+        if stderr.contains("Unknown algorithm")
+            || stderr.contains("not supported")
+            || stderr.contains("not yet supported")
+        {
+            return None; // pqc feature off or algo not yet wired → skip
         }
         panic!("keygen {alg} failed: {stderr}");
     }
@@ -66,12 +69,17 @@ fn assert_algo(alg: &str, expected_substrings: &[&str]) {
             "`pki key show` output for {alg} missing `{needle}`:\n{stdout}"
         );
     }
-    // Catch the #97 regression directly: PQC keys must NOT be reported as EcP256.
+    // Catch the #97 regression class: PQC keys must NOT be reported as a
+    // classical algorithm. The original bug collapsed onto `EcP256`, but the
+    // detector's size-heuristic fallback can just as easily misfile a PQC key
+    // as RSA or Ed25519 — guard all three so a future parser bug is caught.
     if !alg.starts_with("ec-") && !alg.starts_with("rsa") && !alg.starts_with("ed") {
-        assert!(
-            !stdout.contains("\"EcP256\""),
-            "PQC key {alg} misidentified as EcP256 (regression of #97):\n{stdout}"
-        );
+        for forbidden in ["\"EcP256\"", "\"Rsa\"", "\"Ed25519\""] {
+            assert!(
+                !stdout.contains(forbidden),
+                "PQC key {alg} misidentified as {forbidden} (regression of #97 class):\n{stdout}"
+            );
+        }
     }
 }
 
@@ -104,4 +112,22 @@ fn key_show_detects_mldsa87() {
 #[test]
 fn key_show_detects_slhdsa_128s() {
     assert_algo("slh-dsa-128s", &["SlhDsa"]);
+}
+
+#[test]
+fn key_show_detects_slhdsa_192s() {
+    assert_algo("slh-dsa-192s", &["SlhDsa"]);
+}
+
+#[test]
+fn key_show_detects_slhdsa_256s() {
+    assert_algo("slh-dsa-256s", &["SlhDsa"]);
+}
+
+// Future-guard: when `pki key gen ed25519` is re-enabled, detection must
+// report Ed25519 and not fall through to the size/OID heuristics. The
+// skip-on-"not supported" path keeps this inert today.
+#[test]
+fn key_show_detects_ed25519() {
+    assert_algo("ed25519", &["\"Ed25519\""]);
 }
