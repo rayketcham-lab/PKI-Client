@@ -264,6 +264,116 @@ fn is_pkcs8_private_key(data: &[u8]) -> bool {
     body[3] == 0x30
 }
 
+/// Decode a DER OID's content bytes into a dotted string (e.g. "1.2.840.113549.1.1.1").
+/// Input is the OID *content* — not including the 0x06 tag or length.
+fn decode_oid_bytes(oid: &[u8]) -> Option<String> {
+    let first = *oid.first()?;
+    let mut parts = Vec::with_capacity(8);
+    parts.push(format!("{}", first / 40));
+    parts.push(format!("{}", first % 40));
+    let mut acc: u64 = 0;
+    for &b in &oid[1..] {
+        acc = acc.checked_shl(7)?.checked_add((b & 0x7F) as u64)?;
+        if b & 0x80 == 0 {
+            parts.push(acc.to_string());
+            acc = 0;
+        }
+    }
+    Some(parts.join("."))
+}
+
+/// Extract the AlgorithmIdentifier OID (dotted form) from a PKCS#8 PrivateKeyInfo.
+fn extract_pkcs8_oid(der: &[u8]) -> Option<String> {
+    if !is_pkcs8_private_key(der) {
+        return None;
+    }
+    // Skip outer SEQUENCE tag + length → body of PrivateKeyInfo
+    let body = skip_der_tag_and_length(der)?;
+    // Skip version INTEGER(0): 02 01 00 (3 bytes)
+    if body.len() < 4 {
+        return None;
+    }
+    let after_version = &body[3..];
+    // Expect AlgorithmIdentifier SEQUENCE (tag 0x30)
+    if *after_version.first()? != 0x30 {
+        return None;
+    }
+    let alg_body = skip_der_tag_and_length(after_version)?;
+    // First field is the OID
+    if *alg_body.first()? != 0x06 {
+        return None;
+    }
+    let oid_len = *alg_body.get(1)? as usize;
+    if oid_len == 0 || oid_len >= 0x80 {
+        return None;
+    }
+    let oid_content = alg_body.get(2..2 + oid_len)?;
+    decode_oid_bytes(oid_content)
+}
+
+/// Decode PEM → DER bytes. Returns None on parse errors or non-PEM input.
+fn pem_to_der(pem_str: &str) -> Option<Vec<u8>> {
+    pem::parse(pem_str).ok().map(|p| p.contents().to_vec())
+}
+
+/// Identify a PKCS#8 private key's algorithm by parsing its AlgorithmIdentifier OID.
+/// Returns the `KeyAlgorithm` variant plus a reasonable bit-count hint for display.
+/// Accepts either PEM or raw DER input as text.
+fn detect_pkcs8_algorithm(pem_or_der: &str) -> Option<(KeyAlgorithm, u32)> {
+    let der = pem_to_der(pem_or_der)?;
+    let oid = extract_pkcs8_oid(&der)?;
+    match oid.as_str() {
+        // Classical
+        "1.2.840.113549.1.1.1" => {
+            // rsaEncryption — size must be inferred from the inner RSAPrivateKey;
+            // fall back to PEM size heuristic here since we only need a hint.
+            let bits = rsa_bits_from_pem_len(pem_or_der.len());
+            Some((KeyAlgorithm::Rsa(bits), bits))
+        }
+        "1.2.840.10045.2.1" => {
+            // ecPublicKey — curve is a nested OID in the AlgorithmIdentifier parameters.
+            // Check the PEM text for the two curves we support.
+            if pem_or_der.contains("BgUrgQQAIg") || pem_or_der.contains("GBSuBBAAi") {
+                Some((KeyAlgorithm::EcP384, 384))
+            } else {
+                Some((KeyAlgorithm::EcP256, 256))
+            }
+        }
+        "1.3.101.112" => Some((KeyAlgorithm::Ed25519, 256)),
+        "1.3.101.113" => Some((KeyAlgorithm::Ed448, 456)),
+
+        // PQC — ML-DSA (FIPS 204). `bits` reports the claimed classical-equivalent
+        // security level so the generic "Size: N bits" UI stays meaningful.
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.17" => Some((KeyAlgorithm::MlDsa(44), 128)),
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.18" => Some((KeyAlgorithm::MlDsa(65), 192)),
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.19" => Some((KeyAlgorithm::MlDsa(87), 256)),
+
+        // PQC — SLH-DSA (FIPS 205)
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.20" => Some((KeyAlgorithm::SlhDsa("SHA2-128s".to_string()), 128)),
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.22" => Some((KeyAlgorithm::SlhDsa("SHA2-192s".to_string()), 192)),
+        #[cfg(feature = "pqc")]
+        "2.16.840.1.101.3.4.3.24" => Some((KeyAlgorithm::SlhDsa("SHA2-256s".to_string()), 256)),
+
+        _ => None,
+    }
+}
+
+/// Heuristic: infer RSA key size from PKCS#8 PEM character length.
+fn rsa_bits_from_pem_len(len: usize) -> u32 {
+    if len > 3000 {
+        4096
+    } else if len > 2200 {
+        3072
+    } else {
+        2048
+    }
+}
+
 /// Skip the DER tag and length bytes, returning the body.
 fn skip_der_tag_and_length(data: &[u8]) -> Option<&[u8]> {
     if data.len() < 2 {
@@ -1724,11 +1834,22 @@ impl CsrBuilder {
                 ));
             }
             #[cfg(feature = "pqc")]
-            KeyAlgorithm::MlDsa(_) | KeyAlgorithm::SlhDsa(_) => {
-                return Err(anyhow!(
-                    "ML-DSA/SLH-DSA not yet supported for CSR generation."
-                ));
+            KeyAlgorithm::MlDsa(44) => spork_core::AlgorithmId::MlDsa44,
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::MlDsa(65) => spork_core::AlgorithmId::MlDsa65,
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::MlDsa(87) => spork_core::AlgorithmId::MlDsa87,
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::MlDsa(level) => {
+                return Err(anyhow!("Unsupported ML-DSA level: {level}"));
             }
+            #[cfg(feature = "pqc")]
+            KeyAlgorithm::SlhDsa(ref variant) => match variant.as_str() {
+                "SHA2-128s" => spork_core::AlgorithmId::SlhDsaSha2_128s,
+                "SHA2-192s" => spork_core::AlgorithmId::SlhDsaSha2_192s,
+                "SHA2-256s" => spork_core::AlgorithmId::SlhDsaSha2_256s,
+                other => return Err(anyhow!("Unsupported SLH-DSA variant: {other}")),
+            },
         };
 
         // Load key pair from PEM
@@ -1942,6 +2063,29 @@ pub fn load_private_key(path: &Path) -> Result<PrivateKey> {
 
     // Check if encrypted
     let encrypted = data.contains("ENCRYPTED");
+
+    // First, try the authoritative path: decode PKCS#8 DER and match the
+    // AlgorithmIdentifier OID. This is the only way to reliably distinguish
+    // ML-DSA / SLH-DSA (FIPS 204/205) from classical keys, since PQC PKCS#8
+    // containers can be smaller than classical RSA PEMs and otherwise land
+    // in the size-based RSA/EC heuristics below. Issue #97.
+    if !encrypted {
+        if let Some((algo, bits_hint)) = detect_pkcs8_algorithm(&data) {
+            let curve = match algo {
+                KeyAlgorithm::EcP256 => Some("P-256".to_string()),
+                KeyAlgorithm::EcP384 => Some("P-384".to_string()),
+                _ => None,
+            };
+            return Ok(PrivateKey {
+                algorithm: algo,
+                key_size: Some(bits_hint),
+                curve,
+                pem: data,
+                bits: bits_hint,
+                encrypted,
+            });
+        }
+    }
 
     // Detect key type from PEM header and content
     // For PKCS#8 keys, we need to check the base64-encoded OID markers:

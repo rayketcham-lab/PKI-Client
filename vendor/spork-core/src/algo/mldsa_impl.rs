@@ -10,6 +10,7 @@ use ml_dsa::{
 };
 use zeroize::Zeroizing;
 
+use super::pqc_pkcs8::{try_extract_pkcs8_payload, wrap_in_pkcs8};
 use super::{AlgorithmId, SigningAlgorithm};
 use crate::error::{Error, Result};
 
@@ -42,14 +43,16 @@ impl MlDsa44 {
 
     #[allow(deprecated)]
     pub fn from_pkcs8_der(der: &[u8]) -> Result<Self> {
+        // PKCS#8 envelope (preferred, self-describing): unwrap and recurse on the payload.
+        let raw = try_extract_pkcs8_payload(der).unwrap_or(der);
         // New format: 32-byte seed (compact, preferred)
-        if der.len() == 32 {
+        if raw.len() == 32 {
             let mut seed = [0u8; 32];
-            seed.copy_from_slice(der);
+            seed.copy_from_slice(raw);
             return Self::from_seed(&seed);
         }
         // Legacy format: expanded signing key (backward compat)
-        let encoded: ExpandedSigningKey<MlDsa44Param> = der.try_into().map_err(|_| {
+        let encoded: ExpandedSigningKey<MlDsa44Param> = raw.try_into().map_err(|_| {
             Error::InvalidKey("Invalid ML-DSA-44 key: expected 32-byte seed or expanded key".into())
         })?;
         let signing_key = SigningKey::<MlDsa44Param>::from_expanded(&encoded);
@@ -87,11 +90,13 @@ impl SigningAlgorithm for MlDsa44 {
     }
 
     fn private_key_der(&self) -> Result<Zeroizing<Vec<u8>>> {
-        // Prefer seed format (32 bytes) if available
+        // RFC 5958 PKCS#8 PrivateKeyInfo wrapping the 32-byte seed.
         if *self.seed != [0u8; 32] {
-            return Ok(Zeroizing::new(self.seed.to_vec()));
+            return Ok(Zeroizing::new(wrap_in_pkcs8(&*self.seed, &oid::ML_DSA_44)));
         }
-        // Fallback: legacy expanded format for keys loaded from old storage
+        // Legacy fallback: key was loaded from an expanded blob and cannot be
+        // re-serialised as a seed. Emit the expanded form unwrapped so old
+        // import paths keep working.
         #[allow(deprecated)]
         Ok(Zeroizing::new(self.signing_key.to_expanded().to_vec()))
     }
@@ -150,12 +155,13 @@ impl MlDsa65 {
 
     #[allow(deprecated)]
     pub fn from_pkcs8_der(der: &[u8]) -> Result<Self> {
-        if der.len() == 32 {
+        let raw = try_extract_pkcs8_payload(der).unwrap_or(der);
+        if raw.len() == 32 {
             let mut seed = [0u8; 32];
-            seed.copy_from_slice(der);
+            seed.copy_from_slice(raw);
             return Self::from_seed(&seed);
         }
-        let encoded: ExpandedSigningKey<MlDsa65Param> = der.try_into().map_err(|_| {
+        let encoded: ExpandedSigningKey<MlDsa65Param> = raw.try_into().map_err(|_| {
             Error::InvalidKey("Invalid ML-DSA-65 key: expected 32-byte seed or expanded key".into())
         })?;
         let signing_key = SigningKey::<MlDsa65Param>::from_expanded(&encoded);
@@ -192,7 +198,7 @@ impl SigningAlgorithm for MlDsa65 {
 
     fn private_key_der(&self) -> Result<Zeroizing<Vec<u8>>> {
         if *self.seed != [0u8; 32] {
-            return Ok(Zeroizing::new(self.seed.to_vec()));
+            return Ok(Zeroizing::new(wrap_in_pkcs8(&*self.seed, &oid::ML_DSA_65)));
         }
         #[allow(deprecated)]
         Ok(Zeroizing::new(self.signing_key.to_expanded().to_vec()))
@@ -252,12 +258,13 @@ impl MlDsa87 {
 
     #[allow(deprecated)]
     pub fn from_pkcs8_der(der: &[u8]) -> Result<Self> {
-        if der.len() == 32 {
+        let raw = try_extract_pkcs8_payload(der).unwrap_or(der);
+        if raw.len() == 32 {
             let mut seed = [0u8; 32];
-            seed.copy_from_slice(der);
+            seed.copy_from_slice(raw);
             return Self::from_seed(&seed);
         }
-        let encoded: ExpandedSigningKey<MlDsa87Param> = der.try_into().map_err(|_| {
+        let encoded: ExpandedSigningKey<MlDsa87Param> = raw.try_into().map_err(|_| {
             Error::InvalidKey("Invalid ML-DSA-87 key: expected 32-byte seed or expanded key".into())
         })?;
         let signing_key = SigningKey::<MlDsa87Param>::from_expanded(&encoded);
@@ -294,7 +301,7 @@ impl SigningAlgorithm for MlDsa87 {
 
     fn private_key_der(&self) -> Result<Zeroizing<Vec<u8>>> {
         if *self.seed != [0u8; 32] {
-            return Ok(Zeroizing::new(self.seed.to_vec()));
+            return Ok(Zeroizing::new(wrap_in_pkcs8(&*self.seed, &oid::ML_DSA_87)));
         }
         #[allow(deprecated)]
         Ok(Zeroizing::new(self.signing_key.to_expanded().to_vec()))
@@ -412,11 +419,18 @@ mod tests {
     fn test_mldsa44_seed_round_trip() {
         let kp = MlDsa44::generate().unwrap();
         let der = kp.private_key_der().unwrap();
-        // New keys export as 32-byte seed
-        assert_eq!(der.len(), 32);
-        // Round-trip: load from seed, verify same public key
+        // Exports as RFC 5958 PKCS#8 PrivateKeyInfo wrapping the 32-byte seed.
+        assert_eq!(der[0], 0x30, "expected PKCS#8 SEQUENCE tag");
+        let pki = pkcs8::PrivateKeyInfo::try_from(der.as_ref())
+            .expect("private_key_der must emit valid PKCS#8");
+        assert_eq!(pki.algorithm.oid, oid::ML_DSA_44);
+        assert_eq!(pki.private_key.len(), 32);
+        // Round-trip: load from PKCS#8, verify same public key
         let kp2 = MlDsa44::from_pkcs8_der(&der).unwrap();
         assert_eq!(kp.public_key_der().unwrap(), kp2.public_key_der().unwrap());
+        // Also accepts raw 32-byte seed for backward compatibility.
+        let kp3 = MlDsa44::from_pkcs8_der(pki.private_key).unwrap();
+        assert_eq!(kp.public_key_der().unwrap(), kp3.public_key_der().unwrap());
         // Sign with original, verify with reloaded
         let sig = kp.sign(b"round trip test").unwrap();
         assert!(kp2.verify(b"round trip test", &sig).unwrap());
@@ -424,24 +438,46 @@ mod tests {
 
     #[test]
     fn test_mldsa65_seed_round_trip() {
-        let kp = MlDsa65::generate().unwrap();
+        // ExpandedSigningKey is large (~15 KB) — Box to keep the test stack small.
+        let kp = Box::new(MlDsa65::generate().unwrap());
         let der = kp.private_key_der().unwrap();
-        assert_eq!(der.len(), 32);
-        let kp2 = MlDsa65::from_pkcs8_der(&der).unwrap();
-        assert_eq!(kp.public_key_der().unwrap(), kp2.public_key_der().unwrap());
-        let sig = kp.sign(b"round trip test").unwrap();
-        assert!(kp2.verify(b"round trip test", &sig).unwrap());
+        let pki = pkcs8::PrivateKeyInfo::try_from(der.as_ref())
+            .expect("private_key_der must emit valid PKCS#8");
+        assert_eq!(pki.algorithm.oid, oid::ML_DSA_65);
+        assert_eq!(pki.private_key.len(), 32);
+        let pub_original = kp.public_key_der().unwrap();
+        {
+            let kp2 = Box::new(MlDsa65::from_pkcs8_der(&der).unwrap());
+            assert_eq!(pub_original, kp2.public_key_der().unwrap());
+            let sig = kp.sign(b"round trip test").unwrap();
+            assert!(kp2.verify(b"round trip test", &sig).unwrap());
+        }
+        {
+            let kp3 = Box::new(MlDsa65::from_pkcs8_der(pki.private_key).unwrap());
+            assert_eq!(pub_original, kp3.public_key_der().unwrap());
+        }
     }
 
     #[test]
     fn test_mldsa87_seed_round_trip() {
-        let kp = MlDsa87::generate().unwrap();
+        // ExpandedSigningKey is very large (~16 KB) — Box to avoid stack overflow in debug builds.
+        let kp = Box::new(MlDsa87::generate().unwrap());
         let der = kp.private_key_der().unwrap();
-        assert_eq!(der.len(), 32);
-        let kp2 = MlDsa87::from_pkcs8_der(&der).unwrap();
-        assert_eq!(kp.public_key_der().unwrap(), kp2.public_key_der().unwrap());
-        let sig = kp.sign(b"round trip test").unwrap();
-        assert!(kp2.verify(b"round trip test", &sig).unwrap());
+        let pki = pkcs8::PrivateKeyInfo::try_from(der.as_ref())
+            .expect("private_key_der must emit valid PKCS#8");
+        assert_eq!(pki.algorithm.oid, oid::ML_DSA_87);
+        assert_eq!(pki.private_key.len(), 32);
+        let pub_original = kp.public_key_der().unwrap();
+        {
+            let kp2 = Box::new(MlDsa87::from_pkcs8_der(&der).unwrap());
+            assert_eq!(pub_original, kp2.public_key_der().unwrap());
+            let sig = kp.sign(b"round trip test").unwrap();
+            assert!(kp2.verify(b"round trip test", &sig).unwrap());
+        }
+        {
+            let kp3 = Box::new(MlDsa87::from_pkcs8_der(pki.private_key).unwrap());
+            assert_eq!(pub_original, kp3.public_key_der().unwrap());
+        }
     }
 
     #[test]
