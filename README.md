@@ -33,7 +33,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One static binary (musl
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.9.1-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.9.2-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -241,7 +241,7 @@ Certificate:
 
 ```bash
 # Download installer + signatures
-VERSION=v0.9.1
+VERSION=v0.9.2
 curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client_${VERSION#v}_amd64.deb
 curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client_${VERSION#v}_amd64.deb.bundle
 
@@ -266,7 +266,7 @@ pki --version
 
 ```bash
 # Download installer + signatures
-VERSION=v0.9.1
+VERSION=v0.9.2
 curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client-${VERSION#v}-1.x86_64.rpm
 curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client-${VERSION#v}-1.x86_64.rpm.bundle
 
@@ -303,18 +303,18 @@ sha256sum -c --ignore-missing SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-client_0.9.1_amd64.deb --repo rayketcham-lab/PKI-Client
-gh attestation verify pki-client-0.9.1-1.x86_64.rpm --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-client_0.9.2_amd64.deb --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-client-0.9.2-1.x86_64.rpm --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore keyless):**
 ```bash
 # .deb example (see per-distro sections above for inline usage)
 cosign verify-blob \
-  --bundle pki-client_0.9.1_amd64.deb.bundle \
+  --bundle pki-client_0.9.2_amd64.deb.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-client_0.9.1_amd64.deb
+  pki-client_0.9.2_amd64.deb
 ```
 
 ### Shell completions
