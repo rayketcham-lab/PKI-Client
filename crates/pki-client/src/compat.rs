@@ -2067,7 +2067,28 @@ impl GeneratedKey {
 
 /// Load private key from file
 pub fn load_private_key(path: &Path) -> Result<PrivateKey> {
-    let data = std::fs::read_to_string(path)?;
+    let data = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read key file: {}", path.display()))?;
+
+    // Reject empty / whitespace-only inputs before any heuristic fires.
+    // Without this, the RSA-2048 default at the bottom of this function
+    // would happily report "" as a valid 2048-bit RSA key (issue #102).
+    if data.trim().is_empty() {
+        anyhow::bail!(
+            "{}: file is empty or contains no key material",
+            path.display()
+        );
+    }
+
+    // Validate that the input is actually a recognisable PEM block.
+    // pem::parse rejects: missing BEGIN/END frames, mismatched labels,
+    // non-base64 bodies, and empty bodies. Bailing here closes the
+    // garbage-in / RSA-2048-out path the size heuristics fell through to.
+    let parsed_pem = pem::parse(&data)
+        .with_context(|| format!("{}: not a valid PEM-encoded private key", path.display()))?;
+    if parsed_pem.contents().is_empty() {
+        anyhow::bail!("{}: PEM frame contained no key material", path.display());
+    }
 
     // Check if encrypted
     let encrypted = data.contains("ENCRYPTED");
