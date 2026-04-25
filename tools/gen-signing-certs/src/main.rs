@@ -5,6 +5,8 @@
 //!
 //! Output: /tmp/pki-sign/certs/{type}_{algo}.pfx
 
+#![forbid(unsafe_code)]
+
 use std::path::Path;
 
 use const_oid::ObjectIdentifier;
