@@ -211,7 +211,11 @@ jobs:
     needs: [fmt, clippy-fips]
     runs-on: [self-hosted, Linux]
     timeout-minutes: 20
-    continue-on-error: true  # FIPS entropy health check can be non-deterministic
+    # NB: job-level continue-on-error was removed (DevOps P1 hardening) —
+    # it silenced compile errors and real test regressions, not just the
+    # flaky entropy check. Compile must always be a hard gate; only the
+    # test-execution step is allowed to soft-fail until the entropy
+    # health-check is deflaked.
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -220,7 +224,10 @@ jobs:
         with:
           cache-prefix: v3-test-fips
 
-      - name: cargo test --features fips
+      - name: cargo build --tests --features fips (hard gate)
+        run: cargo build --all --tests --features fips
+      - name: cargo test --features fips (soft gate, flaky entropy check)
+        continue-on-error: true
         run: cargo test --all --features fips
 
   build:
