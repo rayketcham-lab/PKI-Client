@@ -4,66 +4,31 @@ set -euo pipefail
 # ============================================================================
 # PKI-Client Installer / Upgrader / Uninstaller
 #
-# Detects the host distro and installs the appropriate native package:
-#   Debian/Ubuntu  -> .deb  (installed with dpkg)
-#   RHEL/Fedora/etc -> .rpm (installed with dnf/yum)
+# Downloads the statically-linked musl binary (single artifact, zero runtime
+# deps). Works on any x86_64 Linux distro — Debian, Ubuntu, RHEL, Rocky,
+# Alma, Fedora, Alpine — because the binary depends on nothing at runtime.
 #
 # Install:     curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash
 # Upgrade:     curl -fsSL .../install.sh | sudo bash -s -- upgrade
 # Uninstall:   curl -fsSL .../install.sh | sudo bash -s -- uninstall
-# Pin version: curl -fsSL .../install.sh | sudo bash -s -- v0.9.1
+# Pin version: curl -fsSL .../install.sh | sudo bash -s -- v0.9.3
 # ============================================================================
 
 REPO="rayketcham-lab/PKI-Client"
 ACTION="${1:-install}"
-
-# ── Detect package format ────────────────────────────────────────────────────
-
-detect_pkg_format() {
-    if command -v dpkg >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
-        echo "deb"
-    elif command -v rpm >/dev/null 2>&1 && (command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1); then
-        echo "rpm"
-    else
-        echo "unsupported"
-    fi
-}
-
-PKG_FORMAT="$(detect_pkg_format)"
+INSTALL_PATH="${PKI_INSTALL_PATH:-/usr/local/bin/pki}"
 
 # ── Uninstall ────────────────────────────────────────────────────────────────
 
 if [[ "$ACTION" == "uninstall" ]]; then
     echo "PKI-Client Uninstaller"
     echo "======================"
-
-    case "$PKG_FORMAT" in
-        deb)
-            if dpkg -s pki-client >/dev/null 2>&1; then
-                apt-get remove -y pki-client
-            else
-                echo "pki-client is not installed (dpkg)."
-            fi
-            ;;
-        rpm)
-            if rpm -q pki-client >/dev/null 2>&1; then
-                if command -v dnf >/dev/null 2>&1; then
-                    dnf remove -y pki-client
-                else
-                    yum remove -y pki-client
-                fi
-            else
-                echo "pki-client is not installed (rpm)."
-            fi
-            ;;
-        *)
-            echo "ERROR: Unsupported distro — no dpkg or rpm detected."
-            exit 1
-            ;;
-    esac
-
-    echo ""
-    echo "Done! pki-client has been uninstalled."
+    if [[ -f "$INSTALL_PATH" ]]; then
+        rm -f "$INSTALL_PATH"
+        echo "Removed $INSTALL_PATH"
+    else
+        echo "$INSTALL_PATH not present — nothing to remove."
+    fi
     exit 0
 fi
 
@@ -77,7 +42,7 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 
 if [[ "$OS" != "linux" ]]; then
-    echo "ERROR: Unsupported OS: $OS (Linux only for pre-built installers)"
+    echo "ERROR: Unsupported OS: $OS (Linux only)"
     exit 1
 fi
 
@@ -88,13 +53,6 @@ case "$ARCH" in
         exit 1
         ;;
 esac
-
-if [[ "$PKG_FORMAT" == "unsupported" ]]; then
-    echo "ERROR: No supported package manager found."
-    echo "Supported: dpkg+apt (Debian/Ubuntu) or rpm+dnf/yum (RHEL/Fedora/Rocky/Alma)."
-    echo "Download assets manually from: https://github.com/$REPO/releases"
-    exit 1
-fi
 
 # Resolve version
 if [[ "$ACTION" == "upgrade" || "$ACTION" == "install" ]]; then
@@ -113,24 +71,20 @@ if [[ "$VERSION" == "latest" ]]; then
 fi
 
 VERSION_NUM="${VERSION#v}"
-
-case "$PKG_FORMAT" in
-    deb) FILENAME="pki-client_${VERSION_NUM}_amd64.deb" ;;
-    rpm) FILENAME="pki-client-${VERSION_NUM}-1.x86_64.rpm" ;;
-esac
-
+FILENAME="pki-${VERSION_NUM}-linux-x86_64-musl"
 URL="https://github.com/$REPO/releases/download/${VERSION}/${FILENAME}"
 CHECKSUM_URL="https://github.com/$REPO/releases/download/${VERSION}/SHA256SUMS.txt"
 
 echo "Version:  $VERSION"
-echo "Package:  $FILENAME ($PKG_FORMAT)"
+echo "Asset:    $FILENAME"
+echo "Install:  $INSTALL_PATH"
 echo ""
 
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR"' EXIT
+WORKDIR="$(mktemp -d)"
+trap 'rm -rf "$WORKDIR"' EXIT
 
 echo "Downloading $FILENAME..."
-if ! curl -fSL -o "$TMPDIR/$FILENAME" "$URL"; then
+if ! curl -fSL -o "$WORKDIR/$FILENAME" "$URL"; then
     echo "ERROR: Download failed from $URL"
     exit 1
 fi
@@ -138,41 +92,32 @@ fi
 # ── Verify checksum ──────────────────────────────────────────────────────────
 
 echo "Verifying checksum..."
-curl -fsSL -o "$TMPDIR/SHA256SUMS.txt" "$CHECKSUM_URL" 2>/dev/null || true
-if [[ -f "$TMPDIR/SHA256SUMS.txt" ]]; then
-    EXPECTED="$(grep "$FILENAME" "$TMPDIR/SHA256SUMS.txt" | cut -d' ' -f1)"
-    ACTUAL="$(sha256sum "$TMPDIR/$FILENAME" | cut -d' ' -f1)"
-    if [[ "$EXPECTED" == "$ACTUAL" ]]; then
-        echo "Checksum: OK"
-    else
-        echo "ERROR: Checksum mismatch!"
-        echo "  Expected: $EXPECTED"
-        echo "  Got:      $ACTUAL"
-        exit 1
-    fi
-else
-    echo "Checksum: skipped (no SHA256SUMS.txt)"
+if ! curl -fsSL -o "$WORKDIR/SHA256SUMS.txt" "$CHECKSUM_URL"; then
+    echo "ERROR: SHA256SUMS.txt download failed — refusing to install unverified binary."
+    exit 1
 fi
+
+EXPECTED="$(grep " ${FILENAME}\$" "$WORKDIR/SHA256SUMS.txt" | cut -d' ' -f1)"
+if [[ -z "$EXPECTED" ]]; then
+    echo "ERROR: $FILENAME not listed in SHA256SUMS.txt — refusing to install."
+    exit 1
+fi
+ACTUAL="$(sha256sum "$WORKDIR/$FILENAME" | cut -d' ' -f1)"
+if [[ "$EXPECTED" != "$ACTUAL" ]]; then
+    echo "ERROR: Checksum mismatch!"
+    echo "  Expected: $EXPECTED"
+    echo "  Got:      $ACTUAL"
+    exit 1
+fi
+echo "Checksum: OK"
 
 # ── Install ──────────────────────────────────────────────────────────────────
 
-echo "Installing $FILENAME..."
-case "$PKG_FORMAT" in
-    deb)
-        dpkg -i "$TMPDIR/$FILENAME" || {
-            echo "dpkg reported unmet deps — attempting apt-get -f install"
-            apt-get install -f -y
-        }
-        ;;
-    rpm)
-        if command -v dnf >/dev/null 2>&1; then
-            dnf install -y "$TMPDIR/$FILENAME"
-        else
-            yum install -y "$TMPDIR/$FILENAME"
-        fi
-        ;;
-esac
+echo "Installing to $INSTALL_PATH..."
+chmod +x "$WORKDIR/$FILENAME"
+mkdir -p "$(dirname "$INSTALL_PATH")"
+mv "$WORKDIR/$FILENAME" "$INSTALL_PATH"
 
 echo ""
-echo "Done! Installed pki-client $VERSION"
-pki --version 2>/dev/null || echo "(pki binary not yet on PATH in this shell; open a new shell or check /usr/bin/pki)"
+echo "Done! Installed pki $VERSION"
+"$INSTALL_PATH" --version

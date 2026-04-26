@@ -33,7 +33,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One static binary (musl
 [![OpenSSL](https://img.shields.io/badge/OpenSSL-not%20required-brightgreen?logo=openssl&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 
 <!-- Project Info -->
-[![Version](https://img.shields.io/badge/version-0.9.2-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
+[![Version](https://img.shields.io/badge/version-0.9.3-blue?logo=semver&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green?logo=apache&logoColor=white)](LICENSE)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88.0-orange?logo=rust&logoColor=white)](https://blog.rust-lang.org/)
@@ -235,57 +235,44 @@ Certificate:
 
 ## Install
 
-`pki-client` ships as native Linux installers — `.deb` for Debian/Ubuntu and `.rpm` for RHEL/Fedora/Rocky/Alma. The binary is statically linked against musl libc — zero runtime dependencies. Installers deploy `pki` to `/usr/bin/pki` with appropriate permissions and register with the distro's package manager so `apt remove` / `dnf remove` work as expected.
+`pki-client` ships as a single statically-linked musl binary — zero runtime dependencies, runs on any x86_64 Linux distro (Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, Alpine, etc.).
 
-### Debian / Ubuntu (.deb)
+### One-line install
 
 ```bash
-# Download installer + signatures
-VERSION=v0.9.2
-curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client_${VERSION#v}_amd64.deb
-curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client_${VERSION#v}_amd64.deb.bundle
+curl -fsSL https://raw.githubusercontent.com/rayketcham-lab/PKI-Client/main/install.sh | sudo bash
+```
+
+The installer downloads the binary, verifies its SHA256, and drops it at `/usr/local/bin/pki` (override with `PKI_INSTALL_PATH=/some/other/path`).
+
+**Upgrade:** `curl -fsSL .../install.sh | sudo bash -s -- upgrade`
+**Uninstall:** `curl -fsSL .../install.sh | sudo bash -s -- uninstall`
+**Pin version:** `curl -fsSL .../install.sh | sudo bash -s -- v0.9.3`
+
+### Manual install
+
+```bash
+VERSION=v0.9.3
+ASSET=pki-${VERSION#v}-linux-x86_64-musl
+
+# Download binary + signature bundle
+curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/${ASSET}
+curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/${ASSET}.bundle
 
 # (optional) Verify signature — see "Verify release integrity" below
 cosign verify-blob \
-  --bundle pki-client_${VERSION#v}_amd64.deb.bundle \
+  --bundle ${ASSET}.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-client_${VERSION#v}_amd64.deb
+  ${ASSET}
 
 # Install
-sudo dpkg -i pki-client_${VERSION#v}_amd64.deb
+chmod +x ${ASSET}
+sudo mv ${ASSET} /usr/local/bin/pki
 
 # Verify
 pki --version
 ```
-
-**Upgrade / reinstall:** `sudo dpkg -i pki-client_*.deb` (overwrites in place)
-**Uninstall:** `sudo apt remove pki-client`
-
-### RHEL / Fedora / Rocky / Alma (.rpm)
-
-```bash
-# Download installer + signatures
-VERSION=v0.9.2
-curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client-${VERSION#v}-1.x86_64.rpm
-curl -fSLO https://github.com/rayketcham-lab/PKI-Client/releases/download/${VERSION}/pki-client-${VERSION#v}-1.x86_64.rpm.bundle
-
-# (optional) Verify signature — see "Verify release integrity" below
-cosign verify-blob \
-  --bundle pki-client-${VERSION#v}-1.x86_64.rpm.bundle \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-client-${VERSION#v}-1.x86_64.rpm
-
-# Install (dnf/yum auto-resolves no deps — binary is static)
-sudo dnf install -y ./pki-client-${VERSION#v}-1.x86_64.rpm
-
-# Verify
-pki --version
-```
-
-**Upgrade:** `sudo dnf upgrade ./pki-client-*.rpm`
-**Uninstall:** `sudo dnf remove pki-client`
 
 **Platform:** x86_64 Linux. The binary is statically linked (musl) — zero runtime dependencies, installs cleanly on any glibc or musl host.
 
@@ -293,7 +280,7 @@ Browse all assets at [GitHub Releases](https://github.com/rayketcham-lab/PKI-Cli
 
 ### Verify release integrity
 
-Every release ships with SHA256 checksums, [SLSA build provenance](https://slsa.dev/), and [Sigstore](https://www.sigstore.dev/) cosign signatures. All installers are built by GitHub Actions directly from tagged source — no human touches the binary.
+Every release ships with SHA256 checksums, [SLSA build provenance](https://slsa.dev/), and [Sigstore](https://www.sigstore.dev/) cosign signatures. The binary is built by GitHub Actions directly from tagged source — no human touches it.
 
 **SHA256 checksum:**
 ```bash
@@ -303,18 +290,16 @@ sha256sum -c --ignore-missing SHA256SUMS.txt
 
 **GitHub attestation (SLSA provenance):**
 ```bash
-gh attestation verify pki-client_0.9.2_amd64.deb --repo rayketcham-lab/PKI-Client
-gh attestation verify pki-client-0.9.2-1.x86_64.rpm --repo rayketcham-lab/PKI-Client
+gh attestation verify pki-0.9.3-linux-x86_64-musl --repo rayketcham-lab/PKI-Client
 ```
 
 **Cosign signature (Sigstore keyless):**
 ```bash
-# .deb example (see per-distro sections above for inline usage)
 cosign verify-blob \
-  --bundle pki-client_0.9.2_amd64.deb.bundle \
+  --bundle pki-0.9.3-linux-x86_64-musl.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp "github.com/rayketcham-lab/PKI-Client" \
-  pki-client_0.9.2_amd64.deb
+  pki-0.9.3-linux-x86_64-musl
 ```
 
 ### Shell completions

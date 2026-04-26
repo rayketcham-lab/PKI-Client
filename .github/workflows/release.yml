@@ -55,11 +55,10 @@ jobs:
           echo "CI is green for this SHA."
 
   build-linux:
-    name: Build Linux installers (.deb + .rpm)
+    name: Build static musl binary
     needs: [verify-ci]
-    # Pinned to ubuntu3-runner: musl-tools not available on Rocky Linux
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -73,14 +72,6 @@ jobs:
           if ! command -v musl-gcc &> /dev/null; then
             sudo apt-get update
             sudo apt-get install -y musl-tools
-          fi
-      - name: Install cargo-deb and cargo-generate-rpm
-        run: |
-          if ! command -v cargo-deb &> /dev/null; then
-            cargo install --locked cargo-deb@2.7.0
-          fi
-          if ! command -v cargo-generate-rpm &> /dev/null; then
-            cargo install --locked cargo-generate-rpm@0.14.1
           fi
       - name: Build static binary (with PQC support)
         run: cargo build --release --features pqc --target x86_64-unknown-linux-musl -p pki-client
@@ -98,50 +89,23 @@ jobs:
           fi
           ls -lh target/x86_64-unknown-linux-musl/release/pki
 
-      # ── Build .deb installer ──────────────────────────────────────
-      - name: Build .deb installer
+      - name: Stage release artifact
         env:
           TAG_NAME: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
           VERSION="${TAG_NAME#v}"
-          cargo deb --no-build --no-strip \
-            --target x86_64-unknown-linux-musl \
-            -p pki-client \
-            --output "pki-client_${VERSION}_amd64.deb"
-          ls -lh pki-client_*.deb
-
-      # ── Build .rpm installer ──────────────────────────────────────
-      - name: Build .rpm installer
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          VERSION="${TAG_NAME#v}"
-          cargo generate-rpm \
-            --target x86_64-unknown-linux-musl \
-            -p crates/pki-client \
-            --output "pki-client-${VERSION}-1.x86_64.rpm"
-          ls -lh pki-client-*.rpm
-
-      # ── Smoke-test installers ─────────────────────────────────────
-      - name: Smoke-test .deb (dpkg-deb inspection)
-        run: |
-          dpkg-deb --info pki-client_*.deb
-          dpkg-deb --contents pki-client_*.deb
-      - name: Smoke-test .rpm (rpm inspection)
-        run: |
-          if command -v rpm &> /dev/null; then
-            rpm -qip pki-client-*.rpm
-            rpm -qlp pki-client-*.rpm
-          else
-            echo "rpm not installed on runner — skipping inspection"
-          fi
+          ASSET="pki-${VERSION}-linux-x86_64-musl"
+          cp target/x86_64-unknown-linux-musl/release/pki "$ASSET"
+          chmod +x "$ASSET"
+          ls -lh "$ASSET"
+          # Smoke-test: the binary itself runs and reports the right version.
+          ./"$ASSET" --version
 
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7
         with:
-          name: pki-linux-installers
-          path: |
-            pki-client_*.deb
-            pki-client-*.rpm
+          name: pki-linux-musl
+          path: pki-*-linux-x86_64-musl
 
   sign-and-release:
     name: Sign and Release
@@ -176,27 +140,26 @@ jobs:
               exit 1
             fi
           fi
+
       # --- Supply chain security: Sigstore cosign signing ---
       # Signing order matters for checksum coverage:
-      #   1. Sign .deb and .rpm first, producing .bundle files.
-      #   2. Generate SHA256SUMS.txt over every deliverable (installers + bundles).
+      #   1. Sign the binary first, producing a .bundle file.
+      #   2. Generate SHA256SUMS.txt over both deliverables (binary + bundle).
       #   3. Sign SHA256SUMS.txt itself, producing SHA256SUMS.txt.bundle.
-      # This way users who download SHA256SUMS.txt can sha256sum-verify every
-      # other asset; SHA256SUMS.txt.bundle is the Sigstore root of trust for it.
+      # Users who download SHA256SUMS.txt can sha256sum-verify the binary;
+      # SHA256SUMS.txt.bundle is the Sigstore root of trust for the file.
       - name: Install cosign
         uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac  # v3
-      - name: Sign installers with cosign (keyless)
+      - name: Sign binary with cosign (keyless)
         run: |
           set -euo pipefail
-          for f in pki-client_*.deb pki-client-*.rpm; do
+          for f in pki-*-linux-x86_64-musl; do
             cosign sign-blob --yes --bundle "${f}.bundle" "$f"
           done
-      - name: Generate checksums (installers + bundles)
+      - name: Generate checksums (binary + bundle)
         run: |
           set -euo pipefail
-          sha256sum pki-client_*.deb pki-client-*.rpm \
-            pki-client_*.deb.bundle pki-client-*.rpm.bundle \
-            > SHA256SUMS.txt
+          sha256sum pki-*-linux-x86_64-musl pki-*-linux-x86_64-musl.bundle > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: Verify checksums round-trip
         run: sha256sum -c SHA256SUMS.txt
@@ -204,14 +167,10 @@ jobs:
         run: cosign sign-blob --yes --bundle SHA256SUMS.txt.bundle SHA256SUMS.txt
 
       # --- Supply chain security: SLSA provenance (signed assets only) ---
-      - name: Attest build provenance (.deb)
+      - name: Attest build provenance (binary)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
-          subject-path: pki-client_*.deb
-      - name: Attest build provenance (.rpm)
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
-        with:
-          subject-path: pki-client-*.rpm
+          subject-path: pki-*-linux-x86_64-musl
       - name: Attest build provenance (checksums)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be  # v2
         with:
@@ -225,4 +184,4 @@ jobs:
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
             --generate-notes \
-            pki-client_*.deb pki-client-*.rpm SHA256SUMS.txt *.bundle
+            pki-*-linux-x86_64-musl SHA256SUMS.txt *.bundle
