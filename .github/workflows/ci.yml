@@ -57,6 +57,50 @@ jobs:
           fi
           echo "OK: All dependencies are from crates.io or local paths — build is fully self-contained."
 
+  artifact-strategy-guard:
+    name: Artifact Strategy Guard
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Forbid .deb / .rpm / tarball packaging
+        # Release artifact policy (issue #106): the only release deliverable is
+        # the bare static-musl binary `pki-${VERSION}-linux-x86_64-musl`.
+        # No .deb, no .rpm, no tar.gz wrapper. This guard fails the build if
+        # the forbidden patterns reappear (cargo-deb / cargo-generate-rpm
+        # metadata, packaging tooling in release.yml, or non-musl assets in
+        # the release upload glob).
+        run: |
+          set -euo pipefail
+          fail=0
+          msg() { echo "::error::$1"; fail=1; }
+
+          # 1. No cargo-deb / cargo-generate-rpm metadata in any Cargo.toml.
+          if grep -RIn --include='Cargo.toml' -E '^\[package\.metadata\.(deb|generate-rpm)\]' . ; then
+            msg "Forbidden [package.metadata.deb] or [package.metadata.generate-rpm] block found. Release artifact is bare musl binary only — no .deb or .rpm."
+          fi
+
+          # 2. No cargo-deb / cargo-generate-rpm tooling in release.yml.
+          if grep -nE '(cargo[- ]deb|cargo[- ]generate[- ]rpm)' .github/workflows/release.yml ; then
+            msg "Forbidden cargo-deb / cargo-generate-rpm reference in .github/workflows/release.yml."
+          fi
+
+          # 3. No .deb / .rpm / .tar.gz / .zip in the release upload step.
+          #    The release workflow's gh release create line is the source of truth.
+          if grep -nE 'gh release create.*\.(deb|rpm|tar\.gz|tgz|zip)' .github/workflows/release.yml ; then
+            msg "Forbidden non-musl asset (.deb/.rpm/.tar.gz/.tgz/.zip) in release upload."
+          fi
+
+          if [[ "$fail" -ne 0 ]]; then
+            echo ""
+            echo "Release artifact policy: only pki-\${VERSION}-linux-x86_64-musl is shipped."
+            echo "See: https://github.com/rayketcham-lab/PKI-Client/issues/106"
+            exit 1
+          fi
+          echo "OK: release artifact strategy is bare musl binary only."
+
   vendor-check:
     name: Vendor Freshness
     runs-on: [self-hosted, Linux]
