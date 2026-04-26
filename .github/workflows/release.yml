@@ -36,8 +36,18 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1")
-          echo "$response" | jq '.workflow_runs[0] | {status, conclusion, html_url}'
+          echo "$response" | jq '.workflow_runs[0] | {head_sha, status, conclusion, html_url}'
+          # Belt-and-braces: pin the picked run to the exact tagged SHA.
+          # The head_sha query param is a filter, but defending against a
+          # future API edge case (or a forced-push race) costs one jq
+          # filter and stops a green-on-different-sha run from being
+          # accepted as proof. (DevOps P1 hardening.)
+          run_sha=$(echo "$response" | jq -r '.workflow_runs[0].head_sha // "missing"')
           conclusion=$(echo "$response" | jq -r '.workflow_runs[0].conclusion // "missing"')
+          if [[ "$run_sha" != "$SHA" ]]; then
+            echo "::error::No CI run found for ${SHA} (got head_sha=${run_sha}). Aborting release."
+            exit 1
+          fi
           if [[ "$conclusion" != "success" ]]; then
             echo "::error::CI has not passed on ${SHA}: conclusion=${conclusion}. Aborting release."
             exit 1

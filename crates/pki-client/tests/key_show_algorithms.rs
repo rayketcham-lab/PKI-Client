@@ -94,34 +94,38 @@ fn key_show_detects_rsa() {
     assert_algo("rsa", &["\"Rsa\"", "4096"]);
 }
 
+// ML-DSA assertions include the parameter-set integer so a regression that
+// collapses 44/65/87 onto a single value is caught (Tester P1 finding).
 #[test]
 fn key_show_detects_mldsa44() {
-    assert_algo("ml-dsa-44", &["MlDsa"]);
+    assert_algo("ml-dsa-44", &["\"MlDsa\": 44"]);
 }
 
 #[test]
 fn key_show_detects_mldsa65() {
-    assert_algo("ml-dsa-65", &["MlDsa"]);
+    assert_algo("ml-dsa-65", &["\"MlDsa\": 65"]);
 }
 
 #[test]
 fn key_show_detects_mldsa87() {
-    assert_algo("ml-dsa-87", &["MlDsa"]);
+    assert_algo("ml-dsa-87", &["\"MlDsa\": 87"]);
 }
 
+// SLH-DSA assertions pin the hash family + parameter set so a swap to a
+// neighbouring variant (e.g., 128s misreported as 192s) is caught.
 #[test]
 fn key_show_detects_slhdsa_128s() {
-    assert_algo("slh-dsa-128s", &["SlhDsa"]);
+    assert_algo("slh-dsa-128s", &["\"SlhDsa\": \"SHA2-128s\""]);
 }
 
 #[test]
 fn key_show_detects_slhdsa_192s() {
-    assert_algo("slh-dsa-192s", &["SlhDsa"]);
+    assert_algo("slh-dsa-192s", &["\"SlhDsa\": \"SHA2-192s\""]);
 }
 
 #[test]
 fn key_show_detects_slhdsa_256s() {
-    assert_algo("slh-dsa-256s", &["SlhDsa"]);
+    assert_algo("slh-dsa-256s", &["\"SlhDsa\": \"SHA2-256s\""]);
 }
 
 // Future-guard: when `pki key gen ed25519` is re-enabled, detection must
