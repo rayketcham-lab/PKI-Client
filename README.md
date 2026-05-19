@@ -41,7 +41,7 @@ Pure Rust. No OpenSSL dependency. Human-friendly output. One static binary (musl
 <!-- Build & Quality -->
 [![Clippy](https://img.shields.io/badge/clippy--D%20warnings-passing-brightgreen?logo=rust&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
 [![Formatting](https://img.shields.io/badge/rustfmt-checked-brightgreen?logo=rust&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/actions/workflows/ci.yml)
-[![PQC](https://img.shields.io/badge/post--quantum-supported-blueviolet?logo=quantcast&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
+[![PQC](https://img.shields.io/badge/post--quantum-opt--in_(--features_pqc)-yellow?logo=quantcast&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 [![FIPS](https://img.shields.io/badge/FIPS%20140--3-optional-blue?logo=nist&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client)
 [![Static Binary](https://img.shields.io/badge/static%20binary-musl-blue?logo=linux&logoColor=white)](https://github.com/rayketcham-lab/PKI-Client/releases)
 
