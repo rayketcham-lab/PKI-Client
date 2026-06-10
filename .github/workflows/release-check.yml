@@ -7,6 +7,10 @@ on:
     - cron: '0 12 * * *'  # Noon UTC daily
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 concurrency:
   group: release-check-${{ github.ref }}
   cancel-in-progress: true

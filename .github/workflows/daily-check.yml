@@ -5,6 +5,9 @@ on:
     - cron: '30 2 * * *'  # 02:30 UTC daily
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
