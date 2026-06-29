@@ -35,10 +35,13 @@ jobs:
             features: "--features pqc"
           - name: fips
             features: "--features fips"
-            # FIPS entropy health check is non-deterministic — allow failure
+            # FIPS entropy health check is non-deterministic on some runners — allow failure
             allow_failure: true
           - name: pqc+fips
             features: "--features pqc,fips"
+            # ML-DSA keygen deterministically fails in FIPS mode (FIPS 204 not yet validated);
+            # the skip logic in cli_integration_tests.rs handles this gracefully.
+            # allow_failure here covers any other non-deterministic FIPS entropy issues.
             allow_failure: true
           - name: no-default
             features: "--no-default-features"
