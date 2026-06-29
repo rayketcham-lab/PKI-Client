@@ -1074,8 +1074,10 @@ fn test_key_gen_mldsa65() {
         if stderr.contains("Unknown algorithm")
             || stderr.contains("not supported")
             || stderr.contains("not implemented")
+            || stderr.contains("FIPS 140-3 violation")
+            || stderr.contains("not yet validated")
         {
-            eprintln!("Skipping: ML-DSA-65 unavailable (pqc feature disabled)");
+            eprintln!("Skipping: ML-DSA-65 unavailable (pqc feature disabled or FIPS mode rejects ML-DSA)");
             return;
         }
         panic!("ml-dsa-65 keygen failed unexpectedly: {}", stderr);
@@ -1110,8 +1112,10 @@ fn test_csr_create_mldsa65() {
         if stderr.contains("Unknown algorithm")
             || stderr.contains("not supported")
             || stderr.contains("not implemented")
+            || stderr.contains("FIPS 140-3 violation")
+            || stderr.contains("not yet validated")
         {
-            eprintln!("Skipping: ML-DSA-65 unavailable (pqc feature disabled)");
+            eprintln!("Skipping: ML-DSA-65 unavailable (pqc feature disabled or FIPS mode rejects ML-DSA)");
             return;
         }
         panic!("ml-dsa-65 keygen failed unexpectedly: {}", stderr);
@@ -1150,5 +1154,43 @@ fn test_csr_create_mldsa65() {
     assert!(
         content.contains("-----BEGIN CERTIFICATE REQUEST-----"),
         "PQC CSR missing PEM header"
+    );
+}
+
+// ============================================================================
+// FIPS-mode rejection guard — pins the deterministic ML-DSA rejection behavior
+// so skip-logic gaps cannot silently swallow the FIPS enforcement.
+// ============================================================================
+
+/// When both `pqc` and `fips` are enabled, the binary MUST reject ML-DSA key
+/// generation with a clear FIPS violation message and non-zero exit code.
+/// This is a deliberate design invariant, not a bug: ML-DSA (FIPS 204) is not
+/// yet FIPS 140-3 validated, so FIPS mode must refuse to generate those keys.
+#[test]
+#[cfg(all(feature = "pqc", feature = "fips"))]
+fn test_key_gen_mldsa65_fips_rejected() {
+    if !binary_exists() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    let key_path = temp_dir.path().join("mldsa65-fips-check.key");
+
+    let output = Command::new(pki_binary())
+        .args(["key", "gen", "ml-dsa-65", "-o"])
+        .arg(&key_path)
+        .output()
+        .expect("Failed to execute pki");
+
+    assert!(
+        !output.status.success(),
+        "pki key gen ml-dsa-65 must exit non-zero in FIPS mode (got success, expected rejection)"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("FIPS 140-3 violation"),
+        "Expected FIPS rejection message in stderr, got: {}",
+        stderr
     );
 }
